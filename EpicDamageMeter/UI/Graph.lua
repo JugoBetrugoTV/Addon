@@ -334,18 +334,17 @@ function Graph:Draw()
 
     -- Draw DPS line
     local lastX, lastY
+    local damageR = graphSettings.damageColor and graphSettings.damageColor.r or 0.9
+    local damageG = graphSettings.damageColor and graphSettings.damageColor.g or 0.2
+    local damageB = graphSettings.damageColor and graphSettings.damageColor.b or 0.2
+
     for i, point in ipairs(self.dataPoints) do
         local x = ((point.time - startTime) / duration) * width
         local y = (point.dps / maxValue) * height
 
         if lastX and lastY then
             local line = self:GetLineTexture()
-            line:SetColorTexture(
-                graphSettings.damageColor and graphSettings.damageColor.r or 0.9,
-                graphSettings.damageColor and graphSettings.damageColor.g or 0.2,
-                graphSettings.damageColor and graphSettings.damageColor.b or 0.2,
-                1
-            )
+            line:SetVertexColor(damageR, damageG, damageB, 1)
             line:SetThickness(graphSettings.lineWidth or 2)
             line:SetStartPoint("BOTTOMLEFT", self.canvas, lastX, lastY)
             line:SetEndPoint("BOTTOMLEFT", self.canvas, x, y)
@@ -356,18 +355,17 @@ function Graph:Draw()
 
     -- Draw HPS line
     lastX, lastY = nil, nil
+    local healingR = graphSettings.healingColor and graphSettings.healingColor.r or 0.2
+    local healingG = graphSettings.healingColor and graphSettings.healingColor.g or 0.9
+    local healingB = graphSettings.healingColor and graphSettings.healingColor.b or 0.2
+
     for i, point in ipairs(self.dataPoints) do
         local x = ((point.time - startTime) / duration) * width
         local y = (point.hps / maxValue) * height
 
         if lastX and lastY then
             local line = self:GetLineTexture()
-            line:SetColorTexture(
-                graphSettings.healingColor and graphSettings.healingColor.r or 0.2,
-                graphSettings.healingColor and graphSettings.healingColor.g or 0.9,
-                graphSettings.healingColor and graphSettings.healingColor.b or 0.2,
-                1
-            )
+            line:SetVertexColor(healingR, healingG, healingB, 1)
             line:SetThickness(graphSettings.lineWidth or 2)
             line:SetStartPoint("BOTTOMLEFT", self.canvas, lastX, lastY)
             line:SetEndPoint("BOTTOMLEFT", self.canvas, x, y)
