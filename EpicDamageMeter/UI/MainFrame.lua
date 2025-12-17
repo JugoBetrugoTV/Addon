@@ -1,6 +1,6 @@
 --[[
-    EpicDamageMeter - Main Frame (Rewritten)
-    Multi-window support with proper bar management
+    EpicDamageMeter - Main Frame (Rewritten v2)
+    Multi-window support with proper bar management, live updates, and per-character settings
 ]]
 
 local ADDON_NAME, EDM = ...
@@ -8,7 +8,6 @@ local ADDON_NAME, EDM = ...
 EDM.UI = {}
 local UI = EDM.UI
 local Skins = EDM.Skins
-local Widgets = EDM.Widgets
 local Utils = EDM.Utils
 local C = EDM.Constants
 local DB = EDM.Database
@@ -21,7 +20,6 @@ UI.initialized = false
 
 -- Bar pool for efficient reuse
 UI.barPool = {}
-UI.barPoolIndex = 0
 
 --============================================================================
 -- INSTANCE CLASS (Each window is an instance)
@@ -41,6 +39,7 @@ function Instance:New(id, mode, parent)
     self.scrollOffset = 0
     self.lastUpdate = 0
     self.isUpdating = false
+    self.selectedActor = nil
 
     -- Create the window frame
     self:CreateFrame(parent)
@@ -49,8 +48,11 @@ function Instance:New(id, mode, parent)
 end
 
 function Instance:CreateFrame(parent)
-    local skin = Skins:Get()
     local db = EDM.db and EDM.db.profile or C.DEFAULT_SETTINGS.profile
+
+    -- Get per-character position if available
+    local charKey = UnitName("player") .. "-" .. GetRealmName()
+    local charSettings = EDM.db and EDM.db.char and EDM.db.char.windows and EDM.db.char.windows[self.id]
 
     -- Calculate position offset for new windows
     local offsetX = (self.id - 1) * 20
@@ -58,8 +60,14 @@ function Instance:CreateFrame(parent)
 
     -- Main frame
     self.frame = CreateFrame("Frame", "EDMInstance" .. self.id, parent or UIParent, "BackdropTemplate")
-    self.frame:SetSize(db.window.width or 280, db.window.height or 200)
-    self.frame:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
+    self.frame:SetSize(charSettings and charSettings.width or db.window.width or 300, charSettings and charSettings.height or db.window.height or 200)
+
+    if charSettings and charSettings.point then
+        self.frame:SetPoint(charSettings.point, UIParent, charSettings.relPoint or charSettings.point, charSettings.x or 0, charSettings.y or 0)
+    else
+        self.frame:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
+    end
+
     self.frame:SetFrameStrata("MEDIUM")
     self.frame:SetFrameLevel(5 + self.id)
     self.frame:SetMovable(true)
@@ -69,7 +77,14 @@ function Instance:CreateFrame(parent)
     self.frame.instance = self
 
     -- Apply backdrop
-    Skins:ApplyBackground(self.frame)
+    self.frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 }
+    })
+    self.frame:SetBackdropColor(0.05, 0.05, 0.08, 0.92)
+    self.frame:SetBackdropBorderColor(0.15, 0.15, 0.2, 1)
 
     -- Create components
     self:CreateTitleBar()
@@ -85,29 +100,21 @@ function Instance:CreateFrame(parent)
 end
 
 function Instance:CreateTitleBar()
-    local skin = Skins:Get()
-    local ts = skin and skin.titleBar or {}
-
     self.titleBar = CreateFrame("Frame", nil, self.frame)
-    self.titleBar:SetHeight(ts.height or 22)
+    self.titleBar:SetHeight(22)
     self.titleBar:SetPoint("TOPLEFT", 0, 0)
     self.titleBar:SetPoint("TOPRIGHT", 0, 0)
 
     -- Background
     self.titleBar.bg = self.titleBar:CreateTexture(nil, "BACKGROUND")
     self.titleBar.bg:SetAllPoints()
-    self.titleBar.bg:SetColorTexture(
-        ts.backgroundColor and ts.backgroundColor.r or 0.08,
-        ts.backgroundColor and ts.backgroundColor.g or 0.08,
-        ts.backgroundColor and ts.backgroundColor.b or 0.12,
-        ts.backgroundColor and ts.backgroundColor.a or 0.98
-    )
+    self.titleBar.bg:SetColorTexture(0.08, 0.08, 0.12, 0.98)
 
-    -- Title text
+    -- Title text (shows mode)
     self.titleText = self.titleBar:CreateFontString(nil, "OVERLAY")
     self.titleText:SetPoint("LEFT", 8, 0)
-    self.titleText:SetFont(ts.font or "Fonts\\FRIZQT__.TTF", ts.fontSize or 11, ts.fontFlags or "OUTLINE")
-    self.titleText:SetTextColor(ts.fontColor and ts.fontColor.r or 1, ts.fontColor and ts.fontColor.g or 1, ts.fontColor and ts.fontColor.b or 1, 1)
+    self.titleText:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+    self.titleText:SetTextColor(1, 1, 1, 1)
     self:UpdateTitle()
 
     -- Close button
@@ -125,7 +132,7 @@ function Instance:CreateTitleBar()
         end
     end)
 
-    -- New window button (under settings)
+    -- New window button
     self.newWindowBtn = CreateFrame("Button", nil, self.titleBar)
     self.newWindowBtn:SetSize(14, 14)
     self.newWindowBtn:SetPoint("RIGHT", self.closeBtn, "LEFT", -3, 0)
@@ -162,8 +169,9 @@ function Instance:CreateTitleBar()
     self.resetBtn:SetHighlightTexture("Interface\\Buttons\\UI-RefreshButton")
     self.resetBtn:GetHighlightTexture():SetVertexColor(0.3, 1, 0.3, 0.8)
     self.resetBtn:SetScript("OnClick", function()
-        if EDM.Core then
-            EDM.Core:Reset()
+        if DB then
+            DB:Reset()
+            print("|cff00ff00EpicDamageMeter:|r Data reset!")
         end
     end)
 
@@ -191,9 +199,9 @@ function Instance:CreateToolbar()
     self.toolbar.bg:SetAllPoints()
     self.toolbar.bg:SetColorTexture(0.04, 0.04, 0.06, 0.95)
 
-    -- Mode selector
+    -- Mode selector (with right-click menu)
     self.modeBtn = CreateFrame("Button", nil, self.toolbar, "BackdropTemplate")
-    self.modeBtn:SetSize(90, 16)
+    self.modeBtn:SetSize(100, 16)
     self.modeBtn:SetPoint("LEFT", 4, 0)
     self.modeBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
     self.modeBtn:SetBackdropColor(0.12, 0.12, 0.15, 1)
@@ -208,7 +216,7 @@ function Instance:CreateToolbar()
         if button == "LeftButton" then
             self:CycleMode(1)
         else
-            self:CycleMode(-1)
+            self:ShowModeMenu()
         end
     end)
     self.modeBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -217,7 +225,7 @@ function Instance:CreateToolbar()
         GameTooltip:SetOwner(btn, "ANCHOR_TOP")
         GameTooltip:AddLine("Display Mode")
         GameTooltip:AddLine("Left-click: Next mode", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine("Right-click: Previous mode", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Right-click: Select mode", 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     self.modeBtn:SetScript("OnLeave", function(btn)
@@ -272,7 +280,7 @@ function Instance:CreateContentArea()
     self.content:EnableMouse(true)
     self.content:SetScript("OnMouseDown", function(_, button)
         if button == "RightButton" then
-            self:ShowContextMenu()
+            self:ShowModeMenu()
         end
     end)
 end
@@ -287,10 +295,23 @@ function Instance:CreateStatusBar()
     self.statusBar.bg:SetAllPoints()
     self.statusBar.bg:SetColorTexture(0.04, 0.04, 0.06, 0.95)
 
+    -- Player info (name-server with class icon)
+    self.statusBar.playerInfo = self.statusBar:CreateFontString(nil, "OVERLAY")
+    self.statusBar.playerInfo:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+    self.statusBar.playerInfo:SetPoint("LEFT", 4, 0)
+    self.statusBar.playerInfo:SetTextColor(0.8, 0.8, 0.8, 1)
+
+    -- Update player info
+    local playerName = UnitName("player")
+    local playerRealm = GetRealmName()
+    local _, playerClass = UnitClass("player")
+    local r, g, b = Utils.GetClassColor(playerClass)
+    self.statusBar.playerInfo:SetText(string.format("|cff%02x%02x%02x%s|r-%s", r*255, g*255, b*255, playerName, playerRealm))
+
     -- Combat time
     self.statusBar.time = self.statusBar:CreateFontString(nil, "OVERLAY")
     self.statusBar.time:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
-    self.statusBar.time:SetPoint("LEFT", 4, 0)
+    self.statusBar.time:SetPoint("CENTER", 0, 0)
     self.statusBar.time:SetTextColor(0.6, 0.6, 0.6, 1)
     self.statusBar.time:SetText("0:00")
 
@@ -300,13 +321,6 @@ function Instance:CreateStatusBar()
     self.statusBar.total:SetPoint("RIGHT", -4, 0)
     self.statusBar.total:SetTextColor(0.6, 0.6, 0.6, 1)
     self.statusBar.total:SetText("Total: 0")
-
-    -- Instance number
-    self.statusBar.instanceNum = self.statusBar:CreateFontString(nil, "OVERLAY")
-    self.statusBar.instanceNum:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
-    self.statusBar.instanceNum:SetPoint("CENTER", 0, 0)
-    self.statusBar.instanceNum:SetTextColor(0.4, 0.4, 0.4, 1)
-    self.statusBar.instanceNum:SetText("#" .. self.id)
 end
 
 function Instance:CreateResizeHandle()
@@ -355,20 +369,50 @@ end
 
 function Instance:UpdateTitle()
     local modeName = C.DISPLAY_MODE_NAMES[self.mode] or "Damage"
-    self.titleText:SetText(modeName)
+    self.titleText:SetText("|cff00ff00Epic|r|cffff6600DM|r - " .. modeName)
+end
+
+function Instance:ShowModeMenu()
+    local menu = CreateFrame("Frame", "EDMModeMenu" .. self.id, UIParent, "UIDropDownMenuTemplate")
+
+    local menuList = {
+        { text = "Damage", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.DAMAGE_DONE), func = function() self:SetMode(C.DISPLAY_MODE.DAMAGE_DONE) end },
+        { text = "DPS", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.DPS), func = function() self:SetMode(C.DISPLAY_MODE.DPS) end },
+        { text = "Damage Taken", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.DAMAGE_TAKEN), func = function() self:SetMode(C.DISPLAY_MODE.DAMAGE_TAKEN) end },
+        { text = "", notCheckable = true, disabled = true },
+        { text = "Healing", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.HEALING_DONE), func = function() self:SetMode(C.DISPLAY_MODE.HEALING_DONE) end },
+        { text = "HPS", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.HPS), func = function() self:SetMode(C.DISPLAY_MODE.HPS) end },
+        { text = "Overhealing", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.OVERHEALING), func = function() self:SetMode(C.DISPLAY_MODE.OVERHEALING) end },
+        { text = "Absorbs", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.ABSORBS), func = function() self:SetMode(C.DISPLAY_MODE.ABSORBS) end },
+        { text = "", notCheckable = true, disabled = true },
+        { text = "Deaths", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.DEATHS), func = function() self:SetMode(C.DISPLAY_MODE.DEATHS) end },
+        { text = "Interrupts", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.INTERRUPTS), func = function() self:SetMode(C.DISPLAY_MODE.INTERRUPTS) end },
+        { text = "Dispels", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.DISPELS), func = function() self:SetMode(C.DISPLAY_MODE.DISPELS) end },
+    }
+
+    EasyMenu(menuList, menu, "cursor", 0, 0, "MENU")
+end
+
+function Instance:SetMode(mode)
+    self.mode = mode
+    self:UpdateTitle()
+    self.modeBtn.text:SetText(C.DISPLAY_MODE_NAMES[self.mode] or "Damage")
+    self:UpdateBars()
 end
 
 function Instance:CycleMode(direction)
     direction = direction or 1
     local modes = {
         C.DISPLAY_MODE.DAMAGE_DONE,
-        C.DISPLAY_MODE.HEALING_DONE,
         C.DISPLAY_MODE.DPS,
+        C.DISPLAY_MODE.HEALING_DONE,
         C.DISPLAY_MODE.HPS,
         C.DISPLAY_MODE.DAMAGE_TAKEN,
         C.DISPLAY_MODE.DEATHS,
         C.DISPLAY_MODE.INTERRUPTS,
         C.DISPLAY_MODE.DISPELS,
+        C.DISPLAY_MODE.ABSORBS,
+        C.DISPLAY_MODE.OVERHEALING,
     }
 
     local currentIndex = 1
@@ -383,10 +427,7 @@ function Instance:CycleMode(direction)
     if currentIndex > #modes then currentIndex = 1 end
     if currentIndex < 1 then currentIndex = #modes end
 
-    self.mode = modes[currentIndex]
-    self:UpdateTitle()
-    self.modeBtn.text:SetText(C.DISPLAY_MODE_NAMES[self.mode] or "Damage")
-    self:UpdateBars()
+    self:SetMode(modes[currentIndex])
 end
 
 function Instance:CycleSegment()
@@ -401,7 +442,7 @@ function Instance:CycleSegment()
 end
 
 function Instance:OnScroll(delta)
-    local maxScroll = math.max(0, #self.bars - self:GetVisibleBarCount())
+    local maxScroll = math.max(0, self.barCount - self:GetVisibleBarCount())
     self.scrollOffset = self.scrollOffset - delta
     self.scrollOffset = math.max(0, math.min(maxScroll, self.scrollOffset))
     self:LayoutBars()
@@ -422,11 +463,28 @@ function Instance:UpdateLayout()
 end
 
 function Instance:SavePosition()
-    -- Could save per-instance positions to savedvariables
+    if not EDM.db then return end
+
+    -- Initialize char table if needed
+    EDM.db.char = EDM.db.char or {}
+    EDM.db.char.windows = EDM.db.char.windows or {}
+
+    local point, _, relPoint, x, y = self.frame:GetPoint()
+    local width, height = self.frame:GetSize()
+
+    EDM.db.char.windows[self.id] = {
+        point = point,
+        relPoint = relPoint,
+        x = x,
+        y = y,
+        width = width,
+        height = height,
+        mode = self.mode,
+    }
 end
 
 --============================================================================
--- BAR MANAGEMENT (Fixed scroll bug)
+-- BAR MANAGEMENT
 --============================================================================
 
 function Instance:GetBar(index)
@@ -471,9 +529,10 @@ function Instance:UpdateBars()
     -- Get sorted actors
     local actors = DB:GetSortedActors(segment, self.mode)
     local duration = DB:GetSegmentDuration(segment)
+    if duration == 0 then duration = 1 end
 
     -- Calculate totals
-    local total, topValue = self:CalculateTotals(actors, segment)
+    local total, topValue = self:CalculateTotals(actors, segment, duration)
 
     -- Update bar count (don't clear, reuse)
     local maxBars = (EDM.db and EDM.db.profile.display.maxBars) or 25
@@ -483,7 +542,7 @@ function Instance:UpdateBars()
     for i = 1, barCount do
         local bar = self:GetBar(i)
         local actor = actors[i]
-        self:SetBarData(bar, actor, i, topValue, duration)
+        self:SetBarData(bar, actor, i, topValue, duration, total)
         bar:Show()
     end
 
@@ -506,36 +565,52 @@ function Instance:UpdateBars()
     self.isUpdating = false
 end
 
-function Instance:CalculateTotals(actors, segment)
+function Instance:CalculateTotals(actors, segment, duration)
     local total = 0
     local topValue = 0
 
     if self.mode == C.DISPLAY_MODE.DAMAGE_DONE or self.mode == C.DISPLAY_MODE.DPS then
-        total = segment.totalDamage
-        topValue = actors[1] and actors[1].damage or 1
+        total = segment.totalDamage or 0
+        for _, actor in ipairs(actors) do
+            local val = self.mode == C.DISPLAY_MODE.DPS and (actor.damage / duration) or actor.damage
+            if val > topValue then topValue = val end
+        end
     elseif self.mode == C.DISPLAY_MODE.HEALING_DONE or self.mode == C.DISPLAY_MODE.HPS then
-        total = segment.totalHealing
-        topValue = actors[1] and actors[1].healing or 1
+        total = segment.totalHealing or 0
+        for _, actor in ipairs(actors) do
+            local val = self.mode == C.DISPLAY_MODE.HPS and (actor.healing / duration) or actor.healing
+            if val > topValue then topValue = val end
+        end
     elseif self.mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
         for _, actor in ipairs(actors) do
             total = total + (actor.damageTaken or 0)
+            if (actor.damageTaken or 0) > topValue then topValue = actor.damageTaken end
         end
-        topValue = actors[1] and actors[1].damageTaken or 1
     elseif self.mode == C.DISPLAY_MODE.DEATHS then
         for _, actor in ipairs(actors) do
             total = total + (actor.deaths or 0)
+            if (actor.deaths or 0) > topValue then topValue = actor.deaths end
         end
-        topValue = actors[1] and actors[1].deaths or 1
     elseif self.mode == C.DISPLAY_MODE.INTERRUPTS then
         for _, actor in ipairs(actors) do
             total = total + (actor.interrupts or 0)
+            if (actor.interrupts or 0) > topValue then topValue = actor.interrupts end
         end
-        topValue = actors[1] and actors[1].interrupts or 1
     elseif self.mode == C.DISPLAY_MODE.DISPELS then
         for _, actor in ipairs(actors) do
             total = total + (actor.dispels or 0)
+            if (actor.dispels or 0) > topValue then topValue = actor.dispels end
         end
-        topValue = actors[1] and actors[1].dispels or 1
+    elseif self.mode == C.DISPLAY_MODE.ABSORBS then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.absorbs or 0)
+            if (actor.absorbs or 0) > topValue then topValue = actor.absorbs end
+        end
+    elseif self.mode == C.DISPLAY_MODE.OVERHEALING then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.overhealing or 0)
+            if (actor.overhealing or 0) > topValue then topValue = actor.overhealing end
+        end
     end
 
     if total == 0 then total = 1 end
@@ -544,7 +619,7 @@ function Instance:CalculateTotals(actors, segment)
     return total, topValue
 end
 
-function Instance:SetBarData(bar, actor, rank, topValue, duration)
+function Instance:SetBarData(bar, actor, rank, topValue, duration, total)
     bar.actorData = actor
     bar.rank = rank
 
@@ -552,12 +627,18 @@ function Instance:SetBarData(bar, actor, rank, topValue, duration)
     local value = 0
     local perSecond = 0
 
-    if self.mode == C.DISPLAY_MODE.DAMAGE_DONE or self.mode == C.DISPLAY_MODE.DPS then
+    if self.mode == C.DISPLAY_MODE.DAMAGE_DONE then
         value = actor.damage or 0
-        perSecond = duration > 0 and (value / duration) or 0
-    elseif self.mode == C.DISPLAY_MODE.HEALING_DONE or self.mode == C.DISPLAY_MODE.HPS then
+        perSecond = value / duration
+    elseif self.mode == C.DISPLAY_MODE.DPS then
+        value = (actor.damage or 0) / duration
+        perSecond = value
+    elseif self.mode == C.DISPLAY_MODE.HEALING_DONE then
         value = actor.healing or 0
-        perSecond = duration > 0 and (value / duration) or 0
+        perSecond = value / duration
+    elseif self.mode == C.DISPLAY_MODE.HPS then
+        value = (actor.healing or 0) / duration
+        perSecond = value
     elseif self.mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
         value = actor.damageTaken or 0
     elseif self.mode == C.DISPLAY_MODE.DEATHS then
@@ -566,11 +647,18 @@ function Instance:SetBarData(bar, actor, rank, topValue, duration)
         value = actor.interrupts or 0
     elseif self.mode == C.DISPLAY_MODE.DISPELS then
         value = actor.dispels or 0
+    elseif self.mode == C.DISPLAY_MODE.ABSORBS then
+        value = actor.absorbs or 0
+    elseif self.mode == C.DISPLAY_MODE.OVERHEALING then
+        value = actor.overhealing or 0
     end
 
-    -- Set bar fill (relative to top player)
+    -- Calculate percentage relative to top player (for bar width)
     local percent = topValue > 0 and (value / topValue) or 0
     bar.statusBar:SetValue(percent)
+
+    -- Calculate percentage of total (for display)
+    local percentOfTotal = total > 0 and ((value / total) * 100) or 0
 
     -- Set color
     local r, g, b = Utils.GetClassColor(actor.class)
@@ -578,15 +666,20 @@ function Instance:SetBarData(bar, actor, rank, topValue, duration)
 
     -- Set texts
     bar.rankText:SetText(rank)
-    bar.nameText:SetText(Utils.ClassColorText(actor.name or "Unknown", actor.class))
 
-    if self.mode == C.DISPLAY_MODE.DPS or self.mode == C.DISPLAY_MODE.HPS then
-        bar.valueText:SetText(Utils.FormatNumber(perSecond))
+    -- Name with class color
+    local nameColor = string.format("|cff%02x%02x%02x", r*255, g*255, b*255)
+    bar.nameText:SetText(nameColor .. (actor.name or "Unknown") .. "|r")
+
+    -- Value text with percentage
+    local displayValue = (self.mode == C.DISPLAY_MODE.DPS or self.mode == C.DISPLAY_MODE.HPS) and perSecond or value
+    if self.mode == C.DISPLAY_MODE.DEATHS or self.mode == C.DISPLAY_MODE.INTERRUPTS or self.mode == C.DISPLAY_MODE.DISPELS then
+        bar.valueText:SetText(string.format("%d (%.1f%%)", value, percentOfTotal))
     else
-        bar.valueText:SetText(Utils.FormatNumber(value))
+        bar.valueText:SetText(string.format("%s (%.1f%%)", Utils.FormatNumber(displayValue), percentOfTotal))
     end
 
-    -- Icon
+    -- Icon - use class icon
     local icon = actor.class and ("Interface\\Icons\\ClassIcon_" .. actor.class) or "Interface\\Icons\\INV_Misc_QuestionMark"
     bar.icon:SetTexture(icon)
 end
@@ -596,7 +689,6 @@ function Instance:LayoutBars()
     local spacing = (EDM.db and EDM.db.profile.bars.spacing) or 1
     local contentWidth = self.content:GetWidth() or 280
 
-    local yOffset = 0
     local startIndex = math.floor(self.scrollOffset) + 1
     local visibleCount = self:GetVisibleBarCount() + 1
 
@@ -617,44 +709,6 @@ function Instance:LayoutBars()
 
     -- Update scroll child height
     self.scrollChild:SetHeight(self.barCount * (barHeight + spacing))
-end
-
-function Instance:ShowContextMenu()
-    local menu = CreateFrame("Frame", "EDMInstanceMenu" .. self.id, UIParent, "UIDropDownMenuTemplate")
-
-    local menuList = {
-        { text = "EpicDamageMeter #" .. self.id, isTitle = true, notCheckable = true },
-        { text = "", notCheckable = true, disabled = true },
-        { text = "Display Mode", notCheckable = true, hasArrow = true, menuList = {} },
-        { text = "", notCheckable = true, disabled = true },
-        { text = "New Window", notCheckable = true, func = function() UI:CreateNewInstance() end },
-        { text = "Reset Data", notCheckable = true, func = function() if EDM.Core then EDM.Core:Reset() end end },
-        { text = "", notCheckable = true, disabled = true },
-        { text = "Settings", notCheckable = true, func = function() if EDM.Config then EDM.Config:Open() end end },
-        { text = "Close Window", notCheckable = true, func = function()
-            if #UI.instances > 1 then
-                UI:DestroyInstance(self.id)
-            else
-                self.frame:Hide()
-            end
-        end },
-    }
-
-    -- Add display modes
-    for modeId, modeName in pairs(C.DISPLAY_MODE_NAMES) do
-        table.insert(menuList[3].menuList, {
-            text = modeName,
-            checked = self.mode == modeId,
-            func = function()
-                self.mode = modeId
-                self:UpdateTitle()
-                self.modeBtn.text:SetText(modeName)
-                self:UpdateBars()
-            end,
-        })
-    end
-
-    EasyMenu(menuList, menu, "cursor", 0, 0, "MENU")
 end
 
 --============================================================================
@@ -728,14 +782,12 @@ function UI:CreateBar()
     bar.bg:SetAllPoints()
     bar.bg:SetColorTexture(0.08, 0.08, 0.1, 0.7)
 
-    -- Status bar
+    -- Status bar (percentage fill)
     bar.statusBar = CreateFrame("StatusBar", nil, bar)
     bar.statusBar:SetAllPoints()
     bar.statusBar:SetMinMaxValues(0, 1)
     bar.statusBar:SetValue(0)
-
-    local texture = LSM:Fetch("statusbar", db.texture) or "Interface\\TargetingFrame\\UI-StatusBar"
-    bar.statusBar:SetStatusBarTexture(texture)
+    bar.statusBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 
     -- Icon
     bar.icon = bar:CreateTexture(nil, "OVERLAY")
@@ -745,7 +797,7 @@ function UI:CreateBar()
 
     -- Rank
     bar.rankText = bar:CreateFontString(nil, "OVERLAY")
-    bar.rankText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", db.fontSize - 2 or 9, db.fontFlags or "OUTLINE")
+    bar.rankText:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
     bar.rankText:SetPoint("LEFT", bar.icon, "RIGHT", 2, 0)
     bar.rankText:SetWidth(14)
     bar.rankText:SetJustifyH("CENTER")
@@ -753,15 +805,15 @@ function UI:CreateBar()
 
     -- Name
     bar.nameText = bar:CreateFontString(nil, "OVERLAY")
-    bar.nameText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", db.fontSize or 11, db.fontFlags or "OUTLINE")
+    bar.nameText:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
     bar.nameText:SetPoint("LEFT", bar.rankText, "RIGHT", 2, 0)
-    bar.nameText:SetPoint("RIGHT", bar, "RIGHT", -50, 0)
+    bar.nameText:SetPoint("RIGHT", bar, "RIGHT", -70, 0)
     bar.nameText:SetJustifyH("LEFT")
     bar.nameText:SetWordWrap(false)
 
     -- Value
     bar.valueText = bar:CreateFontString(nil, "OVERLAY")
-    bar.valueText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", db.fontSize or 11, db.fontFlags or "OUTLINE")
+    bar.valueText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
     bar.valueText:SetPoint("RIGHT", -4, 0)
     bar.valueText:SetJustifyH("RIGHT")
 
@@ -773,35 +825,104 @@ function UI:CreateBar()
     -- Click handlers
     bar:SetScript("OnClick", function(self, button)
         if button == "LeftButton" then
-            if IsShiftKeyDown() then
-                -- Report to chat
-                if self.actorData then
-                    local text = string.format("%d. %s - %s",
-                        self.rank or 1,
-                        self.actorData.name or "Unknown",
-                        self.valueText:GetText() or "0"
-                    )
-                    print(text)
-                end
-            elseif self.actorData and EDM.DetailWindow then
+            if self.actorData and EDM.DetailWindow then
                 EDM.DetailWindow:Show(self.actorData)
+            end
+        elseif button == "RightButton" then
+            if self.instance then
+                self.instance:ShowModeMenu()
             end
         end
     end)
 
     bar:SetScript("OnEnter", function(self)
-        if self.actorData and EDM.Tooltip then
-            EDM.Tooltip:ShowActorTooltip(self, self.actorData)
+        if self.actorData then
+            UI:ShowBarTooltip(self, self.actorData, self.instance)
         end
     end)
 
     bar:SetScript("OnLeave", function()
-        if EDM.Tooltip then
-            EDM.Tooltip:Hide()
-        end
+        GameTooltip:Hide()
     end)
 
     return bar
+end
+
+-- Enhanced tooltip with abilities
+function UI:ShowBarTooltip(bar, actor, instance)
+    if not actor then return end
+
+    GameTooltip:SetOwner(bar, "ANCHOR_RIGHT")
+
+    -- Header with class color
+    local r, g, b = Utils.GetClassColor(actor.class)
+    GameTooltip:AddLine(actor.name or "Unknown", r, g, b)
+    GameTooltip:AddLine(" ")
+
+    local segment = instance.segment == C.SEGMENT_TYPE.OVERALL and DB.Data.overallSegment or DB.Data.currentSegment
+    local duration = segment and DB:GetSegmentDuration(segment) or 1
+    if duration == 0 then duration = 1 end
+
+    -- Main stats
+    if actor.damage > 0 then
+        local dps = actor.damage / duration
+        GameTooltip:AddDoubleLine("Damage:", string.format("%s (%s/s)", Utils.FormatNumber(actor.damage), Utils.FormatNumber(dps)), 1, 0.5, 0.5, 1, 1, 1)
+    end
+    if actor.healing > 0 then
+        local hps = actor.healing / duration
+        GameTooltip:AddDoubleLine("Healing:", string.format("%s (%s/s)", Utils.FormatNumber(actor.healing), Utils.FormatNumber(hps)), 0.5, 1, 0.5, 1, 1, 1)
+    end
+    if actor.absorbs > 0 then
+        GameTooltip:AddDoubleLine("Absorbs:", Utils.FormatNumber(actor.absorbs), 0.9, 0.9, 0.5, 1, 1, 1)
+    end
+    if actor.overhealing > 0 then
+        GameTooltip:AddDoubleLine("Overhealing:", Utils.FormatNumber(actor.overhealing), 0.7, 0.7, 0.7, 1, 1, 1)
+    end
+    if actor.damageTaken > 0 then
+        GameTooltip:AddDoubleLine("Damage Taken:", Utils.FormatNumber(actor.damageTaken), 1, 0.3, 0.3, 1, 1, 1)
+    end
+
+    -- Activity stats
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddDoubleLine("Deaths:", actor.deaths or 0, 0.8, 0.8, 0.8, 1, 1, 1)
+    GameTooltip:AddDoubleLine("Interrupts:", actor.interrupts or 0, 0.8, 0.8, 0.8, 1, 1, 1)
+    GameTooltip:AddDoubleLine("Dispels:", actor.dispels or 0, 0.8, 0.8, 0.8, 1, 1, 1)
+
+    -- Top abilities (if available)
+    if actor.abilities and next(actor.abilities) then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Top Abilities:", 1, 0.8, 0)
+
+        -- Sort abilities by damage/healing
+        local sortedAbilities = {}
+        for spellId, ability in pairs(actor.abilities) do
+            table.insert(sortedAbilities, ability)
+        end
+
+        local sortKey = (instance.mode == C.DISPLAY_MODE.HEALING_DONE or instance.mode == C.DISPLAY_MODE.HPS) and "healing" or "damage"
+        table.sort(sortedAbilities, function(a, b) return (a[sortKey] or 0) > (b[sortKey] or 0) end)
+
+        local totalForPercent = sortKey == "healing" and actor.healing or actor.damage
+        if totalForPercent == 0 then totalForPercent = 1 end
+
+        for i = 1, math.min(5, #sortedAbilities) do
+            local ability = sortedAbilities[i]
+            local abilityValue = ability[sortKey] or 0
+            if abilityValue > 0 then
+                local percent = (abilityValue / totalForPercent) * 100
+                GameTooltip:AddDoubleLine(
+                    ability.name or "Unknown",
+                    string.format("%s (%.1f%%)", Utils.FormatNumber(abilityValue), percent),
+                    0.7, 0.7, 1, 1, 1, 1
+                )
+            end
+        end
+    end
+
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("Click for details | Right-click for menu", 0.5, 0.5, 0.5)
+
+    GameTooltip:Show()
 end
 
 -- Update all instances
@@ -822,15 +943,11 @@ end
 function UI:ApplySettings()
     -- Update bar pool textures/fonts
     local db = EDM.db and EDM.db.profile.bars or {}
-    local texture = LSM:Fetch("statusbar", db.texture) or "Interface\\TargetingFrame\\UI-StatusBar"
 
     for _, bar in ipairs(self.barPool) do
-        bar.statusBar:SetStatusBarTexture(texture)
+        bar.statusBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
         bar:SetHeight(db.height or 18)
-        bar.icon:SetSize(db.height - 2, db.height - 2)
-        bar.rankText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", (db.fontSize or 11) - 2, db.fontFlags or "OUTLINE")
-        bar.nameText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", db.fontSize or 11, db.fontFlags or "OUTLINE")
-        bar.valueText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", db.fontSize or 11, db.fontFlags or "OUTLINE")
+        bar.icon:SetSize((db.height or 18) - 2, (db.height or 18) - 2)
     end
 
     -- Refresh layout

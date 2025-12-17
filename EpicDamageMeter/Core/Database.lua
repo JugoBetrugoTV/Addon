@@ -482,8 +482,30 @@ function DB:GetSortedActors(segment, mode)
 
     local actors = {}
     for guid, actor in pairs(segment.actors) do
-        -- Filter to only friendly players/pets
-        if actor.flags and Utils.IsInGroup(actor.flags) then
+        -- Include all tracked actors (already filtered by Parser)
+        -- Only skip if actor has zero relevant value for the mode
+        local hasValue = false
+        if mode == C.DISPLAY_MODE.DAMAGE_DONE or mode == C.DISPLAY_MODE.DPS then
+            hasValue = (actor.damage or 0) > 0
+        elseif mode == C.DISPLAY_MODE.HEALING_DONE or mode == C.DISPLAY_MODE.HPS then
+            hasValue = (actor.healing or 0) > 0
+        elseif mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
+            hasValue = (actor.damageTaken or 0) > 0
+        elseif mode == C.DISPLAY_MODE.DEATHS then
+            hasValue = (actor.deaths or 0) > 0
+        elseif mode == C.DISPLAY_MODE.INTERRUPTS then
+            hasValue = (actor.interrupts or 0) > 0
+        elseif mode == C.DISPLAY_MODE.DISPELS then
+            hasValue = (actor.dispels or 0) > 0
+        elseif mode == C.DISPLAY_MODE.ABSORBS then
+            hasValue = (actor.absorbs or 0) > 0
+        elseif mode == C.DISPLAY_MODE.OVERHEALING then
+            hasValue = (actor.overhealing or 0) > 0
+        else
+            hasValue = (actor.damage or 0) > 0 or (actor.healing or 0) > 0
+        end
+
+        if hasValue then
             table.insert(actors, actor)
         end
     end
