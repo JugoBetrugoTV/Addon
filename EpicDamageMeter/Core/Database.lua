@@ -1,0 +1,548 @@
+--[[
+    EpicDamageMeter - Database
+    Data structures and storage
+]]
+
+local ADDON_NAME, EDM = ...
+
+EDM.Database = {}
+local DB = EDM.Database
+local C = EDM.Constants
+local Utils = EDM.Utils
+
+-- Data Templates
+
+-- Player/Actor data structure
+function DB.CreateActorData(guid, name, class, flags)
+    return {
+        guid = guid,
+        name = name,
+        class = class or "UNKNOWN",
+        flags = flags,
+
+        -- Totals
+        damage = 0,
+        healing = 0,
+        absorbs = 0,
+        overhealing = 0,
+        damageTaken = 0,
+        healingTaken = 0,
+
+        -- Counts
+        deaths = 0,
+        kills = 0,
+        interrupts = 0,
+        dispels = 0,
+
+        -- Time tracking
+        activeTime = 0,
+        lastActivity = 0,
+
+        -- Detailed breakdown
+        abilities = {}, -- spellId -> ability data
+        targets = {}, -- guid -> target data
+        sources = {}, -- guid -> source data (for damage taken)
+
+        -- Death log
+        deathLog = {},
+
+        -- Timeline data for graphs
+        timeline = {
+            damage = {},
+            healing = {},
+        },
+
+        -- Pet tracking (if this actor has pets)
+        pets = {},
+        owner = nil, -- GUID of owner if this is a pet
+    }
+end
+
+-- Ability data structure
+function DB.CreateAbilityData(spellId, spellName, spellIcon)
+    return {
+        spellId = spellId,
+        name = spellName or "Unknown",
+        icon = spellIcon,
+
+        -- Damage
+        damage = 0,
+        damageHits = 0,
+        damageCrits = 0,
+        damageMin = 0,
+        damageMax = 0,
+
+        -- Healing
+        healing = 0,
+        healingHits = 0,
+        healingCrits = 0,
+        overhealing = 0,
+
+        -- Absorbs
+        absorbs = 0,
+        absorbCount = 0,
+
+        -- Miss tracking
+        misses = {
+            MISS = 0,
+            DODGE = 0,
+            PARRY = 0,
+            BLOCK = 0,
+            RESIST = 0,
+            ABSORB = 0,
+            IMMUNE = 0,
+            DEFLECT = 0,
+            EVADE = 0,
+            REFLECT = 0,
+        },
+
+        -- Targets
+        targets = {},
+    }
+end
+
+-- Target data structure
+function DB.CreateTargetData(guid, name)
+    return {
+        guid = guid,
+        name = name,
+        damage = 0,
+        healing = 0,
+        hits = 0,
+    }
+end
+
+-- Segment data structure
+function DB.CreateSegment(segmentType, name)
+    return {
+        type = segmentType or C.SEGMENT_TYPE.CURRENT,
+        name = name or "Segment",
+
+        -- Timing
+        startTime = GetTime(),
+        endTime = nil,
+        duration = 0,
+
+        -- Combat state
+        inCombat = false,
+
+        -- Boss info (if applicable)
+        bossName = nil,
+        bossId = nil,
+        difficultyId = nil,
+        success = nil, -- nil = ongoing, true = kill, false = wipe
+
+        -- Instance info
+        instanceName = nil,
+        instanceType = nil,
+
+        -- Actors
+        actors = {}, -- guid -> actor data
+
+        -- Totals for quick access
+        totalDamage = 0,
+        totalHealing = 0,
+        totalAbsorbs = 0,
+
+        -- Timeline (for overall graph)
+        timeline = {
+            timestamps = {},
+            damage = {},
+            healing = {},
+        },
+
+        -- Deaths
+        deaths = {},
+    }
+end
+
+-- Death log entry
+function DB.CreateDeathLogEntry(timestamp, victimGuid, victimName, killerName, spellId, spellName, damage, overkill, healthBefore)
+    return {
+        timestamp = timestamp,
+        victimGuid = victimGuid,
+        victimName = victimName,
+        killerName = killerName,
+        spellId = spellId,
+        spellName = spellName or "Unknown",
+        damage = damage or 0,
+        overkill = overkill or 0,
+        healthBefore = healthBefore or 0,
+        lastHits = {}, -- Recent damage events before death
+    }
+end
+
+-- Main data storage
+DB.Data = {
+    segments = {},
+    currentSegment = nil,
+    overallSegment = nil,
+}
+
+-- Initialize database
+function DB:Initialize()
+    -- Create overall segment
+    self.Data.overallSegment = DB.CreateSegment(C.SEGMENT_TYPE.OVERALL, "Overall")
+
+    -- Create current segment
+    self:NewSegment()
+end
+
+-- Create new segment
+function DB:NewSegment(name, segmentType, bossInfo)
+    local segment = DB.CreateSegment(segmentType or C.SEGMENT_TYPE.CURRENT, name or "Current")
+
+    if bossInfo then
+        segment.bossName = bossInfo.name
+        segment.bossId = bossInfo.id
+        segment.difficultyId = bossInfo.difficultyId
+        segment.type = C.SEGMENT_TYPE.BOSS
+    end
+
+    -- Get instance info
+    local instance = Utils.GetInstanceInfo()
+    segment.instanceName = instance.name
+    segment.instanceType = instance.type
+
+    -- Set as current
+    self.Data.currentSegment = segment
+
+    -- Add to segment list (at beginning)
+    table.insert(self.Data.segments, 1, segment)
+
+    -- Trim old segments
+    local maxSegments = EDM.db and EDM.db.profile.combat.maxSegments or C.MAX_SEGMENTS
+    while #self.Data.segments > maxSegments do
+        table.remove(self.Data.segments)
+    end
+
+    return segment
+end
+
+-- End current segment
+function DB:EndSegment(success)
+    local segment = self.Data.currentSegment
+    if not segment then return end
+
+    segment.endTime = GetTime()
+    segment.duration = segment.endTime - segment.startTime
+    segment.inCombat = false
+    segment.success = success
+
+    -- Calculate final totals
+    self:CalculateSegmentTotals(segment)
+end
+
+-- Calculate segment totals
+function DB:CalculateSegmentTotals(segment)
+    segment.totalDamage = 0
+    segment.totalHealing = 0
+    segment.totalAbsorbs = 0
+
+    for _, actor in pairs(segment.actors) do
+        segment.totalDamage = segment.totalDamage + actor.damage
+        segment.totalHealing = segment.totalHealing + actor.healing
+        segment.totalAbsorbs = segment.totalAbsorbs + actor.absorbs
+    end
+end
+
+-- Get or create actor in segment
+function DB:GetActor(segment, guid, name, class, flags)
+    if not segment or not guid then return nil end
+
+    if not segment.actors[guid] then
+        segment.actors[guid] = DB.CreateActorData(guid, name, class, flags)
+    end
+
+    local actor = segment.actors[guid]
+
+    -- Update name/class if provided
+    if name and actor.name ~= name then
+        actor.name = name
+    end
+    if class and class ~= "UNKNOWN" and actor.class == "UNKNOWN" then
+        actor.class = class
+    end
+    if flags then
+        actor.flags = flags
+    end
+
+    return actor
+end
+
+-- Get or create ability for actor
+function DB:GetAbility(actor, spellId, spellName, spellIcon)
+    if not actor or not spellId then return nil end
+
+    if not actor.abilities[spellId] then
+        actor.abilities[spellId] = DB.CreateAbilityData(spellId, spellName, spellIcon)
+    end
+
+    return actor.abilities[spellId]
+end
+
+-- Record damage
+function DB:RecordDamage(segment, sourceGuid, sourceName, sourceClass, sourceFlags,
+                         destGuid, destName, destFlags,
+                         spellId, spellName, spellIcon, amount, overkill, school, critical)
+    if not segment then return end
+
+    -- Get or create source actor
+    local actor = self:GetActor(segment, sourceGuid, sourceName, sourceClass, sourceFlags)
+    if not actor then return end
+
+    -- Update totals
+    actor.damage = actor.damage + amount
+    actor.lastActivity = GetTime()
+    segment.totalDamage = segment.totalDamage + amount
+
+    -- Also update overall
+    if self.Data.overallSegment then
+        local overallActor = self:GetActor(self.Data.overallSegment, sourceGuid, sourceName, sourceClass, sourceFlags)
+        if overallActor then
+            overallActor.damage = overallActor.damage + amount
+            overallActor.lastActivity = GetTime()
+        end
+        self.Data.overallSegment.totalDamage = self.Data.overallSegment.totalDamage + amount
+    end
+
+    -- Record ability
+    if EDM.db and EDM.db.profile.advanced.recordAbilities then
+        local ability = self:GetAbility(actor, spellId, spellName, spellIcon)
+        if ability then
+            ability.damage = ability.damage + amount
+            ability.damageHits = ability.damageHits + 1
+            if critical then
+                ability.damageCrits = ability.damageCrits + 1
+            end
+            if amount > ability.damageMax then
+                ability.damageMax = amount
+            end
+            if ability.damageMin == 0 or amount < ability.damageMin then
+                ability.damageMin = amount
+            end
+
+            -- Record target
+            if not ability.targets[destGuid] then
+                ability.targets[destGuid] = DB.CreateTargetData(destGuid, destName)
+            end
+            ability.targets[destGuid].damage = ability.targets[destGuid].damage + amount
+            ability.targets[destGuid].hits = ability.targets[destGuid].hits + 1
+        end
+    end
+
+    -- Record target for actor
+    if EDM.db and EDM.db.profile.advanced.recordTargets then
+        if not actor.targets[destGuid] then
+            actor.targets[destGuid] = DB.CreateTargetData(destGuid, destName)
+        end
+        actor.targets[destGuid].damage = actor.targets[destGuid].damage + amount
+        actor.targets[destGuid].hits = actor.targets[destGuid].hits + 1
+    end
+end
+
+-- Record healing
+function DB:RecordHealing(segment, sourceGuid, sourceName, sourceClass, sourceFlags,
+                          destGuid, destName, destFlags,
+                          spellId, spellName, spellIcon, amount, overhealing, critical)
+    if not segment then return end
+
+    local actor = self:GetActor(segment, sourceGuid, sourceName, sourceClass, sourceFlags)
+    if not actor then return end
+
+    local effectiveHeal = amount - (overhealing or 0)
+
+    -- Update totals
+    actor.healing = actor.healing + effectiveHeal
+    actor.overhealing = actor.overhealing + (overhealing or 0)
+    actor.lastActivity = GetTime()
+    segment.totalHealing = segment.totalHealing + effectiveHeal
+
+    -- Also update overall
+    if self.Data.overallSegment then
+        local overallActor = self:GetActor(self.Data.overallSegment, sourceGuid, sourceName, sourceClass, sourceFlags)
+        if overallActor then
+            overallActor.healing = overallActor.healing + effectiveHeal
+            overallActor.overhealing = overallActor.overhealing + (overhealing or 0)
+            overallActor.lastActivity = GetTime()
+        end
+        self.Data.overallSegment.totalHealing = self.Data.overallSegment.totalHealing + effectiveHeal
+    end
+
+    -- Record ability
+    if EDM.db and EDM.db.profile.advanced.recordAbilities then
+        local ability = self:GetAbility(actor, spellId, spellName, spellIcon)
+        if ability then
+            ability.healing = ability.healing + effectiveHeal
+            ability.overhealing = ability.overhealing + (overhealing or 0)
+            ability.healingHits = ability.healingHits + 1
+            if critical then
+                ability.healingCrits = ability.healingCrits + 1
+            end
+        end
+    end
+
+    -- Record healing received
+    local destActor = self:GetActor(segment, destGuid, destName, nil, destFlags)
+    if destActor then
+        destActor.healingTaken = destActor.healingTaken + effectiveHeal
+    end
+end
+
+-- Record death
+function DB:RecordDeath(segment, timestamp, victimGuid, victimName, killerName, spellId, spellName, damage, overkill)
+    if not segment then return end
+
+    local actor = segment.actors[victimGuid]
+    if actor then
+        actor.deaths = actor.deaths + 1
+
+        -- Create death log entry
+        local deathEntry = DB.CreateDeathLogEntry(
+            timestamp, victimGuid, victimName, killerName,
+            spellId, spellName, damage, overkill
+        )
+
+        -- Add recent damage as last hits
+        -- (This would need to be tracked separately, simplified here)
+
+        table.insert(actor.deathLog, 1, deathEntry)
+
+        -- Limit death log size
+        while #actor.deathLog > C.MAX_DEATH_LOG_ENTRIES do
+            table.remove(actor.deathLog)
+        end
+    end
+
+    -- Add to segment deaths
+    table.insert(segment.deaths, {
+        timestamp = timestamp,
+        victimGuid = victimGuid,
+        victimName = victimName,
+        killerName = killerName,
+    })
+end
+
+-- Record interrupt
+function DB:RecordInterrupt(segment, sourceGuid, sourceName, sourceClass, sourceFlags, spellId)
+    if not segment then return end
+
+    local actor = self:GetActor(segment, sourceGuid, sourceName, sourceClass, sourceFlags)
+    if actor then
+        actor.interrupts = actor.interrupts + 1
+    end
+
+    -- Overall
+    if self.Data.overallSegment then
+        local overallActor = self:GetActor(self.Data.overallSegment, sourceGuid, sourceName, sourceClass, sourceFlags)
+        if overallActor then
+            overallActor.interrupts = overallActor.interrupts + 1
+        end
+    end
+end
+
+-- Record dispel
+function DB:RecordDispel(segment, sourceGuid, sourceName, sourceClass, sourceFlags, spellId)
+    if not segment then return end
+
+    local actor = self:GetActor(segment, sourceGuid, sourceName, sourceClass, sourceFlags)
+    if actor then
+        actor.dispels = actor.dispels + 1
+    end
+
+    -- Overall
+    if self.Data.overallSegment then
+        local overallActor = self:GetActor(self.Data.overallSegment, sourceGuid, sourceName, sourceClass, sourceFlags)
+        if overallActor then
+            overallActor.dispels = overallActor.dispels + 1
+        end
+    end
+end
+
+-- Add timeline data point
+function DB:AddTimelinePoint(segment, timestamp, damage, healing)
+    if not segment or not EDM.db or not EDM.db.profile.advanced.recordTimeline then return end
+
+    local timeline = segment.timeline
+    table.insert(timeline.timestamps, timestamp)
+    table.insert(timeline.damage, damage)
+    table.insert(timeline.healing, healing)
+
+    -- Limit data points
+    while #timeline.timestamps > C.MAX_GRAPH_POINTS do
+        table.remove(timeline.timestamps, 1)
+        table.remove(timeline.damage, 1)
+        table.remove(timeline.healing, 1)
+    end
+end
+
+-- Get sorted actors for display
+function DB:GetSortedActors(segment, mode)
+    if not segment then return {} end
+
+    local actors = {}
+    for guid, actor in pairs(segment.actors) do
+        -- Filter to only friendly players/pets
+        if actor.flags and Utils.IsInGroup(actor.flags) then
+            table.insert(actors, actor)
+        end
+    end
+
+    -- Sort based on mode
+    local sortKey
+    if mode == C.DISPLAY_MODE.DAMAGE_DONE or mode == C.DISPLAY_MODE.DPS then
+        sortKey = "damage"
+    elseif mode == C.DISPLAY_MODE.HEALING_DONE or mode == C.DISPLAY_MODE.HPS then
+        sortKey = "healing"
+    elseif mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
+        sortKey = "damageTaken"
+    elseif mode == C.DISPLAY_MODE.DEATHS then
+        sortKey = "deaths"
+    elseif mode == C.DISPLAY_MODE.INTERRUPTS then
+        sortKey = "interrupts"
+    elseif mode == C.DISPLAY_MODE.DISPELS then
+        sortKey = "dispels"
+    elseif mode == C.DISPLAY_MODE.ABSORBS then
+        sortKey = "absorbs"
+    elseif mode == C.DISPLAY_MODE.OVERHEALING then
+        sortKey = "overhealing"
+    else
+        sortKey = "damage"
+    end
+
+    table.sort(actors, function(a, b)
+        return (a[sortKey] or 0) > (b[sortKey] or 0)
+    end)
+
+    return actors
+end
+
+-- Get segment duration
+function DB:GetSegmentDuration(segment)
+    if not segment then return 0 end
+    if segment.endTime then
+        return segment.duration
+    else
+        return GetTime() - segment.startTime
+    end
+end
+
+-- Reset all data
+function DB:Reset()
+    self.Data.segments = {}
+    self.Data.overallSegment = DB.CreateSegment(C.SEGMENT_TYPE.OVERALL, "Overall")
+    self:NewSegment()
+
+    if EDM.UI then
+        EDM.UI:Refresh()
+    end
+end
+
+-- Get segment by index (1 = current, 2 = previous, etc.)
+function DB:GetSegment(index)
+    if index == 0 then
+        return self.Data.overallSegment
+    else
+        return self.Data.segments[index]
+    end
+end
