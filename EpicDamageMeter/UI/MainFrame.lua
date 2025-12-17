@@ -1,6 +1,6 @@
 --[[
-    EpicDamageMeter - Main Frame
-    Primary UI window
+    EpicDamageMeter - Main Frame (Rewritten)
+    Multi-window support with proper bar management
 ]]
 
 local ADDON_NAME, EDM = ...
@@ -9,522 +9,866 @@ EDM.UI = {}
 local UI = EDM.UI
 local Skins = EDM.Skins
 local Widgets = EDM.Widgets
-local Bars = EDM.Bars
-local Graph = EDM.Graph
 local Utils = EDM.Utils
 local C = EDM.Constants
 local DB = EDM.Database
+local LSM = LibStub("LibSharedMedia-3.0")
 
--- UI state
-UI.mainFrame = nil
-UI.titleBar = nil
-UI.contentFrame = nil
-UI.scrollFrame = nil
-UI.bars = {}
-UI.graphFrame = nil
+-- Instance management (multi-window support)
+UI.instances = {}
+UI.instanceCounter = 0
 UI.initialized = false
 
--- Initialize UI
-function UI:Initialize()
-    if self.initialized then return end
+-- Bar pool for efficient reuse
+UI.barPool = {}
+UI.barPoolIndex = 0
 
-    -- Create main frame
-    self:CreateMainFrame()
+--============================================================================
+-- INSTANCE CLASS (Each window is an instance)
+--============================================================================
 
-    -- Create graph frame
-    self:CreateGraphFrame()
+local Instance = {}
+Instance.__index = Instance
 
-    -- Apply initial settings
-    self:ApplySettings()
+function Instance:New(id, mode, parent)
+    local self = setmetatable({}, Instance)
 
-    self.initialized = true
-    Utils.Debug("UI initialized")
+    self.id = id
+    self.mode = mode or C.DISPLAY_MODE.DAMAGE_DONE
+    self.segment = C.SEGMENT_TYPE.CURRENT
+    self.bars = {}
+    self.barCount = 0
+    self.scrollOffset = 0
+    self.lastUpdate = 0
+    self.isUpdating = false
+
+    -- Create the window frame
+    self:CreateFrame(parent)
+
+    return self
 end
 
--- Create main frame
-function UI:CreateMainFrame()
+function Instance:CreateFrame(parent)
     local skin = Skins:Get()
+    local db = EDM.db and EDM.db.profile or C.DEFAULT_SETTINGS.profile
+
+    -- Calculate position offset for new windows
+    local offsetX = (self.id - 1) * 20
+    local offsetY = (self.id - 1) * -20
 
     -- Main frame
-    self.mainFrame = CreateFrame("Frame", "EpicDamageMeterFrame", UIParent, "BackdropTemplate")
-    self.mainFrame:SetSize(
-        EDM.db.profile.window.width,
-        EDM.db.profile.window.height
-    )
-    self.mainFrame:SetPoint(
-        EDM.db.profile.window.point,
-        UIParent,
-        EDM.db.profile.window.point,
-        EDM.db.profile.window.x,
-        EDM.db.profile.window.y
-    )
-    self.mainFrame:SetFrameStrata("MEDIUM")
-    self.mainFrame:SetFrameLevel(5)
-    self.mainFrame:SetMovable(true)
-    self.mainFrame:SetResizable(true)
-    self.mainFrame:SetClampedToScreen(true)
-    self.mainFrame:EnableMouse(true)
+    self.frame = CreateFrame("Frame", "EDMInstance" .. self.id, parent or UIParent, "BackdropTemplate")
+    self.frame:SetSize(db.window.width or 280, db.window.height or 200)
+    self.frame:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
+    self.frame:SetFrameStrata("MEDIUM")
+    self.frame:SetFrameLevel(5 + self.id)
+    self.frame:SetMovable(true)
+    self.frame:SetResizable(true)
+    self.frame:SetClampedToScreen(true)
+    self.frame:EnableMouse(true)
+    self.frame.instance = self
 
     -- Apply backdrop
-    Skins:ApplyBackground(self.mainFrame)
+    Skins:ApplyBackground(self.frame)
 
-    -- Title bar
-    self.titleBar = self:CreateTitleBar()
+    -- Create components
+    self:CreateTitleBar()
+    self:CreateToolbar()
+    self:CreateContentArea()
+    self:CreateStatusBar()
+    self:CreateResizeHandle()
 
-    -- Button bar
-    self.buttonBar = self:CreateButtonBar()
+    -- Setup scripts
+    self:SetupScripts()
 
-    -- Content area
-    self.contentFrame = CreateFrame("Frame", nil, self.mainFrame)
-    self.contentFrame:SetPoint("TOPLEFT", self.buttonBar, "BOTTOMLEFT", 4, -2)
-    self.contentFrame:SetPoint("BOTTOMRIGHT", self.mainFrame, "BOTTOMRIGHT", -4, 4)
-
-    -- Scroll frame for bars
-    self.scrollFrame = CreateFrame("ScrollFrame", nil, self.contentFrame)
-    self.scrollFrame:SetAllPoints()
-
-    self.scrollContent = CreateFrame("Frame", nil, self.scrollFrame)
-    self.scrollContent:SetSize(self.contentFrame:GetWidth(), 1)
-    self.scrollFrame:SetScrollChild(self.scrollContent)
-
-    -- Enable scrolling
-    self.scrollFrame:SetScript("OnMouseWheel", function(_, delta)
-        local current = self.scrollFrame:GetVerticalScroll()
-        local max = self.scrollContent:GetHeight() - self.scrollFrame:GetHeight()
-        if max < 0 then max = 0 end
-        local new = current - (delta * 20)
-        new = math.max(0, math.min(max, new))
-        self.scrollFrame:SetVerticalScroll(new)
-    end)
-
-    -- Resize handle
-    self.resizeHandle = Widgets:CreateResizeHandle(self.mainFrame, 150, 100, 600, 800)
-
-    -- Status bar (footer)
-    self.statusBar = self:CreateStatusBar()
-
-    -- Make frame draggable
-    self.mainFrame:RegisterForDrag("LeftButton")
-    self.mainFrame:SetScript("OnDragStart", function(f)
-        if not EDM.db.profile.locked then
-            f:StartMoving()
-        end
-    end)
-    self.mainFrame:SetScript("OnDragStop", function(f)
-        f:StopMovingOrSizing()
-        local point, _, _, x, y = f:GetPoint()
-        EDM.db.profile.window.point = point
-        EDM.db.profile.window.x = x
-        EDM.db.profile.window.y = y
-    end)
-
-    -- Right-click menu
-    self.mainFrame:SetScript("OnMouseDown", function(f, button)
-        if button == "RightButton" then
-            self:ShowContextMenu()
-        end
-    end)
-
-    -- Show frame
-    self.mainFrame:Show()
+    self.frame:Show()
 end
 
--- Create title bar
-function UI:CreateTitleBar()
+function Instance:CreateTitleBar()
     local skin = Skins:Get()
-    local titleSettings = skin and skin.titleBar or {}
+    local ts = skin and skin.titleBar or {}
 
-    local titleBar = CreateFrame("Frame", nil, self.mainFrame)
-    titleBar:SetHeight(titleSettings.height or 22)
-    titleBar:SetPoint("TOPLEFT", self.mainFrame, "TOPLEFT", 0, 0)
-    titleBar:SetPoint("TOPRIGHT", self.mainFrame, "TOPRIGHT", 0, 0)
+    self.titleBar = CreateFrame("Frame", nil, self.frame)
+    self.titleBar:SetHeight(ts.height or 22)
+    self.titleBar:SetPoint("TOPLEFT", 0, 0)
+    self.titleBar:SetPoint("TOPRIGHT", 0, 0)
 
     -- Background
-    titleBar.bg = titleBar:CreateTexture(nil, "BACKGROUND")
-    titleBar.bg:SetAllPoints()
-    titleBar.bg:SetColorTexture(
-        titleSettings.backgroundColor and titleSettings.backgroundColor.r or 0.08,
-        titleSettings.backgroundColor and titleSettings.backgroundColor.g or 0.08,
-        titleSettings.backgroundColor and titleSettings.backgroundColor.b or 0.12,
-        titleSettings.backgroundColor and titleSettings.backgroundColor.a or 0.98
+    self.titleBar.bg = self.titleBar:CreateTexture(nil, "BACKGROUND")
+    self.titleBar.bg:SetAllPoints()
+    self.titleBar.bg:SetColorTexture(
+        ts.backgroundColor and ts.backgroundColor.r or 0.08,
+        ts.backgroundColor and ts.backgroundColor.g or 0.08,
+        ts.backgroundColor and ts.backgroundColor.b or 0.12,
+        ts.backgroundColor and ts.backgroundColor.a or 0.98
     )
-
-    -- Gradient overlay
-    if titleSettings.gradientStart then
-        titleBar.gradient = titleBar:CreateTexture(nil, "ARTWORK")
-        titleBar.gradient:SetAllPoints()
-        titleBar.gradient:SetTexture("Interface\\Buttons\\WHITE8X8")
-        titleBar.gradient:SetGradient("VERTICAL",
-            CreateColor(titleSettings.gradientEnd.r, titleSettings.gradientEnd.g, titleSettings.gradientEnd.b, titleSettings.gradientEnd.a or 1),
-            CreateColor(titleSettings.gradientStart.r, titleSettings.gradientStart.g, titleSettings.gradientStart.b, titleSettings.gradientStart.a or 1)
-        )
-    end
-
-    -- Icon
-    titleBar.icon = titleBar:CreateTexture(nil, "ARTWORK")
-    titleBar.icon:SetSize(16, 16)
-    titleBar.icon:SetPoint("LEFT", titleBar, "LEFT", 4, 0)
-    titleBar.icon:SetTexture("Interface\\AddOns\\EpicDamageMeter\\Textures\\icon")
 
     -- Title text
-    titleBar.title = titleBar:CreateFontString(nil, "OVERLAY")
-    titleBar.title:SetPoint("LEFT", titleBar.icon, "RIGHT", 4, 0)
-    titleBar.title:SetFont(
-        titleSettings.font or "Fonts\\FRIZQT__.TTF",
-        titleSettings.fontSize or 12,
-        titleSettings.fontFlags or "OUTLINE"
-    )
-    titleBar.title:SetTextColor(
-        titleSettings.fontColor and titleSettings.fontColor.r or 1,
-        titleSettings.fontColor and titleSettings.fontColor.g or 1,
-        titleSettings.fontColor and titleSettings.fontColor.b or 1,
-        titleSettings.fontColor and titleSettings.fontColor.a or 1
-    )
-    titleBar.title:SetText(EDM.Core and EDM.Core:GetDisplayModeName() or "Damage Done")
+    self.titleText = self.titleBar:CreateFontString(nil, "OVERLAY")
+    self.titleText:SetPoint("LEFT", 8, 0)
+    self.titleText:SetFont(ts.font or "Fonts\\FRIZQT__.TTF", ts.fontSize or 11, ts.fontFlags or "OUTLINE")
+    self.titleText:SetTextColor(ts.fontColor and ts.fontColor.r or 1, ts.fontColor and ts.fontColor.g or 1, ts.fontColor and ts.fontColor.b or 1, 1)
+    self:UpdateTitle()
 
     -- Close button
-    titleBar.closeBtn = Widgets:CreateCloseButton(titleBar, 14, function()
-        self.mainFrame:Hide()
-    end)
-    titleBar.closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -4, 0)
-
-    -- Settings button
-    titleBar.settingsBtn = Widgets:CreateSettingsButton(titleBar, 14, function()
-        if EDM.Core then
-            EDM.Core:OpenConfig()
+    self.closeBtn = CreateFrame("Button", nil, self.titleBar)
+    self.closeBtn:SetSize(14, 14)
+    self.closeBtn:SetPoint("RIGHT", -4, 0)
+    self.closeBtn:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
+    self.closeBtn:SetHighlightTexture("Interface\\Buttons\\UI-StopButton")
+    self.closeBtn:GetHighlightTexture():SetVertexColor(1, 0.3, 0.3, 0.8)
+    self.closeBtn:SetScript("OnClick", function()
+        if #UI.instances > 1 then
+            UI:DestroyInstance(self.id)
+        else
+            self.frame:Hide()
         end
     end)
-    titleBar.settingsBtn:SetPoint("RIGHT", titleBar.closeBtn, "LEFT", -4, 0)
+
+    -- New window button (under settings)
+    self.newWindowBtn = CreateFrame("Button", nil, self.titleBar)
+    self.newWindowBtn:SetSize(14, 14)
+    self.newWindowBtn:SetPoint("RIGHT", self.closeBtn, "LEFT", -3, 0)
+    self.newWindowBtn:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
+    self.newWindowBtn:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight")
+    self.newWindowBtn:SetScript("OnClick", function()
+        UI:CreateNewInstance()
+    end)
+    self.newWindowBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:SetText("Create New Window")
+        GameTooltip:Show()
+    end)
+    self.newWindowBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Settings button
+    self.settingsBtn = CreateFrame("Button", nil, self.titleBar)
+    self.settingsBtn:SetSize(14, 14)
+    self.settingsBtn:SetPoint("RIGHT", self.newWindowBtn, "LEFT", -3, 0)
+    self.settingsBtn:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
+    self.settingsBtn:SetHighlightTexture("Interface\\Buttons\\UI-OptionsButton")
+    self.settingsBtn:GetHighlightTexture():SetVertexColor(0.3, 0.6, 1, 0.8)
+    self.settingsBtn:SetScript("OnClick", function()
+        if EDM.Config then
+            EDM.Config:Open()
+        end
+    end)
 
     -- Reset button
-    titleBar.resetBtn = Widgets:CreateResetButton(titleBar, 14, function()
+    self.resetBtn = CreateFrame("Button", nil, self.titleBar)
+    self.resetBtn:SetSize(14, 14)
+    self.resetBtn:SetPoint("RIGHT", self.settingsBtn, "LEFT", -3, 0)
+    self.resetBtn:SetNormalTexture("Interface\\Buttons\\UI-RefreshButton")
+    self.resetBtn:SetHighlightTexture("Interface\\Buttons\\UI-RefreshButton")
+    self.resetBtn:GetHighlightTexture():SetVertexColor(0.3, 1, 0.3, 0.8)
+    self.resetBtn:SetScript("OnClick", function()
         if EDM.Core then
             EDM.Core:Reset()
         end
     end)
-    titleBar.resetBtn:SetPoint("RIGHT", titleBar.settingsBtn, "LEFT", -4, 0)
 
-    -- Make draggable
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function()
-        if not EDM.db.profile.locked then
-            self.mainFrame:StartMoving()
+    -- Draggable
+    self.titleBar:EnableMouse(true)
+    self.titleBar:RegisterForDrag("LeftButton")
+    self.titleBar:SetScript("OnDragStart", function()
+        if not (EDM.db and EDM.db.profile.locked) then
+            self.frame:StartMoving()
         end
     end)
-    titleBar:SetScript("OnDragStop", function()
-        self.mainFrame:StopMovingOrSizing()
-        local point, _, _, x, y = self.mainFrame:GetPoint()
-        EDM.db.profile.window.point = point
-        EDM.db.profile.window.x = x
-        EDM.db.profile.window.y = y
+    self.titleBar:SetScript("OnDragStop", function()
+        self.frame:StopMovingOrSizing()
+        self:SavePosition()
     end)
-
-    return titleBar
 end
 
--- Create button bar
-function UI:CreateButtonBar()
-    local buttonBar = CreateFrame("Frame", nil, self.mainFrame)
-    buttonBar:SetHeight(18)
-    buttonBar:SetPoint("TOPLEFT", self.titleBar, "BOTTOMLEFT", 0, 0)
-    buttonBar:SetPoint("TOPRIGHT", self.titleBar, "BOTTOMRIGHT", 0, 0)
+function Instance:CreateToolbar()
+    self.toolbar = CreateFrame("Frame", nil, self.frame)
+    self.toolbar:SetHeight(18)
+    self.toolbar:SetPoint("TOPLEFT", self.titleBar, "BOTTOMLEFT", 0, 0)
+    self.toolbar:SetPoint("TOPRIGHT", self.titleBar, "BOTTOMRIGHT", 0, 0)
 
-    buttonBar.bg = buttonBar:CreateTexture(nil, "BACKGROUND")
-    buttonBar.bg:SetAllPoints()
-    buttonBar.bg:SetColorTexture(0.05, 0.05, 0.08, 0.9)
+    self.toolbar.bg = self.toolbar:CreateTexture(nil, "BACKGROUND")
+    self.toolbar.bg:SetAllPoints()
+    self.toolbar.bg:SetColorTexture(0.04, 0.04, 0.06, 0.95)
 
-    -- Mode dropdown label
-    buttonBar.modeLabel = buttonBar:CreateFontString(nil, "OVERLAY")
-    buttonBar.modeLabel:SetPoint("LEFT", buttonBar, "LEFT", 4, 0)
-    buttonBar.modeLabel:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
-    buttonBar.modeLabel:SetTextColor(0.7, 0.7, 0.7, 1)
-    buttonBar.modeLabel:SetText("Mode:")
+    -- Mode selector
+    self.modeBtn = CreateFrame("Button", nil, self.toolbar, "BackdropTemplate")
+    self.modeBtn:SetSize(90, 16)
+    self.modeBtn:SetPoint("LEFT", 4, 0)
+    self.modeBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    self.modeBtn:SetBackdropColor(0.12, 0.12, 0.15, 1)
+    self.modeBtn:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
 
-    -- Mode button
-    buttonBar.modeBtn = Widgets:CreateTextButton(buttonBar, "Damage", 80, 16, function()
-        if EDM.Core then
-            EDM.Core:CycleDisplayMode()
-            buttonBar.modeBtn.text:SetText(EDM.Core:GetDisplayModeName())
-            self.titleBar.title:SetText(EDM.Core:GetDisplayModeName())
-        end
-    end)
-    buttonBar.modeBtn:SetPoint("LEFT", buttonBar.modeLabel, "RIGHT", 4, 0)
+    self.modeBtn.text = self.modeBtn:CreateFontString(nil, "OVERLAY")
+    self.modeBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+    self.modeBtn.text:SetPoint("CENTER")
+    self.modeBtn.text:SetText(C.DISPLAY_MODE_NAMES[self.mode] or "Damage")
 
-    -- Segment dropdown label
-    buttonBar.segmentLabel = buttonBar:CreateFontString(nil, "OVERLAY")
-    buttonBar.segmentLabel:SetPoint("LEFT", buttonBar.modeBtn, "RIGHT", 8, 0)
-    buttonBar.segmentLabel:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
-    buttonBar.segmentLabel:SetTextColor(0.7, 0.7, 0.7, 1)
-    buttonBar.segmentLabel:SetText("Seg:")
-
-    -- Segment button
-    buttonBar.segmentBtn = Widgets:CreateTextButton(buttonBar, "Current", 60, 16, function()
-        -- Toggle between current and overall
-        if EDM.db.profile.display.segment == C.SEGMENT_TYPE.OVERALL then
-            EDM.db.profile.display.segment = C.SEGMENT_TYPE.CURRENT
-            buttonBar.segmentBtn.text:SetText("Current")
+    self.modeBtn:SetScript("OnClick", function(_, button)
+        if button == "LeftButton" then
+            self:CycleMode(1)
         else
-            EDM.db.profile.display.segment = C.SEGMENT_TYPE.OVERALL
-            buttonBar.segmentBtn.text:SetText("Overall")
-        end
-        self:Refresh()
-    end)
-    buttonBar.segmentBtn:SetPoint("LEFT", buttonBar.segmentLabel, "RIGHT", 4, 0)
-
-    -- Graph toggle button
-    buttonBar.graphBtn = Widgets:CreateTextButton(buttonBar, "Graph", 50, 16, function()
-        if Graph.frame then
-            Graph:Toggle()
+            self:CycleMode(-1)
         end
     end)
-    buttonBar.graphBtn:SetPoint("RIGHT", buttonBar, "RIGHT", -4, 0)
+    self.modeBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    self.modeBtn:SetScript("OnEnter", function(btn)
+        btn:SetBackdropColor(0.18, 0.18, 0.22, 1)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:AddLine("Display Mode")
+        GameTooltip:AddLine("Left-click: Next mode", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Right-click: Previous mode", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    self.modeBtn:SetScript("OnLeave", function(btn)
+        btn:SetBackdropColor(0.12, 0.12, 0.15, 1)
+        GameTooltip:Hide()
+    end)
 
-    return buttonBar
+    -- Segment selector
+    self.segmentBtn = CreateFrame("Button", nil, self.toolbar, "BackdropTemplate")
+    self.segmentBtn:SetSize(60, 16)
+    self.segmentBtn:SetPoint("LEFT", self.modeBtn, "RIGHT", 4, 0)
+    self.segmentBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    self.segmentBtn:SetBackdropColor(0.12, 0.12, 0.15, 1)
+    self.segmentBtn:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
+
+    self.segmentBtn.text = self.segmentBtn:CreateFontString(nil, "OVERLAY")
+    self.segmentBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+    self.segmentBtn.text:SetPoint("CENTER")
+    self.segmentBtn.text:SetText("Current")
+
+    self.segmentBtn:SetScript("OnClick", function()
+        self:CycleSegment()
+    end)
+    self.segmentBtn:SetScript("OnEnter", function(btn)
+        btn:SetBackdropColor(0.18, 0.18, 0.22, 1)
+    end)
+    self.segmentBtn:SetScript("OnLeave", function(btn)
+        btn:SetBackdropColor(0.12, 0.12, 0.15, 1)
+    end)
 end
 
--- Create status bar
-function UI:CreateStatusBar()
-    local statusBar = CreateFrame("Frame", nil, self.mainFrame)
-    statusBar:SetHeight(14)
-    statusBar:SetPoint("BOTTOMLEFT", self.mainFrame, "BOTTOMLEFT", 0, 0)
-    statusBar:SetPoint("BOTTOMRIGHT", self.mainFrame, "BOTTOMRIGHT", 0, 0)
+function Instance:CreateContentArea()
+    -- Content frame (holds the bars)
+    self.content = CreateFrame("Frame", nil, self.frame)
+    self.content:SetPoint("TOPLEFT", self.toolbar, "BOTTOMLEFT", 2, -2)
+    self.content:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -2, 16)
+    self.content:SetClipsChildren(true)
 
-    statusBar.bg = statusBar:CreateTexture(nil, "BACKGROUND")
-    statusBar.bg:SetAllPoints()
-    statusBar.bg:SetColorTexture(0.05, 0.05, 0.08, 0.9)
+    -- Scroll child (bars go here)
+    self.scrollChild = CreateFrame("Frame", nil, self.content)
+    self.scrollChild:SetPoint("TOPLEFT", 0, 0)
+    self.scrollChild:SetWidth(self.content:GetWidth() or 280)
+    self.scrollChild:SetHeight(1)
 
-    -- Time text
-    statusBar.timeText = statusBar:CreateFontString(nil, "OVERLAY")
-    statusBar.timeText:SetPoint("LEFT", statusBar, "LEFT", 4, 0)
-    statusBar.timeText:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
-    statusBar.timeText:SetTextColor(0.7, 0.7, 0.7, 1)
-    statusBar.timeText:SetText("0:00")
+    -- Mouse wheel scrolling
+    self.content:EnableMouseWheel(true)
+    self.content:SetScript("OnMouseWheel", function(_, delta)
+        self:OnScroll(delta)
+    end)
 
-    -- Total text
-    statusBar.totalText = statusBar:CreateFontString(nil, "OVERLAY")
-    statusBar.totalText:SetPoint("RIGHT", statusBar, "RIGHT", -4, 0)
-    statusBar.totalText:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
-    statusBar.totalText:SetTextColor(0.7, 0.7, 0.7, 1)
-    statusBar.totalText:SetText("Total: 0")
-
-    return statusBar
+    -- Right click menu on content area
+    self.content:EnableMouse(true)
+    self.content:SetScript("OnMouseDown", function(_, button)
+        if button == "RightButton" then
+            self:ShowContextMenu()
+        end
+    end)
 end
 
--- Create graph frame
-function UI:CreateGraphFrame()
-    self.graphFrame = Graph:Initialize(self.mainFrame)
+function Instance:CreateStatusBar()
+    self.statusBar = CreateFrame("Frame", nil, self.frame)
+    self.statusBar:SetHeight(14)
+    self.statusBar:SetPoint("BOTTOMLEFT", 0, 0)
+    self.statusBar:SetPoint("BOTTOMRIGHT", 0, 0)
+
+    self.statusBar.bg = self.statusBar:CreateTexture(nil, "BACKGROUND")
+    self.statusBar.bg:SetAllPoints()
+    self.statusBar.bg:SetColorTexture(0.04, 0.04, 0.06, 0.95)
+
+    -- Combat time
+    self.statusBar.time = self.statusBar:CreateFontString(nil, "OVERLAY")
+    self.statusBar.time:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+    self.statusBar.time:SetPoint("LEFT", 4, 0)
+    self.statusBar.time:SetTextColor(0.6, 0.6, 0.6, 1)
+    self.statusBar.time:SetText("0:00")
+
+    -- Total value
+    self.statusBar.total = self.statusBar:CreateFontString(nil, "OVERLAY")
+    self.statusBar.total:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+    self.statusBar.total:SetPoint("RIGHT", -4, 0)
+    self.statusBar.total:SetTextColor(0.6, 0.6, 0.6, 1)
+    self.statusBar.total:SetText("Total: 0")
+
+    -- Instance number
+    self.statusBar.instanceNum = self.statusBar:CreateFontString(nil, "OVERLAY")
+    self.statusBar.instanceNum:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+    self.statusBar.instanceNum:SetPoint("CENTER", 0, 0)
+    self.statusBar.instanceNum:SetTextColor(0.4, 0.4, 0.4, 1)
+    self.statusBar.instanceNum:SetText("#" .. self.id)
 end
 
--- Update bars with data
-function UI:UpdateBars()
-    if not self.mainFrame or not self.mainFrame:IsShown() then return end
+function Instance:CreateResizeHandle()
+    self.resizeHandle = CreateFrame("Frame", nil, self.frame)
+    self.resizeHandle:SetSize(16, 16)
+    self.resizeHandle:SetPoint("BOTTOMRIGHT", 0, 0)
+    self.resizeHandle:EnableMouse(true)
 
-    local mode = EDM.db.profile.display.mode
-    local segmentType = EDM.db.profile.display.segment
+    self.resizeHandle.tex = self.resizeHandle:CreateTexture(nil, "OVERLAY")
+    self.resizeHandle.tex:SetAllPoints()
+    self.resizeHandle.tex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+
+    self.frame:SetResizeBounds(180, 80, 600, 800)
+
+    self.resizeHandle:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" and not (EDM.db and EDM.db.profile.locked) then
+            self.frame:StartSizing("BOTTOMRIGHT")
+        end
+    end)
+
+    self.resizeHandle:SetScript("OnMouseUp", function()
+        self.frame:StopMovingOrSizing()
+        self:SavePosition()
+        self:UpdateLayout()
+    end)
+end
+
+function Instance:SetupScripts()
+    -- Frame dragging from anywhere when unlocked
+    self.frame:RegisterForDrag("LeftButton")
+    self.frame:SetScript("OnDragStart", function()
+        if not (EDM.db and EDM.db.profile.locked) then
+            self.frame:StartMoving()
+        end
+    end)
+    self.frame:SetScript("OnDragStop", function()
+        self.frame:StopMovingOrSizing()
+        self:SavePosition()
+    end)
+
+    -- Size changed
+    self.frame:SetScript("OnSizeChanged", function()
+        self:UpdateLayout()
+    end)
+end
+
+function Instance:UpdateTitle()
+    local modeName = C.DISPLAY_MODE_NAMES[self.mode] or "Damage"
+    self.titleText:SetText(modeName)
+end
+
+function Instance:CycleMode(direction)
+    direction = direction or 1
+    local modes = {
+        C.DISPLAY_MODE.DAMAGE_DONE,
+        C.DISPLAY_MODE.HEALING_DONE,
+        C.DISPLAY_MODE.DPS,
+        C.DISPLAY_MODE.HPS,
+        C.DISPLAY_MODE.DAMAGE_TAKEN,
+        C.DISPLAY_MODE.DEATHS,
+        C.DISPLAY_MODE.INTERRUPTS,
+        C.DISPLAY_MODE.DISPELS,
+    }
+
+    local currentIndex = 1
+    for i, m in ipairs(modes) do
+        if m == self.mode then
+            currentIndex = i
+            break
+        end
+    end
+
+    currentIndex = currentIndex + direction
+    if currentIndex > #modes then currentIndex = 1 end
+    if currentIndex < 1 then currentIndex = #modes end
+
+    self.mode = modes[currentIndex]
+    self:UpdateTitle()
+    self.modeBtn.text:SetText(C.DISPLAY_MODE_NAMES[self.mode] or "Damage")
+    self:UpdateBars()
+end
+
+function Instance:CycleSegment()
+    if self.segment == C.SEGMENT_TYPE.CURRENT then
+        self.segment = C.SEGMENT_TYPE.OVERALL
+        self.segmentBtn.text:SetText("Overall")
+    else
+        self.segment = C.SEGMENT_TYPE.CURRENT
+        self.segmentBtn.text:SetText("Current")
+    end
+    self:UpdateBars()
+end
+
+function Instance:OnScroll(delta)
+    local maxScroll = math.max(0, #self.bars - self:GetVisibleBarCount())
+    self.scrollOffset = self.scrollOffset - delta
+    self.scrollOffset = math.max(0, math.min(maxScroll, self.scrollOffset))
+    self:LayoutBars()
+end
+
+function Instance:GetVisibleBarCount()
+    local contentHeight = self.content:GetHeight() or 150
+    local barHeight = (EDM.db and EDM.db.profile.bars.height) or 18
+    local spacing = (EDM.db and EDM.db.profile.bars.spacing) or 1
+    return math.floor(contentHeight / (barHeight + spacing))
+end
+
+function Instance:UpdateLayout()
+    if self.scrollChild then
+        self.scrollChild:SetWidth(self.content:GetWidth() or 280)
+    end
+    self:LayoutBars()
+end
+
+function Instance:SavePosition()
+    -- Could save per-instance positions to savedvariables
+end
+
+--============================================================================
+-- BAR MANAGEMENT (Fixed scroll bug)
+--============================================================================
+
+function Instance:GetBar(index)
+    if self.bars[index] then
+        return self.bars[index]
+    end
+
+    local bar = UI:GetBarFromPool()
+    bar:SetParent(self.scrollChild)
+    bar.instance = self
+    self.bars[index] = bar
+    return bar
+end
+
+function Instance:ClearBars()
+    for i, bar in ipairs(self.bars) do
+        bar:Hide()
+        UI:ReturnBarToPool(bar)
+    end
+    wipe(self.bars)
+    self.barCount = 0
+end
+
+function Instance:UpdateBars()
+    if not self.frame or not self.frame:IsShown() then return end
+    if self.isUpdating then return end
+    self.isUpdating = true
 
     -- Get segment
     local segment
-    if segmentType == C.SEGMENT_TYPE.OVERALL then
+    if self.segment == C.SEGMENT_TYPE.OVERALL then
         segment = DB.Data.overallSegment
     else
         segment = DB.Data.currentSegment
     end
 
-    if not segment then return end
+    if not segment then
+        self.isUpdating = false
+        return
+    end
 
     -- Get sorted actors
-    local actors = DB:GetSortedActors(segment, mode)
+    local actors = DB:GetSortedActors(segment, self.mode)
     local duration = DB:GetSegmentDuration(segment)
 
-    -- Get max value for percentage calculations
-    local total = 0
-    if mode == C.DISPLAY_MODE.DAMAGE_DONE or mode == C.DISPLAY_MODE.DPS then
-        total = segment.totalDamage
-    elseif mode == C.DISPLAY_MODE.HEALING_DONE or mode == C.DISPLAY_MODE.HPS then
-        total = segment.totalHealing
-    else
-        for _, actor in ipairs(actors) do
-            local value = 0
-            if mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
-                value = actor.damageTaken
-            elseif mode == C.DISPLAY_MODE.DEATHS then
-                value = actor.deaths
-            elseif mode == C.DISPLAY_MODE.INTERRUPTS then
-                value = actor.interrupts
-            elseif mode == C.DISPLAY_MODE.DISPELS then
-                value = actor.dispels
-            end
-            total = total + value
-        end
-    end
+    -- Calculate totals
+    local total, topValue = self:CalculateTotals(actors, segment)
 
-    if total == 0 then total = 1 end -- Prevent division by zero
-
-    -- Get top actor's value for relative bar sizing
-    local topValue = 0
-    if #actors > 0 then
-        local topActor = actors[1]
-        if mode == C.DISPLAY_MODE.DAMAGE_DONE or mode == C.DISPLAY_MODE.DPS then
-            topValue = topActor.damage
-        elseif mode == C.DISPLAY_MODE.HEALING_DONE or mode == C.DISPLAY_MODE.HPS then
-            topValue = topActor.healing
-        elseif mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
-            topValue = topActor.damageTaken
-        elseif mode == C.DISPLAY_MODE.DEATHS then
-            topValue = topActor.deaths
-        elseif mode == C.DISPLAY_MODE.INTERRUPTS then
-            topValue = topActor.interrupts
-        elseif mode == C.DISPLAY_MODE.DISPELS then
-            topValue = topActor.dispels
-        end
-    end
-    if topValue == 0 then topValue = 1 end
-
-    -- Update or create bars
-    local maxBars = EDM.db.profile.display.maxBars or 20
+    -- Update bar count (don't clear, reuse)
+    local maxBars = (EDM.db and EDM.db.profile.display.maxBars) or 25
     local barCount = math.min(#actors, maxBars)
 
+    -- Update existing bars or create new ones
     for i = 1, barCount do
+        local bar = self:GetBar(i)
         local actor = actors[i]
-        local bar = Bars:GetBar(self.scrollContent, i)
-
-        Bars:SetBarData(bar, actor, i, topValue, duration, mode)
-        Bars:AnimateBar(bar)
-
-        table.insert(self.bars, bar)
+        self:SetBarData(bar, actor, i, topValue, duration)
+        bar:Show()
     end
 
-    -- Hide extra bars
-    for i = barCount + 1, #Bars.pool do
-        if Bars.pool[i] then
-            Bars:ReleaseBar(Bars.pool[i])
+    -- Hide unused bars
+    for i = barCount + 1, #self.bars do
+        if self.bars[i] then
+            self.bars[i]:Hide()
         end
     end
 
-    -- Layout bars
-    local contentHeight = Bars:LayoutBars(self.scrollContent, self.bars)
-    self.scrollContent:SetHeight(contentHeight)
+    self.barCount = barCount
+
+    -- Layout without resetting scroll
+    self:LayoutBars()
 
     -- Update status bar
-    self.statusBar.timeText:SetText(Utils.FormatTime(duration))
-    self.statusBar.totalText:SetText("Total: " .. Utils.FormatNumber(total))
+    self.statusBar.time:SetText(Utils.FormatTime(duration))
+    self.statusBar.total:SetText("Total: " .. Utils.FormatNumber(total))
 
-    -- Update graph
-    Graph:Update()
+    self.isUpdating = false
 end
 
--- Refresh UI
-function UI:Refresh()
-    -- Clear existing bars
-    for _, bar in ipairs(self.bars) do
-        Bars:ReleaseBar(bar)
-    end
-    wipe(self.bars)
+function Instance:CalculateTotals(actors, segment)
+    local total = 0
+    local topValue = 0
 
-    -- Update bars
-    self:UpdateBars()
-
-    -- Update title
-    if self.titleBar and self.titleBar.title and EDM.Core then
-        self.titleBar.title:SetText(EDM.Core:GetDisplayModeName())
-    end
-
-    -- Update mode button
-    if self.buttonBar and self.buttonBar.modeBtn and EDM.Core then
-        self.buttonBar.modeBtn.text:SetText(EDM.Core:GetDisplayModeName())
-    end
-end
-
--- Apply settings
-function UI:ApplySettings()
-    if not self.mainFrame then return end
-
-    -- Update size
-    self.mainFrame:SetSize(
-        EDM.db.profile.window.width,
-        EDM.db.profile.window.height
-    )
-
-    -- Update scale
-    self.mainFrame:SetScale(EDM.db.profile.window.scale or 1)
-
-    -- Update opacity
-    local opacity = EDM.db.profile.window.opacity or 0.9
-    self.mainFrame:SetAlpha(opacity)
-
-    -- Apply skin
-    Skins:ApplyBackground(self.mainFrame)
-
-    -- Update bars appearance
-    Bars:ApplySettings()
-
-    -- Lock/unlock
-    self:SetLocked(EDM.db.profile.locked)
-
-    -- Refresh
-    self:Refresh()
-end
-
--- Set locked state
-function UI:SetLocked(locked)
-    if not self.mainFrame then return end
-
-    if locked then
-        self.mainFrame:SetMovable(false)
-        self.mainFrame:SetResizable(false)
-        if self.resizeHandle then
-            self.resizeHandle:Hide()
+    if self.mode == C.DISPLAY_MODE.DAMAGE_DONE or self.mode == C.DISPLAY_MODE.DPS then
+        total = segment.totalDamage
+        topValue = actors[1] and actors[1].damage or 1
+    elseif self.mode == C.DISPLAY_MODE.HEALING_DONE or self.mode == C.DISPLAY_MODE.HPS then
+        total = segment.totalHealing
+        topValue = actors[1] and actors[1].healing or 1
+    elseif self.mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.damageTaken or 0)
         end
+        topValue = actors[1] and actors[1].damageTaken or 1
+    elseif self.mode == C.DISPLAY_MODE.DEATHS then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.deaths or 0)
+        end
+        topValue = actors[1] and actors[1].deaths or 1
+    elseif self.mode == C.DISPLAY_MODE.INTERRUPTS then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.interrupts or 0)
+        end
+        topValue = actors[1] and actors[1].interrupts or 1
+    elseif self.mode == C.DISPLAY_MODE.DISPELS then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.dispels or 0)
+        end
+        topValue = actors[1] and actors[1].dispels or 1
+    end
+
+    if total == 0 then total = 1 end
+    if topValue == 0 then topValue = 1 end
+
+    return total, topValue
+end
+
+function Instance:SetBarData(bar, actor, rank, topValue, duration)
+    bar.actorData = actor
+    bar.rank = rank
+
+    -- Get value based on mode
+    local value = 0
+    local perSecond = 0
+
+    if self.mode == C.DISPLAY_MODE.DAMAGE_DONE or self.mode == C.DISPLAY_MODE.DPS then
+        value = actor.damage or 0
+        perSecond = duration > 0 and (value / duration) or 0
+    elseif self.mode == C.DISPLAY_MODE.HEALING_DONE or self.mode == C.DISPLAY_MODE.HPS then
+        value = actor.healing or 0
+        perSecond = duration > 0 and (value / duration) or 0
+    elseif self.mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
+        value = actor.damageTaken or 0
+    elseif self.mode == C.DISPLAY_MODE.DEATHS then
+        value = actor.deaths or 0
+    elseif self.mode == C.DISPLAY_MODE.INTERRUPTS then
+        value = actor.interrupts or 0
+    elseif self.mode == C.DISPLAY_MODE.DISPELS then
+        value = actor.dispels or 0
+    end
+
+    -- Set bar fill (relative to top player)
+    local percent = topValue > 0 and (value / topValue) or 0
+    bar.statusBar:SetValue(percent)
+
+    -- Set color
+    local r, g, b = Utils.GetClassColor(actor.class)
+    bar.statusBar:SetStatusBarColor(r, g, b, 0.9)
+
+    -- Set texts
+    bar.rankText:SetText(rank)
+    bar.nameText:SetText(Utils.ClassColorText(actor.name or "Unknown", actor.class))
+
+    if self.mode == C.DISPLAY_MODE.DPS or self.mode == C.DISPLAY_MODE.HPS then
+        bar.valueText:SetText(Utils.FormatNumber(perSecond))
     else
-        self.mainFrame:SetMovable(true)
-        self.mainFrame:SetResizable(true)
-        if self.resizeHandle then
-            self.resizeHandle:Show()
-        end
+        bar.valueText:SetText(Utils.FormatNumber(value))
     end
+
+    -- Icon
+    local icon = actor.class and ("Interface\\Icons\\ClassIcon_" .. actor.class) or "Interface\\Icons\\INV_Misc_QuestionMark"
+    bar.icon:SetTexture(icon)
 end
 
--- Show context menu
-function UI:ShowContextMenu()
-    local menu = CreateFrame("Frame", "EDMContextMenu", UIParent, "UIDropDownMenuTemplate")
+function Instance:LayoutBars()
+    local barHeight = (EDM.db and EDM.db.profile.bars.height) or 18
+    local spacing = (EDM.db and EDM.db.profile.bars.spacing) or 1
+    local contentWidth = self.content:GetWidth() or 280
+
+    local yOffset = 0
+    local startIndex = math.floor(self.scrollOffset) + 1
+    local visibleCount = self:GetVisibleBarCount() + 1
+
+    for i = 1, self.barCount do
+        local bar = self.bars[i]
+        if bar then
+            if i >= startIndex and i < startIndex + visibleCount then
+                local displayIndex = i - startIndex
+                bar:ClearAllPoints()
+                bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 0, -displayIndex * (barHeight + spacing))
+                bar:SetSize(contentWidth, barHeight)
+                bar:Show()
+            else
+                bar:Hide()
+            end
+        end
+    end
+
+    -- Update scroll child height
+    self.scrollChild:SetHeight(self.barCount * (barHeight + spacing))
+end
+
+function Instance:ShowContextMenu()
+    local menu = CreateFrame("Frame", "EDMInstanceMenu" .. self.id, UIParent, "UIDropDownMenuTemplate")
 
     local menuList = {
-        { text = "EpicDamageMeter", isTitle = true, notCheckable = true },
+        { text = "EpicDamageMeter #" .. self.id, isTitle = true, notCheckable = true },
         { text = "", notCheckable = true, disabled = true },
-        { text = "Display Mode", notCheckable = true, hasArrow = true, menuList = {
-            { text = "Damage Done", func = function() EDM.Core:SetDisplayMode(C.DISPLAY_MODE.DAMAGE_DONE) end },
-            { text = "Healing Done", func = function() EDM.Core:SetDisplayMode(C.DISPLAY_MODE.HEALING_DONE) end },
-            { text = "DPS", func = function() EDM.Core:SetDisplayMode(C.DISPLAY_MODE.DPS) end },
-            { text = "HPS", func = function() EDM.Core:SetDisplayMode(C.DISPLAY_MODE.HPS) end },
-            { text = "Damage Taken", func = function() EDM.Core:SetDisplayMode(C.DISPLAY_MODE.DAMAGE_TAKEN) end },
-            { text = "Deaths", func = function() EDM.Core:SetDisplayMode(C.DISPLAY_MODE.DEATHS) end },
-            { text = "Interrupts", func = function() EDM.Core:SetDisplayMode(C.DISPLAY_MODE.INTERRUPTS) end },
-            { text = "Dispels", func = function() EDM.Core:SetDisplayMode(C.DISPLAY_MODE.DISPELS) end },
-        }},
+        { text = "Display Mode", notCheckable = true, hasArrow = true, menuList = {} },
         { text = "", notCheckable = true, disabled = true },
-        { text = "Toggle Graph", notCheckable = true, func = function() Graph:Toggle() end },
-        { text = "Reset Data", notCheckable = true, func = function() EDM.Core:Reset() end },
+        { text = "New Window", notCheckable = true, func = function() UI:CreateNewInstance() end },
+        { text = "Reset Data", notCheckable = true, func = function() if EDM.Core then EDM.Core:Reset() end end },
         { text = "", notCheckable = true, disabled = true },
-        { text = EDM.db.profile.locked and "Unlock Window" or "Lock Window", notCheckable = true, func = function()
-            EDM.Core:ToggleLock()
+        { text = "Settings", notCheckable = true, func = function() if EDM.Config then EDM.Config:Open() end end },
+        { text = "Close Window", notCheckable = true, func = function()
+            if #UI.instances > 1 then
+                UI:DestroyInstance(self.id)
+            else
+                self.frame:Hide()
+            end
         end },
-        { text = "Settings", notCheckable = true, func = function() EDM.Core:OpenConfig() end },
-        { text = "", notCheckable = true, disabled = true },
-        { text = "Close", notCheckable = true, func = function() self.mainFrame:Hide() end },
     }
+
+    -- Add display modes
+    for modeId, modeName in pairs(C.DISPLAY_MODE_NAMES) do
+        table.insert(menuList[3].menuList, {
+            text = modeName,
+            checked = self.mode == modeId,
+            func = function()
+                self.mode = modeId
+                self:UpdateTitle()
+                self.modeBtn.text:SetText(modeName)
+                self:UpdateBars()
+            end,
+        })
+    end
 
     EasyMenu(menuList, menu, "cursor", 0, 0, "MENU")
 end
 
--- Toggle window
-function UI:Toggle()
-    if self.mainFrame then
-        if self.mainFrame:IsShown() then
-            self.mainFrame:Hide()
-        else
-            self.mainFrame:Show()
-            self:Refresh()
+--============================================================================
+-- UI MANAGER
+--============================================================================
+
+function UI:Initialize()
+    if self.initialized then return end
+
+    -- Create initial instance
+    self:CreateNewInstance(C.DISPLAY_MODE.DAMAGE_DONE)
+
+    self.initialized = true
+    Utils.Debug("UI initialized with multi-window support")
+end
+
+function UI:CreateNewInstance(mode)
+    self.instanceCounter = self.instanceCounter + 1
+    local instance = Instance:New(self.instanceCounter, mode)
+    self.instances[self.instanceCounter] = instance
+    return instance
+end
+
+function UI:DestroyInstance(id)
+    local instance = self.instances[id]
+    if instance then
+        -- Return bars to pool
+        instance:ClearBars()
+        -- Hide and destroy frame
+        if instance.frame then
+            instance.frame:Hide()
+            instance.frame:SetParent(nil)
+        end
+        self.instances[id] = nil
+    end
+end
+
+function UI:GetBarFromPool()
+    -- Check pool for available bar
+    for i, bar in ipairs(self.barPool) do
+        if not bar.inUse then
+            bar.inUse = true
+            bar:Show()
+            return bar
         end
     end
+
+    -- Create new bar
+    local bar = self:CreateBar()
+    bar.inUse = true
+    table.insert(self.barPool, bar)
+    return bar
+end
+
+function UI:ReturnBarToPool(bar)
+    bar.inUse = false
+    bar:Hide()
+    bar:ClearAllPoints()
+end
+
+function UI:CreateBar()
+    local db = EDM.db and EDM.db.profile.bars or C.DEFAULT_SETTINGS.profile.bars
+
+    local bar = CreateFrame("Button", nil, UIParent, "BackdropTemplate")
+    bar:SetHeight(db.height or 18)
+    bar:EnableMouse(true)
+    bar:RegisterForClicks("AnyUp")
+
+    -- Background
+    bar.bg = bar:CreateTexture(nil, "BACKGROUND")
+    bar.bg:SetAllPoints()
+    bar.bg:SetColorTexture(0.08, 0.08, 0.1, 0.7)
+
+    -- Status bar
+    bar.statusBar = CreateFrame("StatusBar", nil, bar)
+    bar.statusBar:SetAllPoints()
+    bar.statusBar:SetMinMaxValues(0, 1)
+    bar.statusBar:SetValue(0)
+
+    local texture = LSM:Fetch("statusbar", db.texture) or "Interface\\TargetingFrame\\UI-StatusBar"
+    bar.statusBar:SetStatusBarTexture(texture)
+
+    -- Icon
+    bar.icon = bar:CreateTexture(nil, "OVERLAY")
+    bar.icon:SetSize(db.height - 2, db.height - 2)
+    bar.icon:SetPoint("LEFT", 1, 0)
+    bar.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+    -- Rank
+    bar.rankText = bar:CreateFontString(nil, "OVERLAY")
+    bar.rankText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", db.fontSize - 2 or 9, db.fontFlags or "OUTLINE")
+    bar.rankText:SetPoint("LEFT", bar.icon, "RIGHT", 2, 0)
+    bar.rankText:SetWidth(14)
+    bar.rankText:SetJustifyH("CENTER")
+    bar.rankText:SetTextColor(0.7, 0.7, 0.7, 1)
+
+    -- Name
+    bar.nameText = bar:CreateFontString(nil, "OVERLAY")
+    bar.nameText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", db.fontSize or 11, db.fontFlags or "OUTLINE")
+    bar.nameText:SetPoint("LEFT", bar.rankText, "RIGHT", 2, 0)
+    bar.nameText:SetPoint("RIGHT", bar, "RIGHT", -50, 0)
+    bar.nameText:SetJustifyH("LEFT")
+    bar.nameText:SetWordWrap(false)
+
+    -- Value
+    bar.valueText = bar:CreateFontString(nil, "OVERLAY")
+    bar.valueText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", db.fontSize or 11, db.fontFlags or "OUTLINE")
+    bar.valueText:SetPoint("RIGHT", -4, 0)
+    bar.valueText:SetJustifyH("RIGHT")
+
+    -- Highlight
+    bar.highlight = bar:CreateTexture(nil, "HIGHLIGHT")
+    bar.highlight:SetAllPoints()
+    bar.highlight:SetColorTexture(1, 1, 1, 0.1)
+
+    -- Click handlers
+    bar:SetScript("OnClick", function(self, button)
+        if button == "LeftButton" then
+            if IsShiftKeyDown() then
+                -- Report to chat
+                if self.actorData then
+                    local text = string.format("%d. %s - %s",
+                        self.rank or 1,
+                        self.actorData.name or "Unknown",
+                        self.valueText:GetText() or "0"
+                    )
+                    print(text)
+                end
+            elseif self.actorData and EDM.DetailWindow then
+                EDM.DetailWindow:Show(self.actorData)
+            end
+        end
+    end)
+
+    bar:SetScript("OnEnter", function(self)
+        if self.actorData and EDM.Tooltip then
+            EDM.Tooltip:ShowActorTooltip(self, self.actorData)
+        end
+    end)
+
+    bar:SetScript("OnLeave", function()
+        if EDM.Tooltip then
+            EDM.Tooltip:Hide()
+        end
+    end)
+
+    return bar
+end
+
+-- Update all instances
+function UI:UpdateAll()
+    for _, instance in pairs(self.instances) do
+        if instance.frame and instance.frame:IsShown() then
+            instance:UpdateBars()
+        end
+    end
+end
+
+-- Refresh all (force full redraw)
+function UI:Refresh()
+    self:UpdateAll()
+end
+
+-- Apply settings to all instances
+function UI:ApplySettings()
+    -- Update bar pool textures/fonts
+    local db = EDM.db and EDM.db.profile.bars or {}
+    local texture = LSM:Fetch("statusbar", db.texture) or "Interface\\TargetingFrame\\UI-StatusBar"
+
+    for _, bar in ipairs(self.barPool) do
+        bar.statusBar:SetStatusBarTexture(texture)
+        bar:SetHeight(db.height or 18)
+        bar.icon:SetSize(db.height - 2, db.height - 2)
+        bar.rankText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", (db.fontSize or 11) - 2, db.fontFlags or "OUTLINE")
+        bar.nameText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", db.fontSize or 11, db.fontFlags or "OUTLINE")
+        bar.valueText:SetFont(db.font or "Fonts\\FRIZQT__.TTF", db.fontSize or 11, db.fontFlags or "OUTLINE")
+    end
+
+    -- Refresh layout
+    for _, instance in pairs(self.instances) do
+        instance:UpdateLayout()
+    end
+end
+
+-- Set locked state for all instances
+function UI:SetLocked(locked)
+    for _, instance in pairs(self.instances) do
+        if locked then
+            instance.frame:SetMovable(false)
+            if instance.resizeHandle then
+                instance.resizeHandle:Hide()
+            end
+        else
+            instance.frame:SetMovable(true)
+            if instance.resizeHandle then
+                instance.resizeHandle:Show()
+            end
+        end
+    end
+end
+
+-- Toggle visibility
+function UI:Toggle()
+    for _, instance in pairs(self.instances) do
+        if instance.frame:IsShown() then
+            instance.frame:Hide()
+        else
+            instance.frame:Show()
+            instance:UpdateBars()
+        end
+    end
+end
+
+-- Legacy compatibility
+function UI:UpdateBars()
+    self:UpdateAll()
 end

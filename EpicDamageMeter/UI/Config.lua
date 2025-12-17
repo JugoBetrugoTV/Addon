@@ -72,6 +72,56 @@ function Config:GetOptions()
                             end
                         end,
                     },
+                    headerSkin = {
+                        type = "header",
+                        name = "Skin / Theme",
+                        order = 5,
+                    },
+                    skin = {
+                        type = "select",
+                        name = "Skin",
+                        desc = "Choose a visual skin for the addon",
+                        order = 6,
+                        values = function()
+                            if Skins then
+                                return Skins:GetSkinNames()
+                            end
+                            return { Modern = "Modern" }
+                        end,
+                        get = function() return EDM.db.profile.skin or "Modern" end,
+                        set = function(_, val)
+                            EDM.db.profile.skin = val
+                            if Skins then
+                                Skins:Set(val)
+                            end
+                            if EDM.UI then
+                                EDM.UI:ApplySettings()
+                            end
+                        end,
+                    },
+                    skinDesc = {
+                        type = "description",
+                        name = function()
+                            local skinName = EDM.db.profile.skin or "Modern"
+                            local skin = Skins and Skins:Get(skinName)
+                            if skin and skin.description then
+                                return "|cff888888" .. skin.description .. "|r"
+                            end
+                            return ""
+                        end,
+                        order = 7,
+                    },
+                    mergePets = {
+                        type = "toggle",
+                        name = "Merge Pet Damage",
+                        desc = "Combine pet damage with the owner's damage",
+                        order = 8,
+                        get = function() return EDM.db.profile.general and EDM.db.profile.general.mergePets end,
+                        set = function(_, val)
+                            EDM.db.profile.general = EDM.db.profile.general or {}
+                            EDM.db.profile.general.mergePets = val
+                        end,
+                    },
                     headerCombat = {
                         type = "header",
                         name = "Combat Settings",

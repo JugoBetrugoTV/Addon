@@ -1,6 +1,6 @@
 --[[
-    EpicDamageMeter - Skins
-    Custom skin system for beautiful UI
+    EpicDamageMeter - Skins (Enhanced)
+    Beautiful skin system with multiple themes
 ]]
 
 local ADDON_NAME, EDM = ...
@@ -16,12 +16,20 @@ Skins.current = "Modern"
 -- Default textures path
 local TEXTURE_PATH = "Interface\\AddOns\\EpicDamageMeter\\Textures\\"
 
--- Register built-in skins
+-- Register custom textures with LibSharedMedia
+LSM:Register("statusbar", "EDM Modern", TEXTURE_PATH .. "statusbar_modern")
+LSM:Register("statusbar", "EDM Smooth", TEXTURE_PATH .. "statusbar_smooth")
+LSM:Register("statusbar", "EDM Gradient", TEXTURE_PATH .. "statusbar_gradient")
+LSM:Register("statusbar", "EDM Glossy", TEXTURE_PATH .. "statusbar_glossy")
+LSM:Register("statusbar", "EDM Flat", TEXTURE_PATH .. "statusbar_flat")
+
+--============================================================================
+-- MODERN SKIN - Clean, sleek look
+--============================================================================
 Skins.list["Modern"] = {
     name = "Modern",
     description = "Clean, modern look with soft gradients",
 
-    -- Window
     window = {
         background = "Interface\\Buttons\\WHITE8X8",
         backgroundColor = { r = 0.05, g = 0.05, b = 0.08, a = 0.92 },
@@ -32,7 +40,6 @@ Skins.list["Modern"] = {
         cornerRadius = 8,
     },
 
-    -- Title bar
     titleBar = {
         background = "Interface\\Buttons\\WHITE8X8",
         backgroundColor = { r = 0.08, g = 0.08, b = 0.12, a = 0.98 },
@@ -45,9 +52,9 @@ Skins.list["Modern"] = {
         gradientEnd = { r = 0.06, g = 0.06, b = 0.10, a = 1 },
     },
 
-    -- Bars
     bar = {
-        texture = TEXTURE_PATH .. "statusbar_modern",
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
         height = 18,
         spacing = 1,
         backgroundColor = { r = 0.1, g = 0.1, b = 0.1, a = 0.6 },
@@ -66,7 +73,6 @@ Skins.list["Modern"] = {
         glowColor = { r = 1, g = 1, b = 1, a = 0.3 },
     },
 
-    -- Tooltip
     tooltip = {
         background = "Interface\\Buttons\\WHITE8X8",
         backgroundColor = { r = 0.05, g = 0.05, b = 0.08, a = 0.95 },
@@ -80,7 +86,6 @@ Skins.list["Modern"] = {
         padding = 10,
     },
 
-    -- Scrollbar
     scrollbar = {
         width = 8,
         backgroundColor = { r = 0.1, g = 0.1, b = 0.12, a = 0.8 },
@@ -88,7 +93,6 @@ Skins.list["Modern"] = {
         thumbHoverColor = { r = 0.4, g = 0.4, b = 0.5, a = 1 },
     },
 
-    -- Buttons
     button = {
         backgroundColor = { r = 0.15, g = 0.15, b = 0.2, a = 1 },
         hoverColor = { r = 0.25, g = 0.25, b = 0.35, a = 1 },
@@ -98,7 +102,6 @@ Skins.list["Modern"] = {
         fontFlags = "",
     },
 
-    -- Graph
     graph = {
         backgroundColor = { r = 0.03, g = 0.03, b = 0.05, a = 0.95 },
         gridColor = { r = 0.15, g = 0.15, b = 0.2, a = 0.5 },
@@ -110,6 +113,9 @@ Skins.list["Modern"] = {
     },
 }
 
+--============================================================================
+-- DARK SKIN - Sleek minimal dark theme
+--============================================================================
 Skins.list["Dark"] = {
     name = "Dark",
     description = "Sleek dark theme",
@@ -134,7 +140,8 @@ Skins.list["Dark"] = {
     },
 
     bar = {
-        texture = TEXTURE_PATH .. "statusbar_flat",
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
         height = 16,
         spacing = 1,
         backgroundColor = { r = 0.05, g = 0.05, b = 0.05, a = 0.7 },
@@ -189,6 +196,9 @@ Skins.list["Dark"] = {
     },
 }
 
+--============================================================================
+-- NEON SKIN - Vibrant cyberpunk colors
+--============================================================================
 Skins.list["Neon"] = {
     name = "Neon",
     description = "Vibrant neon colors with glow effects",
@@ -215,7 +225,8 @@ Skins.list["Neon"] = {
     },
 
     bar = {
-        texture = TEXTURE_PATH .. "statusbar_glossy",
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
         height = 20,
         spacing = 2,
         backgroundColor = { r = 0.02, g = 0.02, b = 0.05, a = 0.7 },
@@ -274,6 +285,9 @@ Skins.list["Neon"] = {
     },
 }
 
+--============================================================================
+-- CLASSIC SKIN - WoW vanilla style
+--============================================================================
 Skins.list["Classic"] = {
     name = "Classic",
     description = "Classic WoW-style appearance",
@@ -299,6 +313,7 @@ Skins.list["Classic"] = {
 
     bar = {
         texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
         height = 18,
         spacing = 1,
         backgroundColor = { r = 0, g = 0, b = 0, a = 0.5 },
@@ -353,6 +368,360 @@ Skins.list["Classic"] = {
     },
 }
 
+--============================================================================
+-- ELVUI SKIN - ElvUI-style minimalist
+--============================================================================
+Skins.list["ElvUI"] = {
+    name = "ElvUI",
+    description = "ElvUI-inspired minimalist design",
+
+    window = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.1, g = 0.1, b = 0.1, a = 0.85 },
+        border = "Interface\\Buttons\\WHITE8X8",
+        borderColor = { r = 0, g = 0, b = 0, a = 1 },
+        borderSize = 1,
+        inset = 1,
+    },
+
+    titleBar = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.15, g = 0.15, b = 0.15, a = 1 },
+        height = 18,
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 0.8, b = 0, a = 1 },
+    },
+
+    bar = {
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+        height = 17,
+        spacing = 1,
+        backgroundColor = { r = 0.12, g = 0.12, b = 0.12, a = 0.8 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 1, b = 1, a = 1 },
+        rankFont = "Fonts\\FRIZQT__.TTF",
+        rankFontSize = 8,
+        iconSize = 15,
+        padding = 1,
+        showShadow = false,
+    },
+
+    tooltip = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.1, g = 0.1, b = 0.1, a = 0.95 },
+        borderColor = { r = 0, g = 0, b = 0, a = 1 },
+        headerFont = "Fonts\\FRIZQT__.TTF",
+        headerFontSize = 12,
+        headerFontFlags = "OUTLINE",
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "",
+        padding = 8,
+    },
+
+    scrollbar = {
+        width = 5,
+        backgroundColor = { r = 0.12, g = 0.12, b = 0.12, a = 1 },
+        thumbColor = { r = 0.3, g = 0.3, b = 0.3, a = 1 },
+        thumbHoverColor = { r = 0.5, g = 0.5, b = 0.5, a = 1 },
+    },
+
+    button = {
+        backgroundColor = { r = 0.15, g = 0.15, b = 0.15, a = 1 },
+        hoverColor = { r = 0.2, g = 0.2, b = 0.2, a = 1 },
+        pressedColor = { r = 0.1, g = 0.1, b = 0.1, a = 1 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "OUTLINE",
+    },
+
+    graph = {
+        backgroundColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.95 },
+        gridColor = { r = 0.2, g = 0.2, b = 0.2, a = 0.5 },
+        lineWidth = 2,
+        damageColor = { r = 0.9, g = 0.3, b = 0.3, a = 1 },
+        healingColor = { r = 0.3, g = 0.9, b = 0.3, a = 1 },
+        legendFont = "Fonts\\FRIZQT__.TTF",
+        legendFontSize = 9,
+    },
+}
+
+--============================================================================
+-- GLASS SKIN - Transparent glass effect
+--============================================================================
+Skins.list["Glass"] = {
+    name = "Glass",
+    description = "Transparent glass-like appearance",
+
+    window = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.1, g = 0.1, b = 0.15, a = 0.65 },
+        border = "Interface\\Buttons\\WHITE8X8",
+        borderColor = { r = 0.5, g = 0.5, b = 0.6, a = 0.5 },
+        borderSize = 1,
+        inset = 2,
+    },
+
+    titleBar = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.15, g = 0.15, b = 0.2, a = 0.75 },
+        height = 22,
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 1, b = 1, a = 0.95 },
+        gradientStart = { r = 0.3, g = 0.3, b = 0.35, a = 0.4 },
+        gradientEnd = { r = 0.1, g = 0.1, b = 0.15, a = 0.3 },
+    },
+
+    bar = {
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+        height = 18,
+        spacing = 1,
+        backgroundColor = { r = 0.08, g = 0.08, b = 0.1, a = 0.5 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 1, b = 1, a = 1 },
+        rankFont = "Fonts\\FRIZQT__.TTF",
+        rankFontSize = 9,
+        iconSize = 16,
+        padding = 2,
+        showShadow = true,
+        shadowColor = { r = 0, g = 0, b = 0, a = 0.3 },
+        shadowOffset = 1,
+        glowOnHover = true,
+        glowColor = { r = 1, g = 1, b = 1, a = 0.2 },
+    },
+
+    tooltip = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.08, g = 0.08, b = 0.12, a = 0.9 },
+        borderColor = { r = 0.4, g = 0.4, b = 0.5, a = 0.8 },
+        headerFont = "Fonts\\FRIZQT__.TTF",
+        headerFontSize = 13,
+        headerFontFlags = "OUTLINE",
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "",
+        padding = 10,
+    },
+
+    scrollbar = {
+        width = 8,
+        backgroundColor = { r = 0.1, g = 0.1, b = 0.12, a = 0.5 },
+        thumbColor = { r = 0.4, g = 0.4, b = 0.5, a = 0.7 },
+        thumbHoverColor = { r = 0.5, g = 0.5, b = 0.6, a = 0.9 },
+    },
+
+    button = {
+        backgroundColor = { r = 0.2, g = 0.2, b = 0.25, a = 0.7 },
+        hoverColor = { r = 0.3, g = 0.3, b = 0.35, a = 0.8 },
+        pressedColor = { r = 0.15, g = 0.15, b = 0.2, a = 0.6 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "OUTLINE",
+    },
+
+    graph = {
+        backgroundColor = { r = 0.05, g = 0.05, b = 0.08, a = 0.7 },
+        gridColor = { r = 0.2, g = 0.2, b = 0.25, a = 0.4 },
+        lineWidth = 2,
+        damageColor = { r = 1, g = 0.3, b = 0.3, a = 0.9 },
+        healingColor = { r = 0.3, g = 1, b = 0.3, a = 0.9 },
+        legendFont = "Fonts\\FRIZQT__.TTF",
+        legendFontSize = 10,
+    },
+}
+
+--============================================================================
+-- MIDNIGHT SKIN - Deep blue/purple theme
+--============================================================================
+Skins.list["Midnight"] = {
+    name = "Midnight",
+    description = "Deep midnight blue theme",
+
+    window = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.05, g = 0.05, b = 0.12, a = 0.92 },
+        border = TEXTURE_PATH .. "border_modern",
+        borderColor = { r = 0.2, g = 0.2, b = 0.4, a = 1 },
+        borderSize = 2,
+        inset = 3,
+    },
+
+    titleBar = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.08, g = 0.08, b = 0.18, a = 0.98 },
+        height = 22,
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 12,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 0.7, g = 0.7, b = 1, a = 1 },
+        gradientStart = { r = 0.15, g = 0.15, b = 0.3, a = 1 },
+        gradientEnd = { r = 0.05, g = 0.05, b = 0.12, a = 1 },
+    },
+
+    bar = {
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+        height = 18,
+        spacing = 1,
+        backgroundColor = { r = 0.08, g = 0.08, b = 0.15, a = 0.7 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 1, b = 1, a = 1 },
+        rankFont = "Fonts\\FRIZQT__.TTF",
+        rankFontSize = 9,
+        iconSize = 16,
+        padding = 2,
+        showShadow = true,
+        shadowColor = { r = 0.1, g = 0.1, b = 0.3, a = 0.5 },
+        shadowOffset = 1,
+        glowOnHover = true,
+        glowColor = { r = 0.5, g = 0.5, b = 1, a = 0.3 },
+    },
+
+    tooltip = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.05, g = 0.05, b = 0.12, a = 0.98 },
+        borderColor = { r = 0.3, g = 0.3, b = 0.5, a = 1 },
+        headerFont = "Fonts\\FRIZQT__.TTF",
+        headerFontSize = 13,
+        headerFontFlags = "OUTLINE",
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "",
+        padding = 10,
+    },
+
+    scrollbar = {
+        width = 8,
+        backgroundColor = { r = 0.08, g = 0.08, b = 0.15, a = 0.8 },
+        thumbColor = { r = 0.25, g = 0.25, b = 0.45, a = 0.9 },
+        thumbHoverColor = { r = 0.35, g = 0.35, b = 0.6, a = 1 },
+    },
+
+    button = {
+        backgroundColor = { r = 0.12, g = 0.12, b = 0.25, a = 1 },
+        hoverColor = { r = 0.2, g = 0.2, b = 0.4, a = 1 },
+        pressedColor = { r = 0.08, g = 0.08, b = 0.18, a = 1 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "",
+    },
+
+    graph = {
+        backgroundColor = { r = 0.03, g = 0.03, b = 0.08, a = 0.95 },
+        gridColor = { r = 0.15, g = 0.15, b = 0.25, a = 0.5 },
+        lineWidth = 2,
+        damageColor = { r = 0.9, g = 0.3, b = 0.5, a = 1 },
+        healingColor = { r = 0.3, g = 0.8, b = 0.9, a = 1 },
+        legendFont = "Fonts\\FRIZQT__.TTF",
+        legendFontSize = 10,
+    },
+}
+
+--============================================================================
+-- EMBER SKIN - Warm fire/ember theme
+--============================================================================
+Skins.list["Ember"] = {
+    name = "Ember",
+    description = "Warm ember/fire themed",
+
+    window = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.1, g = 0.05, b = 0.03, a = 0.92 },
+        border = TEXTURE_PATH .. "border_modern",
+        borderColor = { r = 0.4, g = 0.2, b = 0.1, a = 1 },
+        borderSize = 2,
+        inset = 3,
+    },
+
+    titleBar = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.15, g = 0.08, b = 0.05, a = 0.98 },
+        height = 22,
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 12,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 0.8, b = 0.5, a = 1 },
+        gradientStart = { r = 0.25, g = 0.12, b = 0.08, a = 1 },
+        gradientEnd = { r = 0.1, g = 0.05, b = 0.03, a = 1 },
+    },
+
+    bar = {
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+        height = 18,
+        spacing = 1,
+        backgroundColor = { r = 0.12, g = 0.06, b = 0.04, a = 0.7 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 1, b = 1, a = 1 },
+        rankFont = "Fonts\\FRIZQT__.TTF",
+        rankFontSize = 9,
+        iconSize = 16,
+        padding = 2,
+        showShadow = true,
+        shadowColor = { r = 0.3, g = 0.1, b = 0, a = 0.5 },
+        shadowOffset = 1,
+        glowOnHover = true,
+        glowColor = { r = 1, g = 0.5, b = 0.2, a = 0.3 },
+    },
+
+    tooltip = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.1, g = 0.05, b = 0.03, a = 0.98 },
+        borderColor = { r = 0.5, g = 0.25, b = 0.15, a = 1 },
+        headerFont = "Fonts\\FRIZQT__.TTF",
+        headerFontSize = 13,
+        headerFontFlags = "OUTLINE",
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "",
+        padding = 10,
+    },
+
+    scrollbar = {
+        width = 8,
+        backgroundColor = { r = 0.12, g = 0.06, b = 0.04, a = 0.8 },
+        thumbColor = { r = 0.4, g = 0.2, b = 0.1, a = 0.9 },
+        thumbHoverColor = { r = 0.6, g = 0.3, b = 0.15, a = 1 },
+    },
+
+    button = {
+        backgroundColor = { r = 0.2, g = 0.1, b = 0.06, a = 1 },
+        hoverColor = { r = 0.3, g = 0.15, b = 0.08, a = 1 },
+        pressedColor = { r = 0.12, g = 0.06, b = 0.04, a = 1 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "",
+    },
+
+    graph = {
+        backgroundColor = { r = 0.08, g = 0.04, b = 0.02, a = 0.95 },
+        gridColor = { r = 0.25, g = 0.12, b = 0.08, a = 0.5 },
+        lineWidth = 2,
+        damageColor = { r = 1, g = 0.4, b = 0.1, a = 1 },
+        healingColor = { r = 0.4, g = 1, b = 0.5, a = 1 },
+        legendFont = "Fonts\\FRIZQT__.TTF",
+        legendFontSize = 10,
+    },
+}
+
+--============================================================================
+-- SKIN FUNCTIONS
+--============================================================================
+
 -- Get skin
 function Skins:Get(skinName)
     return self.list[skinName or self.current] or self.list["Modern"]
@@ -362,6 +731,13 @@ end
 function Skins:Set(skinName)
     if self.list[skinName] then
         self.current = skinName
+        if EDM.db and EDM.db.profile then
+            EDM.db.profile.skin = skinName
+        end
+        -- Trigger skin update for all UI elements
+        if EDM.UI then
+            EDM.UI:ApplySettings()
+        end
         return true
     end
     return false
@@ -373,10 +749,21 @@ function Skins:GetList()
     for name, skin in pairs(self.list) do
         table.insert(list, { name = name, description = skin.description })
     end
+    -- Sort alphabetically
+    table.sort(list, function(a, b) return a.name < b.name end)
     return list
 end
 
--- Apply skin element
+-- Get skin names for dropdown
+function Skins:GetSkinNames()
+    local names = {}
+    for name in pairs(self.list) do
+        names[name] = name
+    end
+    return names
+end
+
+-- Apply skin element to frame background
 function Skins:ApplyBackground(frame, skinName)
     local skin = self:Get(skinName)
     if not skin or not skin.window then return end
@@ -430,8 +817,11 @@ function Skins:ApplyBar(statusBar, nameText, valueText, skinName)
 
     local b = skin.bar
 
-    -- Set status bar texture
-    local texture = LSM:Fetch("statusbar", b.texture) or b.texture
+    -- Set status bar texture - try custom texture first, fall back to default
+    local texture = LSM:Fetch("statusbar", b.texture)
+    if not texture then
+        texture = b.fallbackTexture or "Interface\\TargetingFrame\\UI-StatusBar"
+    end
     statusBar:SetStatusBarTexture(texture)
 
     -- Set fonts
@@ -443,5 +833,62 @@ function Skins:ApplyBar(statusBar, nameText, valueText, skinName)
     if valueText then
         valueText:SetFont(b.font, b.fontSize, b.fontFlags)
         valueText:SetTextColor(b.fontColor.r, b.fontColor.g, b.fontColor.b, b.fontColor.a)
+    end
+end
+
+-- Get bar settings from current skin
+function Skins:GetBarSettings(skinName)
+    local skin = self:Get(skinName)
+    if skin and skin.bar then
+        return skin.bar
+    end
+    return self.list["Modern"].bar
+end
+
+-- Get tooltip settings from current skin
+function Skins:GetTooltipSettings(skinName)
+    local skin = self:Get(skinName)
+    if skin and skin.tooltip then
+        return skin.tooltip
+    end
+    return self.list["Modern"].tooltip
+end
+
+-- Get graph settings from current skin
+function Skins:GetGraphSettings(skinName)
+    local skin = self:Get(skinName)
+    if skin and skin.graph then
+        return skin.graph
+    end
+    return self.list["Modern"].graph
+end
+
+-- Create gradient texture
+function Skins:CreateGradient(frame, startColor, endColor, orientation)
+    local tex = frame:CreateTexture(nil, "BACKGROUND")
+    tex:SetAllPoints()
+    tex:SetGradient(
+        orientation or "VERTICAL",
+        CreateColor(startColor.r, startColor.g, startColor.b, startColor.a or 1),
+        CreateColor(endColor.r, endColor.g, endColor.b, endColor.a or 1)
+    )
+    return tex
+end
+
+-- Apply highlight effect
+function Skins:ApplyHighlight(frame, color)
+    if not frame.highlight then
+        frame.highlight = frame:CreateTexture(nil, "HIGHLIGHT")
+        frame.highlight:SetAllPoints()
+        frame.highlight:SetColorTexture(color.r, color.g, color.b, color.a or 0.1)
+    else
+        frame.highlight:SetColorTexture(color.r, color.g, color.b, color.a or 0.1)
+    end
+end
+
+-- Initialize skin from saved settings
+function Skins:Initialize()
+    if EDM.db and EDM.db.profile and EDM.db.profile.skin then
+        self.current = EDM.db.profile.skin
     end
 end

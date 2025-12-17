@@ -342,6 +342,10 @@ function Core:SlashCommand(input)
     elseif input == "debug" then
         self.db.profile.advanced.debugMode = not self.db.profile.advanced.debugMode
         self:Print("Debug mode:", self.db.profile.advanced.debugMode and "ON" or "OFF")
+    elseif input == "report" or input:match("^report%s") then
+        self:ReportToChat(input)
+    elseif input == "newwindow" or input == "new" then
+        self:CreateNewWindow()
     elseif input == "help" then
         self:PrintHelp()
     else
@@ -362,7 +366,82 @@ function Core:PrintHelp()
     self:Print("  /edm lock - Toggle window lock")
     self:Print("  /edm graph - Toggle graph window")
     self:Print("  /edm minimap - Toggle minimap icon")
+    self:Print("  /edm new - Create new meter window")
+    self:Print("  /edm report [channel] - Report to chat (say/party/raid/guild)")
     self:Print("  /edm help - Show this help")
+end
+
+-- Create new window
+function Core:CreateNewWindow()
+    if EDM.UI then
+        local instance = EDM.UI:CreateNewInstance()
+        if instance then
+            self:Print("Created new window #" .. instance.id)
+        end
+    end
+end
+
+-- Report to chat
+function Core:ReportToChat(input)
+    -- Parse channel from input
+    local channel = "SAY"
+    local args = input:match("^report%s+(.+)$")
+    if args then
+        args = args:upper()
+        if args == "PARTY" or args == "P" then
+            channel = "PARTY"
+        elseif args == "RAID" or args == "R" then
+            channel = "RAID"
+        elseif args == "GUILD" or args == "G" then
+            channel = "GUILD"
+        elseif args == "INSTANCE" or args == "I" then
+            channel = "INSTANCE_CHAT"
+        elseif args == "WHISPER" or args == "W" then
+            channel = "WHISPER"
+        end
+    end
+
+    -- Get current segment data
+    local segment = DB.Data.currentSegment
+    if not segment then
+        self:Print("No data to report")
+        return
+    end
+
+    -- Get sorted actors for damage
+    local actors = DB:GetSortedActors(segment, C.DISPLAY_MODE.DAMAGE_DONE)
+    if not actors or #actors == 0 then
+        self:Print("No damage data to report")
+        return
+    end
+
+    -- Get duration
+    local duration = DB:GetSegmentDuration(segment)
+
+    -- Build report
+    local maxReport = math.min(5, #actors)
+
+    SendChatMessage("--- EpicDamageMeter Report ---", channel)
+
+    for i = 1, maxReport do
+        local actor = actors[i]
+        local dps = duration > 0 and (actor.damage / duration) or 0
+        local msg = string.format("%d. %s - %s (%s DPS)",
+            i,
+            actor.name or "Unknown",
+            Utils.FormatNumber(actor.damage),
+            Utils.FormatNumber(dps)
+        )
+        SendChatMessage(msg, channel)
+    end
+
+    -- Total line
+    local totalDPS = duration > 0 and (segment.totalDamage / duration) or 0
+    SendChatMessage(string.format("Total: %s damage in %s (%s DPS)",
+        Utils.FormatNumber(segment.totalDamage),
+        Utils.FormatTime(duration),
+        Utils.FormatNumber(totalDPS)
+    ), channel)
 end
 
 -- Show window

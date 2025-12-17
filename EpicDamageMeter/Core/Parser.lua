@@ -1,6 +1,6 @@
 --[[
-    EpicDamageMeter - Parser
-    Combat Log parsing and data extraction
+    EpicDamageMeter - Parser (Enhanced)
+    Combat Log parsing with improved group/raid tracking
 ]]
 
 local ADDON_NAME, EDM = ...
@@ -13,54 +13,249 @@ local DB = EDM.Database
 
 -- Player GUID cache
 local playerGUID = nil
+local playerName = nil
 local groupGUIDs = {}
+local petOwners = {}
+local ownerPets = {}
+
+-- GUID type cache for fast lookups
+local guidTypeCache = {}
 
 -- Initialize parser
 function Parser:Initialize()
     playerGUID = UnitGUID("player")
+    playerName = UnitName("player")
+
     self:UpdateGroupGUIDs()
+    self:RegisterEvents()
 end
 
--- Update group GUIDs
+-- Register events for dynamic tracking
+function Parser:RegisterEvents()
+    local frame = CreateFrame("Frame")
+
+    frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+    frame:RegisterEvent("UNIT_PET")
+    frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+    frame:RegisterEvent("ARENA_OPPONENT_UPDATE")
+
+    frame:SetScript("OnEvent", function(_, event, ...)
+        if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+            Parser:UpdateGroupGUIDs()
+        elseif event == "UNIT_PET" then
+            Parser:UpdatePetMapping(...)
+        elseif event == "ARENA_OPPONENT_UPDATE" then
+            Parser:UpdateGroupGUIDs()
+        end
+    end)
+end
+
+-- Update group GUIDs with comprehensive tracking
 function Parser:UpdateGroupGUIDs()
     wipe(groupGUIDs)
+    wipe(guidTypeCache)
 
     -- Add player
     local pGUID = UnitGUID("player")
     if pGUID then
-        groupGUIDs[pGUID] = true
-    end
-
-    -- Add party/raid members
-    local inRaid = IsInRaid()
-    local prefix = inRaid and "raid" or "party"
-    local maxMembers = inRaid and 40 or 4
-
-    for i = 1, maxMembers do
-        local unit = prefix .. i
-        local guid = UnitGUID(unit)
-        if guid then
-            groupGUIDs[guid] = true
-        end
-
-        -- Add pets
-        local petUnit = prefix .. "pet" .. i
-        local petGUID = UnitGUID(petUnit)
-        if petGUID then
-            groupGUIDs[petGUID] = true
-        end
+        groupGUIDs[pGUID] = { name = playerName, type = "player", owner = nil }
+        guidTypeCache[pGUID] = "player"
     end
 
     -- Add player's pet
-    local playerPetGUID = UnitGUID("pet")
-    if playerPetGUID then
-        groupGUIDs[playerPetGUID] = true
+    self:AddPetForUnit("player", pGUID)
+
+    -- Determine group type
+    local inRaid = IsInRaid()
+    local inParty = IsInGroup() and not inRaid
+    local inArena = IsActiveBattlefieldArena and IsActiveBattlefieldArena()
+    local inBattleground = UnitInBattleground("player") ~= nil
+
+    if inRaid then
+        self:ScanRaid()
+    elseif inParty then
+        self:ScanParty()
     end
+
+    -- Add arena teammates/opponents if in arena
+    if inArena then
+        self:ScanArena()
+    end
+
+    Utils.Debug("Group GUIDs updated:", self:GetGroupCount())
+end
+
+-- Scan raid members
+function Parser:ScanRaid()
+    for i = 1, 40 do
+        local unit = "raid" .. i
+        local guid = UnitGUID(unit)
+        if guid then
+            local name, realm = UnitName(unit)
+            if name then
+                groupGUIDs[guid] = { name = name, type = "player", owner = nil }
+                guidTypeCache[guid] = "player"
+                self:AddPetForUnit(unit .. "pet", guid)
+            end
+        end
+    end
+end
+
+-- Scan party members
+function Parser:ScanParty()
+    for i = 1, 4 do
+        local unit = "party" .. i
+        local guid = UnitGUID(unit)
+        if guid then
+            local name, realm = UnitName(unit)
+            if name then
+                groupGUIDs[guid] = { name = name, type = "player", owner = nil }
+                guidTypeCache[guid] = "player"
+                self:AddPetForUnit(unit .. "pet", guid)
+            end
+        end
+    end
+end
+
+-- Scan arena units
+function Parser:ScanArena()
+    for i = 1, 5 do
+        -- Teammates
+        local unit = "arena" .. i
+        local guid = UnitGUID(unit)
+        if guid then
+            local name = UnitName(unit)
+            if name then
+                groupGUIDs[guid] = { name = name, type = "player", owner = nil }
+                guidTypeCache[guid] = "player"
+            end
+        end
+
+        -- Arena pet
+        local petUnit = "arenapet" .. i
+        local petGUID = UnitGUID(petUnit)
+        if petGUID then
+            self:AddPetForUnit(petUnit, guid)
+        end
+    end
+end
+
+-- Add pet for a unit
+function Parser:AddPetForUnit(petUnit, ownerGUID)
+    local petGUID = UnitGUID(petUnit)
+    if petGUID then
+        local petName = UnitName(petUnit)
+        groupGUIDs[petGUID] = { name = petName or "Pet", type = "pet", owner = ownerGUID }
+        guidTypeCache[petGUID] = "pet"
+
+        -- Store pet-owner mapping
+        petOwners[petGUID] = ownerGUID
+        ownerPets[ownerGUID] = ownerPets[ownerGUID] or {}
+        ownerPets[ownerGUID][petGUID] = true
+    end
+end
+
+-- Update pet mapping when UNIT_PET fires
+function Parser:UpdatePetMapping(unit)
+    if not unit then return end
+
+    local ownerGUID = UnitGUID(unit)
+    if not ownerGUID then return end
+
+    local petUnit = unit .. "pet"
+    local petGUID = UnitGUID(petUnit)
+
+    if petGUID then
+        local petName = UnitName(petUnit)
+        groupGUIDs[petGUID] = { name = petName or "Pet", type = "pet", owner = ownerGUID }
+        guidTypeCache[petGUID] = "pet"
+        petOwners[petGUID] = ownerGUID
+        ownerPets[ownerGUID] = ownerPets[ownerGUID] or {}
+        ownerPets[ownerGUID][petGUID] = true
+    end
+end
+
+-- Get group member count
+function Parser:GetGroupCount()
+    local count = 0
+    for _ in pairs(groupGUIDs) do
+        count = count + 1
+    end
+    return count
 end
 
 -- Check if GUID is in our group
 function Parser:IsInGroup(guid)
-    return groupGUIDs[guid] or false
+    if not guid then return false end
+
+    -- Check cache
+    if groupGUIDs[guid] then
+        return true
+    end
+
+    -- Dynamic pet discovery from combat log
+    local guidType = self:GetGUIDType(guid)
+    if guidType == "Pet" or guidType == "Creature" then
+        -- Try to find owner via GUID parsing
+        local ownerGUID = self:FindPetOwner(guid)
+        if ownerGUID and groupGUIDs[ownerGUID] then
+            -- Add pet to tracking
+            local name = self:GetNameFromGUID(guid)
+            groupGUIDs[guid] = { name = name or "Pet", type = "pet", owner = ownerGUID }
+            guidTypeCache[guid] = "pet"
+            petOwners[guid] = ownerGUID
+            return true
+        end
+    end
+
+    return false
+end
+
+-- Get GUID type (Player, Pet, Creature, etc)
+function Parser:GetGUIDType(guid)
+    if not guid then return nil end
+
+    if guidTypeCache[guid] then
+        return guidTypeCache[guid]
+    end
+
+    -- Parse GUID to determine type
+    local guidType = strsplit("-", guid)
+    guidTypeCache[guid] = guidType
+    return guidType
+end
+
+-- Find pet owner through various methods
+function Parser:FindPetOwner(petGUID)
+    -- Check cache first
+    if petOwners[petGUID] then
+        return petOwners[petGUID]
+    end
+
+    -- Try tooltip scanning
+    local ownerGUID = self:ScanTooltipForOwner(petGUID)
+    if ownerGUID then
+        petOwners[petGUID] = ownerGUID
+        return ownerGUID
+    end
+
+    return nil
+end
+
+-- Scan tooltip for pet owner (uses scanning tooltip)
+function Parser:ScanTooltipForOwner(petGUID)
+    -- This is a simplified version - real implementation would use tooltip scanning
+    -- For now, we rely on unit-based pet tracking
+    return nil
+end
+
+-- Get name from GUID
+function Parser:GetNameFromGUID(guid)
+    if groupGUIDs[guid] then
+        return groupGUIDs[guid].name
+    end
+    return nil
 end
 
 -- Get class for GUID
@@ -72,7 +267,50 @@ function Parser:GetClass(guid)
         return info.class
     end
 
+    -- Check if it's a pet
+    if guidTypeCache[guid] == "pet" or (groupGUIDs[guid] and groupGUIDs[guid].type == "pet") then
+        -- Try to get owner class
+        local ownerGUID = petOwners[guid]
+        if ownerGUID then
+            local ownerInfo = Utils.GetPlayerInfo(ownerGUID)
+            if ownerInfo and ownerInfo.class then
+                return ownerInfo.class
+            end
+        end
+    end
+
     return "UNKNOWN"
+end
+
+-- Get pet owner (public API)
+function Parser:GetPetOwner(petGUID)
+    return petOwners[petGUID]
+end
+
+-- Set pet owner (public API)
+function Parser:SetPetOwner(petGUID, ownerGUID)
+    petOwners[petGUID] = ownerGUID
+    if ownerGUID then
+        ownerPets[ownerGUID] = ownerPets[ownerGUID] or {}
+        ownerPets[ownerGUID][petGUID] = true
+    end
+end
+
+-- Check if actor should be merged with owner
+function Parser:ShouldMergePetDamage()
+    return EDM.db and EDM.db.profile.general and EDM.db.profile.general.mergePets
+end
+
+-- Get effective source (pet -> owner if merging)
+function Parser:GetEffectiveSource(sourceGUID, sourceName, sourceFlags)
+    if self:ShouldMergePetDamage() then
+        local ownerGUID = petOwners[sourceGUID]
+        if ownerGUID and groupGUIDs[ownerGUID] then
+            local ownerInfo = groupGUIDs[ownerGUID]
+            return ownerGUID, ownerInfo.name, sourceFlags
+        end
+    end
+    return sourceGUID, sourceName, sourceFlags
 end
 
 -- Main combat log event handler
@@ -114,7 +352,26 @@ function Parser:OnCombatLogEvent()
     elseif C.ABSORB_EVENTS[subEvent] then
         self:ProcessAbsorb(segment, timestamp, subEvent, sourceGUID, sourceName, sourceFlags,
                           destGUID, destName, destFlags)
+
+    -- Handle summon events for pet tracking
+    elseif subEvent == "SPELL_SUMMON" then
+        self:ProcessSummon(sourceGUID, sourceName, destGUID, destName)
     end
+end
+
+-- Process summon event for pet tracking
+function Parser:ProcessSummon(ownerGUID, ownerName, petGUID, petName)
+    if not ownerGUID or not petGUID then return end
+    if not self:IsInGroup(ownerGUID) then return end
+
+    -- Add pet to tracking
+    groupGUIDs[petGUID] = { name = petName or "Pet", type = "pet", owner = ownerGUID }
+    guidTypeCache[petGUID] = "pet"
+    petOwners[petGUID] = ownerGUID
+    ownerPets[ownerGUID] = ownerPets[ownerGUID] or {}
+    ownerPets[ownerGUID][petGUID] = true
+
+    Utils.Debug("Pet summoned:", petName, "by", ownerName)
 end
 
 -- Process damage event
@@ -122,6 +379,9 @@ function Parser:ProcessDamage(segment, timestamp, subEvent, sourceGUID, sourceNa
                               destGUID, destName, destFlags)
     -- Check if source is in our group
     if not self:IsInGroup(sourceGUID) then return end
+
+    -- Get effective source (handles pet merging)
+    local effSourceGUID, effSourceName, effSourceFlags = self:GetEffectiveSource(sourceGUID, sourceName, sourceFlags)
 
     local _, _, _, _, _, _, _, _, _, _, _, spellId, spellName, spellSchool
     local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
@@ -151,16 +411,17 @@ function Parser:ProcessDamage(segment, timestamp, subEvent, sourceGUID, sourceNa
     local spellIcon = spellInfo and spellInfo.icon
 
     -- Get source class
-    local sourceClass = self:GetClass(sourceGUID)
+    local sourceClass = self:GetClass(effSourceGUID)
 
     -- Record damage
-    DB:RecordDamage(segment, sourceGUID, sourceName, sourceClass, sourceFlags,
+    DB:RecordDamage(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags,
                     destGUID, destName, destFlags,
                     spellId, spellName, spellIcon, amount, overkill, spellSchool, critical)
 
     -- Also record damage taken for dest if in group
     if self:IsInGroup(destGUID) then
-        local destActor = DB:GetActor(segment, destGUID, destName, self:GetClass(destGUID), destFlags)
+        local destClass = self:GetClass(destGUID)
+        local destActor = DB:GetActor(segment, destGUID, destName, destClass, destFlags)
         if destActor then
             destActor.damageTaken = destActor.damageTaken + amount
 
@@ -179,6 +440,9 @@ function Parser:ProcessHealing(segment, timestamp, subEvent, sourceGUID, sourceN
     -- Check if source is in our group
     if not self:IsInGroup(sourceGUID) then return end
 
+    -- Get effective source (handles pet merging)
+    local effSourceGUID, effSourceName, effSourceFlags = self:GetEffectiveSource(sourceGUID, sourceName, sourceFlags)
+
     local spellId, spellName, spellSchool, amount, overhealing, absorbed, critical =
         select(12, CombatLogGetCurrentEventInfo())
 
@@ -189,10 +453,10 @@ function Parser:ProcessHealing(segment, timestamp, subEvent, sourceGUID, sourceN
     local spellIcon = spellInfo and spellInfo.icon
 
     -- Get source class
-    local sourceClass = self:GetClass(sourceGUID)
+    local sourceClass = self:GetClass(effSourceGUID)
 
     -- Record healing
-    DB:RecordHealing(segment, sourceGUID, sourceName, sourceClass, sourceFlags,
+    DB:RecordHealing(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags,
                      destGUID, destName, destFlags,
                      spellId, spellName, spellIcon, amount, overhealing, critical)
 end
@@ -202,6 +466,9 @@ function Parser:ProcessMiss(segment, timestamp, subEvent, sourceGUID, sourceName
                             destGUID, destName, destFlags)
     -- Check if source is in our group
     if not self:IsInGroup(sourceGUID) then return end
+
+    -- Get effective source
+    local effSourceGUID, effSourceName, effSourceFlags = self:GetEffectiveSource(sourceGUID, sourceName, sourceFlags)
 
     local spellId, spellName, spellSchool, missType, isOffHand, amountMissed, critical
 
@@ -215,10 +482,10 @@ function Parser:ProcessMiss(segment, timestamp, subEvent, sourceGUID, sourceName
     end
 
     -- Get source class
-    local sourceClass = self:GetClass(sourceGUID)
+    local sourceClass = self:GetClass(effSourceGUID)
 
     -- Get or create actor
-    local actor = DB:GetActor(segment, sourceGUID, sourceName, sourceClass, sourceFlags)
+    local actor = DB:GetActor(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags)
     if not actor then return end
 
     -- Get or create ability
@@ -249,16 +516,19 @@ function Parser:ProcessInterrupt(segment, timestamp, sourceGUID, sourceName, sou
     -- Check if source is in our group
     if not self:IsInGroup(sourceGUID) then return end
 
+    -- Get effective source
+    local effSourceGUID, effSourceName, effSourceFlags = self:GetEffectiveSource(sourceGUID, sourceName, sourceFlags)
+
     local spellId, spellName, spellSchool, extraSpellId, extraSpellName =
         select(12, CombatLogGetCurrentEventInfo())
 
     -- Get source class
-    local sourceClass = self:GetClass(sourceGUID)
+    local sourceClass = self:GetClass(effSourceGUID)
 
     -- Record interrupt
-    DB:RecordInterrupt(segment, sourceGUID, sourceName, sourceClass, sourceFlags, spellId)
+    DB:RecordInterrupt(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags, spellId)
 
-    Utils.Debug("Interrupt recorded for:", sourceName, "->", extraSpellName)
+    Utils.Debug("Interrupt recorded for:", effSourceName, "->", extraSpellName)
 end
 
 -- Process dispel event
@@ -266,16 +536,19 @@ function Parser:ProcessDispel(segment, timestamp, sourceGUID, sourceName, source
     -- Check if source is in our group
     if not self:IsInGroup(sourceGUID) then return end
 
+    -- Get effective source
+    local effSourceGUID, effSourceName, effSourceFlags = self:GetEffectiveSource(sourceGUID, sourceName, sourceFlags)
+
     local spellId, spellName, spellSchool, extraSpellId, extraSpellName =
         select(12, CombatLogGetCurrentEventInfo())
 
     -- Get source class
-    local sourceClass = self:GetClass(sourceGUID)
+    local sourceClass = self:GetClass(effSourceGUID)
 
     -- Record dispel
-    DB:RecordDispel(segment, sourceGUID, sourceName, sourceClass, sourceFlags, spellId)
+    DB:RecordDispel(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags, spellId)
 
-    Utils.Debug("Dispel recorded for:", sourceName, "->", extraSpellName)
+    Utils.Debug("Dispel recorded for:", effSourceName, "->", extraSpellName)
 end
 
 -- Process absorb event
@@ -304,11 +577,14 @@ function Parser:ProcessAbsorb(segment, timestamp, subEvent, sourceGUID, sourceNa
     if not casterGUID or not self:IsInGroup(casterGUID) then return end
     if not amount or amount == 0 then return end
 
+    -- Get effective source
+    local effCasterGUID, effCasterName = self:GetEffectiveSource(casterGUID, casterName, casterFlags)
+
     -- Get caster class
-    local casterClass = self:GetClass(casterGUID)
+    local casterClass = self:GetClass(effCasterGUID)
 
     -- Record absorb as healing
-    local actor = DB:GetActor(segment, casterGUID, casterName, casterClass, casterFlags)
+    local actor = DB:GetActor(segment, effCasterGUID, effCasterName, casterClass, casterFlags)
     if actor then
         actor.absorbs = actor.absorbs + amount
         actor.healing = actor.healing + amount
@@ -318,7 +594,7 @@ function Parser:ProcessAbsorb(segment, timestamp, subEvent, sourceGUID, sourceNa
 
     -- Also update overall
     if DB.Data.overallSegment then
-        local overallActor = DB:GetActor(DB.Data.overallSegment, casterGUID, casterName, casterClass, casterFlags)
+        local overallActor = DB:GetActor(DB.Data.overallSegment, effCasterGUID, effCasterName, casterClass, casterFlags)
         if overallActor then
             overallActor.absorbs = overallActor.absorbs + amount
             overallActor.healing = overallActor.healing + amount
@@ -328,23 +604,23 @@ function Parser:ProcessAbsorb(segment, timestamp, subEvent, sourceGUID, sourceNa
     end
 end
 
--- Pet to owner mapping
-local petOwners = {}
-
--- Get pet owner
-function Parser:GetPetOwner(petGUID)
-    if petOwners[petGUID] then
-        return petOwners[petGUID]
-    end
-
-    -- Try to find owner through tooltip scanning or other methods
-    -- This is simplified - real addon would use more sophisticated tracking
-    return nil
+-- Force refresh group GUIDs (public API)
+function Parser:RefreshGroup()
+    self:UpdateGroupGUIDs()
 end
 
--- Set pet owner
-function Parser:SetPetOwner(petGUID, ownerGUID)
-    petOwners[petGUID] = ownerGUID
+-- Get all group members (public API for debugging)
+function Parser:GetGroupMembers()
+    local members = {}
+    for guid, info in pairs(groupGUIDs) do
+        table.insert(members, {
+            guid = guid,
+            name = info.name,
+            type = info.type,
+            owner = info.owner
+        })
+    end
+    return members
 end
 
 -- Initialize on load
