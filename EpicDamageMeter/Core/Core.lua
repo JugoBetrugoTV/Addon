@@ -515,9 +515,24 @@ end
 
 -- Play sound
 function Core:PlaySound(soundName)
+    -- Try LSM first
     local soundFile = LSM:Fetch("sound", soundName)
-    if soundFile and soundFile ~= "" then
+    if soundFile and soundFile ~= "" and soundFile ~= "None" then
         PlaySoundFile(soundFile, "Master")
+        return
+    end
+
+    -- Fallback to built-in WoW sounds
+    local builtInSounds = {
+        ["Combat Start"] = SOUNDKIT.READY_CHECK,
+        ["Combat End"] = SOUNDKIT.UI_RAID_BOSS_DEFEATED,
+        ["New Record"] = SOUNDKIT.UI_PERSONAL_BEST_BANNER_CHEER,
+        ["Alert"] = SOUNDKIT.ALARM_CLOCK_WARNING_2,
+    }
+
+    local soundID = builtInSounds[soundName]
+    if soundID then
+        PlaySound(soundID, "Master")
     end
 end
 

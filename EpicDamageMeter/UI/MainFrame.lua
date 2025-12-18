@@ -418,8 +418,16 @@ function Instance:ShowModeMenu()
         local info = UIDropDownMenu_CreateInfo()
 
         if level == 1 then
-            -- Damage section
-            info.text = "Damage"
+            -- Damage section header
+            info.text = "|cffff6666Damage|r"
+            info.isTitle = true
+            info.notCheckable = true
+            UIDropDownMenu_AddButton(info, level)
+
+            info.isTitle = false
+            info.notCheckable = false
+
+            info.text = "Damage Done"
             info.checked = (self_ref.mode == C.DISPLAY_MODE.DAMAGE_DONE)
             info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DAMAGE_DONE); CloseDropDownMenus() end
             UIDropDownMenu_AddButton(info, level)
@@ -434,19 +442,18 @@ function Instance:ShowModeMenu()
             info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DAMAGE_TAKEN); CloseDropDownMenus() end
             UIDropDownMenu_AddButton(info, level)
 
-            -- Separator
-            info.text = ""
-            info.disabled = true
+            -- Healing section header
+            info.text = "|cff66ff66Healing|r"
+            info.isTitle = true
+            info.notCheckable = true
             info.checked = false
             info.func = nil
-            info.notCheckable = true
             UIDropDownMenu_AddButton(info, level)
 
-            -- Healing section
-            info.disabled = false
+            info.isTitle = false
             info.notCheckable = false
 
-            info.text = "Healing"
+            info.text = "Healing Done"
             info.checked = (self_ref.mode == C.DISPLAY_MODE.HEALING_DONE)
             info.func = function() self_ref:SetMode(C.DISPLAY_MODE.HEALING_DONE); CloseDropDownMenus() end
             UIDropDownMenu_AddButton(info, level)
@@ -456,26 +463,30 @@ function Instance:ShowModeMenu()
             info.func = function() self_ref:SetMode(C.DISPLAY_MODE.HPS); CloseDropDownMenus() end
             UIDropDownMenu_AddButton(info, level)
 
+            info.text = "Healing Received"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.HEALING_TAKEN)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.HEALING_TAKEN); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
             info.text = "Overhealing"
             info.checked = (self_ref.mode == C.DISPLAY_MODE.OVERHEALING)
             info.func = function() self_ref:SetMode(C.DISPLAY_MODE.OVERHEALING); CloseDropDownMenus() end
             UIDropDownMenu_AddButton(info, level)
 
-            info.text = "Absorbs"
+            info.text = "Absorbs Done"
             info.checked = (self_ref.mode == C.DISPLAY_MODE.ABSORBS)
             info.func = function() self_ref:SetMode(C.DISPLAY_MODE.ABSORBS); CloseDropDownMenus() end
             UIDropDownMenu_AddButton(info, level)
 
-            -- Separator
-            info.text = ""
-            info.disabled = true
+            -- Utility section header
+            info.text = "|cff6699ffUtility|r"
+            info.isTitle = true
+            info.notCheckable = true
             info.checked = false
             info.func = nil
-            info.notCheckable = true
             UIDropDownMenu_AddButton(info, level)
 
-            -- Utility section
-            info.disabled = false
+            info.isTitle = false
             info.notCheckable = false
 
             info.text = "Deaths"
@@ -491,6 +502,11 @@ function Instance:ShowModeMenu()
             info.text = "Dispels"
             info.checked = (self_ref.mode == C.DISPLAY_MODE.DISPELS)
             info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DISPELS); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "CC Breaks"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.CC_BREAKS)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.CC_BREAKS); CloseDropDownMenus() end
             UIDropDownMenu_AddButton(info, level)
         end
     end
@@ -692,6 +708,16 @@ function Instance:CalculateTotals(actors, segment, duration)
             total = total + (actor.damageTaken or 0)
             if (actor.damageTaken or 0) > topValue then topValue = actor.damageTaken end
         end
+    elseif self.mode == C.DISPLAY_MODE.HEALING_TAKEN then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.healingTaken or 0)
+            if (actor.healingTaken or 0) > topValue then topValue = actor.healingTaken end
+        end
+    elseif self.mode == C.DISPLAY_MODE.CC_BREAKS then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.ccBreaks or 0)
+            if (actor.ccBreaks or 0) > topValue then topValue = actor.ccBreaks end
+        end
     elseif self.mode == C.DISPLAY_MODE.DEATHS then
         for _, actor in ipairs(actors) do
             total = total + (actor.deaths or 0)
@@ -747,6 +773,10 @@ function Instance:SetBarData(bar, actor, rank, topValue, duration, total)
         perSecond = value
     elseif self.mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
         value = actor.damageTaken or 0
+    elseif self.mode == C.DISPLAY_MODE.HEALING_TAKEN then
+        value = actor.healingTaken or 0
+    elseif self.mode == C.DISPLAY_MODE.CC_BREAKS then
+        value = actor.ccBreaks or 0
     elseif self.mode == C.DISPLAY_MODE.DEATHS then
         value = actor.deaths or 0
     elseif self.mode == C.DISPLAY_MODE.INTERRUPTS then
@@ -779,7 +809,8 @@ function Instance:SetBarData(bar, actor, rank, topValue, duration, total)
 
     -- Value text with percentage
     local displayValue = (self.mode == C.DISPLAY_MODE.DPS or self.mode == C.DISPLAY_MODE.HPS) and perSecond or value
-    if self.mode == C.DISPLAY_MODE.DEATHS or self.mode == C.DISPLAY_MODE.INTERRUPTS or self.mode == C.DISPLAY_MODE.DISPELS then
+    if self.mode == C.DISPLAY_MODE.DEATHS or self.mode == C.DISPLAY_MODE.INTERRUPTS or
+       self.mode == C.DISPLAY_MODE.DISPELS or self.mode == C.DISPLAY_MODE.CC_BREAKS then
         bar.valueText:SetText(string.format("%d (%.1f%%)", value, percentOfTotal))
     else
         bar.valueText:SetText(string.format("%s (%.1f%%)", Utils.FormatNumber(displayValue), percentOfTotal))
@@ -824,11 +855,36 @@ end
 function UI:Initialize()
     if self.initialized then return end
 
-    -- Create initial instance
-    self:CreateNewInstance(C.DISPLAY_MODE.DAMAGE_DONE)
+    -- Try to restore saved windows from character data
+    local savedWindows = EDM.db and EDM.db.char and EDM.db.char.windows
+    local windowsCreated = 0
+
+    if savedWindows then
+        -- Sort by ID to restore in order
+        local sortedIds = {}
+        for id in pairs(savedWindows) do
+            table.insert(sortedIds, id)
+        end
+        table.sort(sortedIds)
+
+        for _, id in ipairs(sortedIds) do
+            local winData = savedWindows[id]
+            if winData then
+                self.instanceCounter = self.instanceCounter + 1
+                local instance = Instance:New(self.instanceCounter, winData.mode or C.DISPLAY_MODE.DAMAGE_DONE)
+                self.instances[self.instanceCounter] = instance
+                windowsCreated = windowsCreated + 1
+            end
+        end
+    end
+
+    -- Create at least one window if none were restored
+    if windowsCreated == 0 then
+        self:CreateNewInstance(C.DISPLAY_MODE.DAMAGE_DONE)
+    end
 
     self.initialized = true
-    Utils.Debug("UI initialized with multi-window support")
+    Utils.Debug("UI initialized with", windowsCreated > 0 and windowsCreated or 1, "window(s)")
 end
 
 function UI:CreateNewInstance(mode)
@@ -883,17 +939,23 @@ function UI:CreateBar()
     bar:EnableMouse(true)
     bar:RegisterForClicks("AnyUp")
 
-    -- Background
+    -- Background (darker for contrast)
     bar.bg = bar:CreateTexture(nil, "BACKGROUND")
     bar.bg:SetAllPoints()
-    bar.bg:SetColorTexture(0.08, 0.08, 0.1, 0.7)
+    bar.bg:SetColorTexture(0.02, 0.02, 0.02, 0.85)
 
-    -- Status bar (percentage fill)
+    -- Status bar (percentage fill) - with reduced alpha for text visibility
     bar.statusBar = CreateFrame("StatusBar", nil, bar)
     bar.statusBar:SetAllPoints()
     bar.statusBar:SetMinMaxValues(0, 1)
     bar.statusBar:SetValue(0)
     bar.statusBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bar.statusBar:SetAlpha(0.7) -- Reduced alpha so text is readable
+
+    -- Dark overlay on top of status bar for better text contrast
+    bar.overlay = bar:CreateTexture(nil, "ARTWORK", nil, 1)
+    bar.overlay:SetAllPoints()
+    bar.overlay:SetColorTexture(0, 0, 0, 0.3)
 
     -- Icon
     bar.icon = bar:CreateTexture(nil, "OVERLAY")
@@ -901,27 +963,33 @@ function UI:CreateBar()
     bar.icon:SetPoint("LEFT", 1, 0)
     bar.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
-    -- Rank
+    -- Rank with shadow
     bar.rankText = bar:CreateFontString(nil, "OVERLAY")
     bar.rankText:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
     bar.rankText:SetPoint("LEFT", bar.icon, "RIGHT", 2, 0)
     bar.rankText:SetWidth(14)
     bar.rankText:SetJustifyH("CENTER")
-    bar.rankText:SetTextColor(0.7, 0.7, 0.7, 1)
+    bar.rankText:SetTextColor(1, 1, 1, 1)
+    bar.rankText:SetShadowOffset(1, -1)
+    bar.rankText:SetShadowColor(0, 0, 0, 1)
 
-    -- Name
+    -- Name with strong shadow for readability
     bar.nameText = bar:CreateFontString(nil, "OVERLAY")
     bar.nameText:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
     bar.nameText:SetPoint("LEFT", bar.rankText, "RIGHT", 2, 0)
     bar.nameText:SetPoint("RIGHT", bar, "RIGHT", -70, 0)
     bar.nameText:SetJustifyH("LEFT")
     bar.nameText:SetWordWrap(false)
+    bar.nameText:SetShadowOffset(1, -1)
+    bar.nameText:SetShadowColor(0, 0, 0, 1)
 
-    -- Value
+    -- Value with shadow
     bar.valueText = bar:CreateFontString(nil, "OVERLAY")
     bar.valueText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
     bar.valueText:SetPoint("RIGHT", -4, 0)
     bar.valueText:SetJustifyH("RIGHT")
+    bar.valueText:SetShadowOffset(1, -1)
+    bar.valueText:SetShadowColor(0, 0, 0, 1)
 
     -- Highlight
     bar.highlight = bar:CreateTexture(nil, "HIGHLIGHT")
@@ -932,7 +1000,7 @@ function UI:CreateBar()
     bar:SetScript("OnClick", function(self, button)
         if button == "LeftButton" then
             if self.actorData and EDM.DetailWindow then
-                EDM.DetailWindow:Show(self.actorData)
+                EDM.DetailWindow:Show(self.actorData, self.instance)
             end
         elseif button == "RightButton" then
             if self.instance then

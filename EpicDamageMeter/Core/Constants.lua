@@ -15,35 +15,49 @@ C.ADDON_SHORT = "EDM"
 C.VERSION = "1.0.0"
 C.INTERFACE_VERSION = 110207
 
--- Display Modes
+-- Display Modes (Extended like Details!)
 C.DISPLAY_MODE = {
+    -- Damage
     DAMAGE_DONE = 1,
-    HEALING_DONE = 2,
+    DPS = 2,
     DAMAGE_TAKEN = 3,
-    HEALING_TAKEN = 4,
-    DPS = 5,
+    FRIENDLY_FIRE = 4,
+    -- Healing
+    HEALING_DONE = 5,
     HPS = 6,
-    DEATHS = 7,
-    INTERRUPTS = 8,
-    DISPELS = 9,
-    THREAT = 10,
-    ABSORBS = 11,
-    OVERHEALING = 12,
+    OVERHEALING = 7,
+    HEALING_TAKEN = 8,
+    ABSORBS = 9,
+    ABSORBS_DONE = 10,
+    -- Utility
+    DEATHS = 11,
+    INTERRUPTS = 12,
+    DISPELS = 13,
+    CC_BREAKS = 14,
+    RESURRECTS = 15,
+    -- Misc
+    THREAT = 16,
+    ACTIVITY = 17,
 }
 
 C.DISPLAY_MODE_NAMES = {
     [C.DISPLAY_MODE.DAMAGE_DONE] = "Damage Done",
-    [C.DISPLAY_MODE.HEALING_DONE] = "Healing Done",
-    [C.DISPLAY_MODE.DAMAGE_TAKEN] = "Damage Taken",
-    [C.DISPLAY_MODE.HEALING_TAKEN] = "Healing Taken",
     [C.DISPLAY_MODE.DPS] = "DPS",
+    [C.DISPLAY_MODE.DAMAGE_TAKEN] = "Damage Taken",
+    [C.DISPLAY_MODE.FRIENDLY_FIRE] = "Friendly Fire",
+    [C.DISPLAY_MODE.HEALING_DONE] = "Healing Done",
     [C.DISPLAY_MODE.HPS] = "HPS",
+    [C.DISPLAY_MODE.OVERHEALING] = "Overhealing",
+    [C.DISPLAY_MODE.HEALING_TAKEN] = "Healing Received",
+    [C.DISPLAY_MODE.ABSORBS] = "Absorbs Done",
+    [C.DISPLAY_MODE.ABSORBS_DONE] = "Absorbs Received",
     [C.DISPLAY_MODE.DEATHS] = "Deaths",
     [C.DISPLAY_MODE.INTERRUPTS] = "Interrupts",
     [C.DISPLAY_MODE.DISPELS] = "Dispels",
+    [C.DISPLAY_MODE.CC_BREAKS] = "CC Breaks",
+    [C.DISPLAY_MODE.RESURRECTS] = "Resurrects",
     [C.DISPLAY_MODE.THREAT] = "Threat",
-    [C.DISPLAY_MODE.ABSORBS] = "Absorbs",
-    [C.DISPLAY_MODE.OVERHEALING] = "Overhealing",
+    [C.DISPLAY_MODE.ACTIVITY] = "Activity",
 }
 
 -- Segment Types
