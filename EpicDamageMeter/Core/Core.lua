@@ -171,14 +171,29 @@ end
 function Core:OnUpdateTimer()
     if not self.initialized then return end
 
-    -- Update combat time
-    if self.inCombat and DB.Data.currentSegment then
-        DB.Data.currentSegment.duration = GetTime() - DB.Data.currentSegment.startTime
+    -- Update combat time for current segment
+    if DB.Data.currentSegment then
+        if self.inCombat then
+            DB.Data.currentSegment.duration = GetTime() - DB.Data.currentSegment.startTime
+        elseif not DB.Data.currentSegment.endTime then
+            -- Keep updating duration even out of combat until segment ends
+            DB.Data.currentSegment.duration = GetTime() - DB.Data.currentSegment.startTime
+        end
     end
 
-    -- Update UI
-    if EDM.UI and EDM.UI.mainFrame and EDM.UI.mainFrame:IsShown() then
-        EDM.UI:UpdateBars()
+    -- Update all UI instances (multi-window support)
+    if EDM.UI then
+        EDM.UI:UpdateAll()
+    end
+
+    -- Update graph if visible
+    if EDM.Graph and EDM.Graph.frame and EDM.Graph.frame:IsShown() then
+        EDM.Graph:Update()
+    end
+
+    -- Update detail window if visible
+    if EDM.DetailWindow and EDM.DetailWindow.frame and EDM.DetailWindow.frame:IsShown() then
+        EDM.DetailWindow:Update()
     end
 end
 
@@ -212,28 +227,9 @@ function Core:OnCombatEnd()
     local segment = DB.Data.currentSegment
     if segment then
         segment.inCombat = false
-        segment.endTime = GetTime()
+        -- Don't set endTime - keep segment active for continuous tracking
+        -- User must manually reset to clear data
         segment.duration = combatDuration
-    end
-
-    -- Check minimum combat time
-    local minTime = self.db.profile.combat.minCombatTime or 5
-    if combatDuration >= minTime then
-        -- Auto-create new segment if configured
-        if self.db.profile.combat.autoReset then
-            -- Only create new segment if there was meaningful data
-            if segment and segment.totalDamage > 0 then
-                -- Rename current segment based on context
-                if segment.bossName then
-                    segment.name = segment.bossName
-                else
-                    segment.name = Utils.FormatTime(segment.duration)
-                end
-
-                -- Create new segment
-                DB:NewSegment()
-            end
-        end
     end
 
     -- Play sound
@@ -241,7 +237,7 @@ function Core:OnCombatEnd()
         self:PlaySound("Combat End")
     end
 
-    -- Update UI
+    -- Update UI (data stays visible after combat)
     if EDM.UI then
         EDM.UI:Refresh()
     end

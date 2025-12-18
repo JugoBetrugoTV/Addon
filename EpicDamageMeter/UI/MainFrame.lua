@@ -160,11 +160,39 @@ function Instance:CreateTitleBar()
             EDM.Config:Open()
         end
     end)
+    self.settingsBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:SetText("Settings")
+        GameTooltip:Show()
+    end)
+    self.settingsBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Graph button
+    self.graphBtn = CreateFrame("Button", nil, self.titleBar)
+    self.graphBtn:SetSize(14, 14)
+    self.graphBtn:SetPoint("RIGHT", self.settingsBtn, "LEFT", -3, 0)
+    self.graphBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
+    self.graphBtn:SetHighlightTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
+    self.graphBtn:GetHighlightTexture():SetVertexColor(0.3, 1, 0.6, 0.8)
+    self.graphBtn:SetScript("OnClick", function()
+        if EDM.Graph then
+            if not EDM.Graph.frame then
+                EDM.Graph:Initialize(self.frame)
+            end
+            EDM.Graph:Toggle()
+        end
+    end)
+    self.graphBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:SetText("Toggle Graph")
+        GameTooltip:Show()
+    end)
+    self.graphBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Reset button
     self.resetBtn = CreateFrame("Button", nil, self.titleBar)
     self.resetBtn:SetSize(14, 14)
-    self.resetBtn:SetPoint("RIGHT", self.settingsBtn, "LEFT", -3, 0)
+    self.resetBtn:SetPoint("RIGHT", self.graphBtn, "LEFT", -3, 0)
     self.resetBtn:SetNormalTexture("Interface\\Buttons\\UI-RefreshButton")
     self.resetBtn:SetHighlightTexture("Interface\\Buttons\\UI-RefreshButton")
     self.resetBtn:GetHighlightTexture():SetVertexColor(0.3, 1, 0.3, 0.8)
@@ -174,6 +202,12 @@ function Instance:CreateTitleBar()
             print("|cff00ff00EpicDamageMeter:|r Data reset!")
         end
     end)
+    self.resetBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:SetText("Reset Data")
+        GameTooltip:Show()
+    end)
+    self.resetBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Draggable
     self.titleBar:EnableMouse(true)
@@ -373,24 +407,96 @@ function Instance:UpdateTitle()
 end
 
 function Instance:ShowModeMenu()
-    local menu = CreateFrame("Frame", "EDMModeMenu" .. self.id, UIParent, "UIDropDownMenuTemplate")
+    -- Create or reuse dropdown menu
+    if not self.modeDropdown then
+        self.modeDropdown = CreateFrame("Frame", "EDMModeDropdown" .. self.id, UIParent, "UIDropDownMenuTemplate")
+    end
 
-    local menuList = {
-        { text = "Damage", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.DAMAGE_DONE), func = function() self:SetMode(C.DISPLAY_MODE.DAMAGE_DONE) end },
-        { text = "DPS", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.DPS), func = function() self:SetMode(C.DISPLAY_MODE.DPS) end },
-        { text = "Damage Taken", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.DAMAGE_TAKEN), func = function() self:SetMode(C.DISPLAY_MODE.DAMAGE_TAKEN) end },
-        { text = "", notCheckable = true, disabled = true },
-        { text = "Healing", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.HEALING_DONE), func = function() self:SetMode(C.DISPLAY_MODE.HEALING_DONE) end },
-        { text = "HPS", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.HPS), func = function() self:SetMode(C.DISPLAY_MODE.HPS) end },
-        { text = "Overhealing", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.OVERHEALING), func = function() self:SetMode(C.DISPLAY_MODE.OVERHEALING) end },
-        { text = "Absorbs", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.ABSORBS), func = function() self:SetMode(C.DISPLAY_MODE.ABSORBS) end },
-        { text = "", notCheckable = true, disabled = true },
-        { text = "Deaths", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.DEATHS), func = function() self:SetMode(C.DISPLAY_MODE.DEATHS) end },
-        { text = "Interrupts", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.INTERRUPTS), func = function() self:SetMode(C.DISPLAY_MODE.INTERRUPTS) end },
-        { text = "Dispels", notCheckable = false, checked = (self.mode == C.DISPLAY_MODE.DISPELS), func = function() self:SetMode(C.DISPLAY_MODE.DISPELS) end },
-    }
+    local self_ref = self
+    local function InitializeMenu(frame, level)
+        level = level or 1
+        local info = UIDropDownMenu_CreateInfo()
 
-    EasyMenu(menuList, menu, "cursor", 0, 0, "MENU")
+        if level == 1 then
+            -- Damage section
+            info.text = "Damage"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.DAMAGE_DONE)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DAMAGE_DONE); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "DPS"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.DPS)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DPS); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "Damage Taken"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.DAMAGE_TAKEN)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DAMAGE_TAKEN); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
+            -- Separator
+            info.text = ""
+            info.disabled = true
+            info.checked = false
+            info.func = nil
+            info.notCheckable = true
+            UIDropDownMenu_AddButton(info, level)
+
+            -- Healing section
+            info.disabled = false
+            info.notCheckable = false
+
+            info.text = "Healing"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.HEALING_DONE)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.HEALING_DONE); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "HPS"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.HPS)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.HPS); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "Overhealing"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.OVERHEALING)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.OVERHEALING); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "Absorbs"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.ABSORBS)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.ABSORBS); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
+            -- Separator
+            info.text = ""
+            info.disabled = true
+            info.checked = false
+            info.func = nil
+            info.notCheckable = true
+            UIDropDownMenu_AddButton(info, level)
+
+            -- Utility section
+            info.disabled = false
+            info.notCheckable = false
+
+            info.text = "Deaths"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.DEATHS)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DEATHS); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "Interrupts"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.INTERRUPTS)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.INTERRUPTS); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "Dispels"
+            info.checked = (self_ref.mode == C.DISPLAY_MODE.DISPELS)
+            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DISPELS); CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+        end
+    end
+
+    UIDropDownMenu_Initialize(self.modeDropdown, InitializeMenu, "MENU")
+    ToggleDropDownMenu(1, nil, self.modeDropdown, "cursor", 0, 0)
 end
 
 function Instance:SetMode(mode)
@@ -941,17 +1047,62 @@ end
 
 -- Apply settings to all instances
 function UI:ApplySettings()
-    -- Update bar pool textures/fonts
-    local db = EDM.db and EDM.db.profile.bars or {}
-
-    for _, bar in ipairs(self.barPool) do
-        bar.statusBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-        bar:SetHeight(db.height or 18)
-        bar.icon:SetSize((db.height or 18) - 2, (db.height or 18) - 2)
+    -- Initialize skins if needed
+    if Skins and Skins.Initialize then
+        Skins:Initialize()
     end
 
-    -- Refresh layout
+    -- Get skin and bar settings
+    local skin = Skins and Skins:Get() or nil
+    local barSettings = skin and skin.bar or {}
+    local db = EDM.db and EDM.db.profile.bars or {}
+
+    -- Get bar texture from skin
+    local barTexture = "Interface\\TargetingFrame\\UI-StatusBar"
+    if barSettings.texture then
+        local LSM = LibStub("LibSharedMedia-3.0", true)
+        if LSM then
+            local tex = LSM:Fetch("statusbar", barSettings.texture)
+            if tex then barTexture = tex end
+        end
+    end
+
+    -- Update bar pool with skin settings
+    for _, bar in ipairs(self.barPool) do
+        bar.statusBar:SetStatusBarTexture(barTexture)
+        bar:SetHeight(barSettings.height or db.height or 18)
+        bar.icon:SetSize((barSettings.iconSize or db.height or 18) - 2, (barSettings.iconSize or db.height or 18) - 2)
+
+        -- Apply font settings
+        if barSettings.font then
+            bar.nameText:SetFont(barSettings.font, barSettings.fontSize or 11, barSettings.fontFlags or "OUTLINE")
+            bar.valueText:SetFont(barSettings.font, barSettings.fontSize or 10, barSettings.fontFlags or "OUTLINE")
+            bar.rankText:SetFont(barSettings.rankFont or barSettings.font, barSettings.rankFontSize or 9, barSettings.fontFlags or "OUTLINE")
+        end
+
+        -- Apply background color
+        if barSettings.backgroundColor then
+            bar.bg:SetColorTexture(
+                barSettings.backgroundColor.r,
+                barSettings.backgroundColor.g,
+                barSettings.backgroundColor.b,
+                barSettings.backgroundColor.a or 0.7
+            )
+        end
+    end
+
+    -- Apply skin to all instances
     for _, instance in pairs(self.instances) do
+        if skin and skin.window then
+            local w = skin.window
+            instance.frame:SetBackdropColor(w.backgroundColor.r, w.backgroundColor.g, w.backgroundColor.b, w.backgroundColor.a)
+            instance.frame:SetBackdropBorderColor(w.borderColor.r, w.borderColor.g, w.borderColor.b, w.borderColor.a)
+        end
+        if skin and skin.titleBar then
+            local tb = skin.titleBar
+            instance.titleBar.bg:SetColorTexture(tb.backgroundColor.r, tb.backgroundColor.g, tb.backgroundColor.b, tb.backgroundColor.a)
+            instance.titleText:SetFont(tb.font or "Fonts\\FRIZQT__.TTF", tb.fontSize or 11, tb.fontFlags or "OUTLINE")
+        end
         instance:UpdateLayout()
     end
 end

@@ -271,10 +271,38 @@ function DetailWindow:GetAbilityBar(index)
     return bar
 end
 
--- Show abilities tab
+-- Update function for live updates (called by Core timer)
+function DetailWindow:Update()
+    if not self.frame or not self.frame:IsShown() then return end
+    if not self.currentActor then return end
+
+    -- Re-fetch actor data from current segment to get updated values
+    local DB = EDM.Database
+    local segment = DB.Data.currentSegment
+    if segment and self.currentActor.guid then
+        local updatedActor = segment.actors[self.currentActor.guid]
+        if updatedActor then
+            self.currentActor = updatedActor
+        end
+    end
+
+    -- Update header
+    self:UpdateHeader()
+
+    -- Update content
+    self:SelectTab(self.selectedTab)
+end
+
+-- Show abilities tab with detailed spell info (hits, DPS, avg, min, max)
 function DetailWindow:ShowAbilities()
     local actor = self.currentActor
     if not actor or not actor.abilities then return end
+
+    -- Get segment duration for DPS calculation
+    local DB = EDM.Database
+    local segment = DB.Data.currentSegment
+    local duration = segment and DB:GetSegmentDuration(segment) or 1
+    if duration == 0 then duration = 1 end
 
     -- Sort abilities by damage
     local sorted = {}
@@ -307,8 +335,15 @@ function DetailWindow:ShowAbilities()
         -- Set name
         bar.name:SetText(ability.name)
 
-        -- Set value
-        bar.value:SetText(Utils.FormatNumber(ability.damage))
+        -- Calculate detailed stats
+        local hits = ability.damageHits or 0
+        local crits = ability.damageCrits or 0
+        local avgDamage = hits > 0 and (ability.damage / hits) or 0
+        local abilityDPS = ability.damage / duration
+        local critPercent = hits > 0 and ((crits / hits) * 100) or 0
+
+        -- Set value with DPS
+        bar.value:SetText(string.format("%s (%.1fk/s)", Utils.FormatNumber(ability.damage), abilityDPS / 1000))
 
         -- Set percent
         bar.percent:SetText(Utils.FormatPercent(ability.damage, total))
@@ -322,6 +357,23 @@ function DetailWindow:ShowAbilities()
         else
             bar.statusBar:SetStatusBarColor(0.8, 0.2, 0.2, 0.7)
         end
+
+        -- Enhanced tooltip with detailed spell info
+        bar:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(ability.name, 1, 1, 1)
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddDoubleLine("Total Damage:", Utils.FormatNumber(ability.damage), 0.7, 0.7, 0.7, 1, 1, 1)
+            GameTooltip:AddDoubleLine("DPS:", string.format("%.1f", abilityDPS), 0.7, 0.7, 0.7, 1, 1, 1)
+            GameTooltip:AddDoubleLine("Hits:", string.format("%d", hits), 0.7, 0.7, 0.7, 1, 1, 1)
+            GameTooltip:AddDoubleLine("Crits:", string.format("%d (%.1f%%)", crits, critPercent), 0.7, 0.7, 0.7, 1, 0.5, 0.5)
+            GameTooltip:AddDoubleLine("Average:", Utils.FormatNumber(avgDamage), 0.7, 0.7, 0.7, 1, 1, 1)
+            GameTooltip:AddDoubleLine("Min:", Utils.FormatNumber(ability.damageMin or 0), 0.7, 0.7, 0.7, 0.5, 1, 0.5)
+            GameTooltip:AddDoubleLine("Max:", Utils.FormatNumber(ability.damageMax or 0), 0.7, 0.7, 0.7, 1, 0.5, 0.5)
+            GameTooltip:Show()
+        end)
+        bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        bar:EnableMouse(true)
 
         yOffset = yOffset + 26
     end
