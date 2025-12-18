@@ -549,7 +549,7 @@ function DB:GetSegmentDuration(segment)
     end
 end
 
--- Reset all data
+-- Reset all data (clears BOTH current AND overall - user triggered)
 function DB:Reset()
     self.Data.segments = {}
     self.Data.overallSegment = DB.CreateSegment(C.SEGMENT_TYPE.OVERALL, "Overall")
@@ -558,6 +558,31 @@ function DB:Reset()
     if EDM.UI then
         EDM.UI:Refresh()
     end
+end
+
+-- Start new current segment (clears current only, keeps overall - combat triggered)
+function DB:StartNewCurrentSegment()
+    -- Create fresh current segment
+    local segment = DB.CreateSegment(C.SEGMENT_TYPE.CURRENT, "Current Combat")
+
+    -- Get instance info
+    local instance = Utils.GetInstanceInfo()
+    segment.instanceName = instance.name
+    segment.instanceType = instance.type
+
+    -- Set as current (don't touch overall)
+    self.Data.currentSegment = segment
+
+    -- Add to segment list
+    table.insert(self.Data.segments, 1, segment)
+
+    -- Trim old segments
+    local maxSegments = EDM.db and EDM.db.profile.combat.maxSegments or C.MAX_SEGMENTS
+    while #self.Data.segments > maxSegments do
+        table.remove(self.Data.segments)
+    end
+
+    return segment
 end
 
 -- Get segment by index (1 = current, 2 = previous, etc.)

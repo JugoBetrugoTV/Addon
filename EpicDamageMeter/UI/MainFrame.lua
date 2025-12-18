@@ -433,112 +433,143 @@ function Instance:UpdateTitle()
 end
 
 function Instance:ShowModeMenu()
-    -- Create or reuse dropdown menu
-    if not self.modeDropdown then
-        self.modeDropdown = CreateFrame("Frame", "EDMModeDropdown" .. self.id, UIParent, "UIDropDownMenuTemplate")
+    -- Create custom menu frame instead of UIDropDownMenu (more reliable click handling)
+    if not self.customMenu then
+        self.customMenu = self:CreateCustomMenu()
     end
+
+    -- Position at cursor
+    local x, y = GetCursorPosition()
+    local scale = UIParent:GetEffectiveScale()
+    self.customMenu:ClearAllPoints()
+    self.customMenu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / scale, y / scale)
+    self.customMenu:Show()
+    self.customMenu:Raise()
+end
+
+function Instance:CreateCustomMenu()
+    local menu = CreateFrame("Frame", "EDMCustomMenu" .. self.id, UIParent, "BackdropTemplate")
+    menu:SetSize(160, 360)
+    menu:SetFrameStrata("FULLSCREEN_DIALOG")
+    menu:SetFrameLevel(200)
+    menu:EnableMouse(true)
+    menu:SetClampedToScreen(true)
+
+    menu:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 }
+    })
+    menu:SetBackdropColor(0.08, 0.08, 0.12, 0.98)
+    menu:SetBackdropBorderColor(0.3, 0.3, 0.4, 1)
 
     local self_ref = self
-    local function InitializeMenu(frame, level)
-        level = level or 1
-        local info = UIDropDownMenu_CreateInfo()
+    local yOffset = -4
 
-        if level == 1 then
-            -- Damage section header
-            info.text = "|cffff6666Damage|r"
-            info.isTitle = true
-            info.notCheckable = true
-            UIDropDownMenu_AddButton(info, level)
-
-            info.isTitle = false
-            info.notCheckable = false
-
-            info.text = "Damage Done"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.DAMAGE_DONE)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DAMAGE_DONE); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            info.text = "DPS"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.DPS)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DPS); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            info.text = "Damage Taken"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.DAMAGE_TAKEN)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DAMAGE_TAKEN); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            -- Healing section header
-            info.text = "|cff66ff66Healing|r"
-            info.isTitle = true
-            info.notCheckable = true
-            info.checked = false
-            info.func = nil
-            UIDropDownMenu_AddButton(info, level)
-
-            info.isTitle = false
-            info.notCheckable = false
-
-            info.text = "Healing Done"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.HEALING_DONE)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.HEALING_DONE); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            info.text = "HPS"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.HPS)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.HPS); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            info.text = "Healing Received"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.HEALING_TAKEN)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.HEALING_TAKEN); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            info.text = "Overhealing"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.OVERHEALING)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.OVERHEALING); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            info.text = "Absorbs Done"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.ABSORBS)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.ABSORBS); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            -- Utility section header
-            info.text = "|cff6699ffUtility|r"
-            info.isTitle = true
-            info.notCheckable = true
-            info.checked = false
-            info.func = nil
-            UIDropDownMenu_AddButton(info, level)
-
-            info.isTitle = false
-            info.notCheckable = false
-
-            info.text = "Deaths"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.DEATHS)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DEATHS); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            info.text = "Interrupts"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.INTERRUPTS)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.INTERRUPTS); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            info.text = "Dispels"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.DISPELS)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.DISPELS); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-
-            info.text = "CC Breaks"
-            info.checked = (self_ref.mode == C.DISPLAY_MODE.CC_BREAKS)
-            info.func = function() self_ref:SetMode(C.DISPLAY_MODE.CC_BREAKS); CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
-        end
+    local function CreateHeader(text, color)
+        local header = menu:CreateFontString(nil, "OVERLAY")
+        header:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+        header:SetPoint("TOPLEFT", 8, yOffset)
+        header:SetText(color .. text .. "|r")
+        yOffset = yOffset - 16
     end
 
-    UIDropDownMenu_Initialize(self.modeDropdown, InitializeMenu, "MENU")
-    ToggleDropDownMenu(1, nil, self.modeDropdown, "cursor", 0, 0)
+    local function CreateMenuItem(text, mode)
+        local btn = CreateFrame("Button", nil, menu)
+        btn:SetSize(144, 18)
+        btn:SetPoint("TOPLEFT", 8, yOffset)
+
+        btn.bg = btn:CreateTexture(nil, "BACKGROUND")
+        btn.bg:SetAllPoints()
+        btn.bg:SetColorTexture(0.15, 0.15, 0.2, 0)
+
+        btn.check = btn:CreateTexture(nil, "ARTWORK")
+        btn.check:SetSize(12, 12)
+        btn.check:SetPoint("LEFT", 2, 0)
+        btn.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+        btn.check:SetShown(self_ref.mode == mode)
+
+        btn.text = btn:CreateFontString(nil, "OVERLAY")
+        btn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
+        btn.text:SetPoint("LEFT", 18, 0)
+        btn.text:SetText(text)
+        btn.text:SetTextColor(0.9, 0.9, 0.9, 1)
+
+        btn:SetScript("OnEnter", function()
+            btn.bg:SetColorTexture(0.25, 0.25, 0.35, 1)
+        end)
+        btn:SetScript("OnLeave", function()
+            btn.bg:SetColorTexture(0.15, 0.15, 0.2, 0)
+        end)
+        btn:SetScript("OnClick", function()
+            self_ref:SetMode(mode)
+            menu:Hide()
+        end)
+
+        btn.mode = mode
+        yOffset = yOffset - 20
+
+        return btn
+    end
+
+    -- Build menu
+    CreateHeader("Damage", "|cffff6666")
+    menu.damageDone = CreateMenuItem("Damage Done", C.DISPLAY_MODE.DAMAGE_DONE)
+    menu.dps = CreateMenuItem("DPS", C.DISPLAY_MODE.DPS)
+    menu.damageTaken = CreateMenuItem("Damage Taken", C.DISPLAY_MODE.DAMAGE_TAKEN)
+
+    yOffset = yOffset - 6
+    CreateHeader("Healing", "|cff66ff66")
+    menu.healingDone = CreateMenuItem("Healing Done", C.DISPLAY_MODE.HEALING_DONE)
+    menu.hps = CreateMenuItem("HPS", C.DISPLAY_MODE.HPS)
+    menu.healingTaken = CreateMenuItem("Healing Received", C.DISPLAY_MODE.HEALING_TAKEN)
+    menu.overhealing = CreateMenuItem("Overhealing", C.DISPLAY_MODE.OVERHEALING)
+    menu.absorbs = CreateMenuItem("Absorbs", C.DISPLAY_MODE.ABSORBS)
+
+    yOffset = yOffset - 6
+    CreateHeader("Utility", "|cff6699ff")
+    menu.interrupts = CreateMenuItem("Interrupts", C.DISPLAY_MODE.INTERRUPTS)
+    menu.dispels = CreateMenuItem("Dispels", C.DISPLAY_MODE.DISPELS)
+    menu.deaths = CreateMenuItem("Deaths", C.DISPLAY_MODE.DEATHS)
+
+    -- Adjust menu height
+    menu:SetHeight(-yOffset + 8)
+
+    -- Close when clicking outside
+    menu:SetScript("OnShow", function()
+        menu:SetPropagateKeyboardInput(true)
+    end)
+
+    menu:SetScript("OnKeyDown", function(_, key)
+        if key == "ESCAPE" then
+            menu:Hide()
+            menu:SetPropagateKeyboardInput(false)
+        end
+    end)
+
+    -- Close on world click
+    menu:SetScript("OnUpdate", function()
+        if not menu:IsMouseOver() and IsMouseButtonDown("LeftButton") then
+            C_Timer.After(0.1, function()
+                if menu:IsShown() and not menu:IsMouseOver() then
+                    menu:Hide()
+                end
+            end)
+        end
+    end)
+
+    -- Update checks when shown
+    menu:SetScript("OnShow", function()
+        for _, child in pairs({menu:GetChildren()}) do
+            if child.mode and child.check then
+                child.check:SetShown(self_ref.mode == child.mode)
+            end
+        end
+    end)
+
+    menu:Hide()
+    return menu
 end
 
 function Instance:SetMode(mode)

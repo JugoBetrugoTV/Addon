@@ -41,8 +41,10 @@ function Graph:Initialize(parent)
     self.frame:SetFrameStrata("MEDIUM")
     self.frame:SetFrameLevel(10)
     self.frame:SetMovable(true)
+    self.frame:SetResizable(true)
     self.frame:EnableMouse(true)
     self.frame:SetClampedToScreen(true)
+    self.frame:SetResizeBounds(300, 150, 800, 500)
 
     -- Apply backdrop
     self.frame:SetBackdrop({
@@ -60,16 +62,38 @@ function Graph:Initialize(parent)
     self.frame:SetBackdropBorderColor(0.2, 0.2, 0.3, 1)
 
     -- Title bar
-    self.titleBar = Widgets:CreateTitleBar(self.frame, "DPS/HPS Graph", 20)
+    self.titleBar = CreateFrame("Frame", nil, self.frame)
+    self.titleBar:SetHeight(22)
+    self.titleBar:SetPoint("TOPLEFT", 0, 0)
+    self.titleBar:SetPoint("TOPRIGHT", 0, 0)
+
+    self.titleBar.bg = self.titleBar:CreateTexture(nil, "BACKGROUND")
+    self.titleBar.bg:SetAllPoints()
+    self.titleBar.bg:SetColorTexture(0.08, 0.08, 0.12, 1)
+
+    self.titleBar.title = self.titleBar:CreateFontString(nil, "OVERLAY")
+    self.titleBar.title:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+    self.titleBar.title:SetPoint("LEFT", 8, 0)
+    self.titleBar.title:SetText("|cff00ff00DPS|r / |cff66ff66HPS|r Graph")
 
     -- Close button
-    self.closeButton = Widgets:CreateCloseButton(self.titleBar, 14)
-    self.closeButton:SetPoint("RIGHT", self.titleBar, "RIGHT", -4, 0)
+    self.closeButton = CreateFrame("Button", nil, self.titleBar)
+    self.closeButton:SetSize(16, 16)
+    self.closeButton:SetPoint("RIGHT", -4, 0)
+    self.closeButton:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
+    self.closeButton:SetHighlightTexture("Interface\\Buttons\\UI-StopButton")
+    self.closeButton:GetHighlightTexture():SetVertexColor(1, 0.3, 0.3, 0.8)
+    self.closeButton:SetScript("OnClick", function() self.frame:Hide() end)
 
     -- Canvas for drawing
     self.canvas = CreateFrame("Frame", nil, self.frame)
-    self.canvas:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 40, -25)
-    self.canvas:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -10, 30)
+    self.canvas:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 50, -30)
+    self.canvas:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -15, 35)
+
+    -- Canvas background
+    self.canvas.bg = self.canvas:CreateTexture(nil, "BACKGROUND")
+    self.canvas.bg:SetAllPoints()
+    self.canvas.bg:SetColorTexture(0.02, 0.02, 0.04, 0.9)
 
     -- Create grid lines
     self:CreateGrid()
@@ -83,14 +107,34 @@ function Graph:Initialize(parent)
     -- Line textures pool
     self.linePool = {}
 
-    -- Make draggable
-    self.frame:RegisterForDrag("LeftButton")
-    self.frame:SetScript("OnDragStart", function(f)
-        f:StartMoving()
+    -- Make draggable from titlebar
+    self.titleBar:EnableMouse(true)
+    self.titleBar:RegisterForDrag("LeftButton")
+    self.titleBar:SetScript("OnDragStart", function() self.frame:StartMoving() end)
+    self.titleBar:SetScript("OnDragStop", function() self.frame:StopMovingOrSizing() end)
+
+    -- Resize handle
+    self.resizeHandle = CreateFrame("Frame", nil, self.frame)
+    self.resizeHandle:SetSize(16, 16)
+    self.resizeHandle:SetPoint("BOTTOMRIGHT", 0, 0)
+    self.resizeHandle:EnableMouse(true)
+    self.resizeHandle.tex = self.resizeHandle:CreateTexture(nil, "OVERLAY")
+    self.resizeHandle.tex:SetAllPoints()
+    self.resizeHandle.tex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    self.resizeHandle:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" then self.frame:StartSizing("BOTTOMRIGHT") end
     end)
-    self.frame:SetScript("OnDragStop", function(f)
-        f:StopMovingOrSizing()
+    self.resizeHandle:SetScript("OnMouseUp", function()
+        self.frame:StopMovingOrSizing()
+        self:Draw()
     end)
+
+    -- No data label
+    self.noDataLabel = self.canvas:CreateFontString(nil, "OVERLAY")
+    self.noDataLabel:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+    self.noDataLabel:SetPoint("CENTER")
+    self.noDataLabel:SetTextColor(0.5, 0.5, 0.5, 1)
+    self.noDataLabel:SetText("No data - Enter combat to start recording")
 
     -- Initially hidden
     self.frame:Hide()
@@ -193,26 +237,26 @@ end
 
 -- Position axis labels
 function Graph:LayoutAxisLabels(maxValue, duration)
-    local width = self.canvas:GetWidth()
-    local height = self.canvas:GetHeight()
+    local width = self.canvas:GetWidth() or 300
+    local height = self.canvas:GetHeight() or 150
 
-    -- Y-axis labels
+    -- Y-axis labels (positioned from bottom to top)
     for i = 0, 4 do
         local label = self.yLabels[i]
-        local y = (i / 4) * height
+        local yPos = (i / 4) * height
         label:ClearAllPoints()
-        label:SetPoint("RIGHT", self.canvas, "LEFT", -4, y - height/2)
+        label:SetPoint("RIGHT", self.canvas, "BOTTOMLEFT", -6, yPos)
         label:SetText(Utils.FormatNumber((i / 4) * maxValue))
     end
 
-    -- X-axis labels
+    -- X-axis labels (positioned left to right)
     for i = 0, 5 do
         local label = self.xLabels[i]
-        local x = (i / 5) * width
+        local xPos = (i / 5) * width
         label:ClearAllPoints()
-        label:SetPoint("TOP", self.canvas, "BOTTOMLEFT", x, -4)
+        label:SetPoint("TOP", self.canvas, "BOTTOMLEFT", xPos, -6)
         local time = (i / 5) * duration
-        label:SetText(Utils.FormatTime(time))
+        label:SetText(string.format("%d:%02d", math.floor(time / 60), math.floor(time % 60)))
     end
 end
 
@@ -303,23 +347,30 @@ end
 -- Draw the graph
 function Graph:Draw()
     if not self.frame or not self.frame:IsShown() then return end
-    if #self.dataPoints < 2 then return end
 
     self:ReleaseLines()
     self:LayoutGrid()
 
+    -- Show/hide no data label
+    if #self.dataPoints < 2 then
+        if self.noDataLabel then self.noDataLabel:Show() end
+        self:LayoutAxisLabels(100, 60) -- Default values for empty graph
+        return
+    end
+    if self.noDataLabel then self.noDataLabel:Hide() end
+
     local skin = Skins:Get()
     local graphSettings = skin and skin.graph or {}
 
-    local width = self.canvas:GetWidth()
-    local height = self.canvas:GetHeight()
+    local width = self.canvas:GetWidth() or 300
+    local height = self.canvas:GetHeight() or 150
 
     -- Find max values
     local maxDPS = 0
     local maxHPS = 0
     local startTime = self.dataPoints[1].time
     local endTime = self.dataPoints[#self.dataPoints].time
-    local duration = endTime - startTime
+    local duration = math.max(endTime - startTime, 1)
 
     for _, point in ipairs(self.dataPoints) do
         if point.dps > maxDPS then maxDPS = point.dps end
@@ -327,12 +378,16 @@ function Graph:Draw()
     end
 
     local maxValue = math.max(maxDPS, maxHPS)
-    if maxValue == 0 then maxValue = 1 end
+    if maxValue == 0 then maxValue = 100 end
+
+    -- Round up max value for cleaner labels
+    local magnitude = 10 ^ math.floor(math.log10(maxValue))
+    maxValue = math.ceil(maxValue / magnitude) * magnitude
 
     -- Update axis labels
     self:LayoutAxisLabels(maxValue, duration)
 
-    -- Draw DPS line
+    -- Draw DPS line (red)
     local lastX, lastY
     local damageR = graphSettings.damageColor and graphSettings.damageColor.r or 0.9
     local damageG = graphSettings.damageColor and graphSettings.damageColor.g or 0.2
@@ -342,7 +397,7 @@ function Graph:Draw()
         local x = ((point.time - startTime) / duration) * width
         local y = (point.dps / maxValue) * height
 
-        if lastX and lastY then
+        if lastX and lastY and x ~= lastX then
             local line = self:GetLineTexture()
             line:SetVertexColor(damageR, damageG, damageB, 1)
             line:SetThickness(graphSettings.lineWidth or 2)
@@ -353,7 +408,7 @@ function Graph:Draw()
         lastX, lastY = x, y
     end
 
-    -- Draw HPS line
+    -- Draw HPS line (green)
     lastX, lastY = nil, nil
     local healingR = graphSettings.healingColor and graphSettings.healingColor.r or 0.2
     local healingG = graphSettings.healingColor and graphSettings.healingColor.g or 0.9
@@ -363,7 +418,7 @@ function Graph:Draw()
         local x = ((point.time - startTime) / duration) * width
         local y = (point.hps / maxValue) * height
 
-        if lastX and lastY then
+        if lastX and lastY and x ~= lastX then
             local line = self:GetLineTexture()
             line:SetVertexColor(healingR, healingG, healingB, 1)
             line:SetThickness(graphSettings.lineWidth or 2)
@@ -375,10 +430,8 @@ function Graph:Draw()
     end
 end
 
--- Update graph with current data
+-- Update graph with current data (called from timer, records data even when hidden)
 function Graph:Update()
-    if not self.frame or not self.frame:IsShown() then return end
-
     local now = GetTime()
     if now - self.lastUpdate < self.updateInterval then return end
     self.lastUpdate = now
@@ -389,17 +442,19 @@ function Graph:Update()
     if not segment then return end
 
     local duration = DB:GetSegmentDuration(segment)
-    if duration == 0 then return end
+    if duration < 0.5 then return end -- Skip very short durations
 
     -- Calculate total DPS/HPS
     local totalDPS = segment.totalDamage / duration
     local totalHPS = segment.totalHealing / duration
 
-    -- Add data point
+    -- Add data point (always record, even if not visible)
     self:AddDataPoint(now, totalDPS, totalHPS)
 
-    -- Redraw
-    self:Draw()
+    -- Redraw only if visible
+    if self.frame and self.frame:IsShown() then
+        self:Draw()
+    end
 end
 
 -- Clear graph data

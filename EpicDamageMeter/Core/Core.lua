@@ -202,6 +202,10 @@ function Core:OnCombatStart()
     self.inCombat = true
     self.combatStartTime = GetTime()
 
+    -- CURRENT segment: Clear old data and start fresh for this combat
+    -- OVERALL segment: Keep accumulating (never auto-cleared)
+    DB:StartNewCurrentSegment()
+
     local segment = DB.Data.currentSegment
     if segment then
         segment.inCombat = true
@@ -213,7 +217,7 @@ function Core:OnCombatStart()
         self:PlaySound("Combat Start")
     end
 
-    Utils.Debug("Combat started")
+    Utils.Debug("Combat started - Current segment reset")
 end
 
 -- Combat end
@@ -229,10 +233,8 @@ function Core:OnCombatEnd()
         segment.inCombat = false
         segment.duration = combatDuration
         segment.endTime = GetTime()
-
-        -- Save current segment data to overall before potentially clearing
-        -- Overall keeps accumulating until manual reset or group change
-        -- Current segment data persists but shows last combat
+        -- Current segment data preserved until next combat starts
+        -- Overall never cleared except by user reset
     end
 
     -- Play sound
@@ -612,86 +614,115 @@ function Core:ReportToChat(input)
     ))
 end
 
--- Show chat report menu (for UI button)
+-- Show chat report menu (for UI button) - using custom menu for reliable clicks
 function Core:ShowReportMenu(parentFrame)
-    if not self.reportDropdown then
-        self.reportDropdown = CreateFrame("Frame", "EDMReportDropdown", UIParent, "UIDropDownMenuTemplate")
+    if not self.reportMenu then
+        self.reportMenu = self:CreateReportMenu()
     end
 
-    local function InitializeMenu(frame, level)
-        level = level or 1
-        local info = UIDropDownMenu_CreateInfo()
+    -- Position at cursor
+    local x, y = GetCursorPosition()
+    local scale = UIParent:GetEffectiveScale()
+    self.reportMenu:ClearAllPoints()
+    self.reportMenu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / scale, y / scale)
+    self.reportMenu:Show()
+    self.reportMenu:Raise()
+end
 
-        if level == 1 then
-            -- Header
-            info.text = "|cff00ff00Report to Chat|r"
-            info.isTitle = true
-            info.notCheckable = true
-            UIDropDownMenu_AddButton(info, level)
+function Core:CreateReportMenu()
+    local menu = CreateFrame("Frame", "EDMReportMenu", UIParent, "BackdropTemplate")
+    menu:SetSize(160, 280)
+    menu:SetFrameStrata("FULLSCREEN_DIALOG")
+    menu:SetFrameLevel(200)
+    menu:EnableMouse(true)
+    menu:SetClampedToScreen(true)
 
-            info.isTitle = false
-            info.disabled = false
+    menu:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 }
+    })
+    menu:SetBackdropColor(0.08, 0.08, 0.12, 0.98)
+    menu:SetBackdropBorderColor(0.3, 0.3, 0.4, 1)
 
-            -- Report damage
-            info.text = "Damage (Party)"
-            info.notCheckable = true
-            info.func = function() Core:ReportToChat("report party damage 5") end
-            UIDropDownMenu_AddButton(info, level)
+    local yOffset = -4
 
-            info.text = "Damage (Raid)"
-            info.func = function() Core:ReportToChat("report raid damage 5") end
-            UIDropDownMenu_AddButton(info, level)
+    local function CreateHeader(text, color)
+        local header = menu:CreateFontString(nil, "OVERLAY")
+        header:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+        header:SetPoint("TOPLEFT", 8, yOffset)
+        header:SetText(color .. text .. "|r")
+        yOffset = yOffset - 16
+    end
 
-            info.text = "Damage (Instance)"
-            info.func = function() Core:ReportToChat("report instance damage 5") end
-            UIDropDownMenu_AddButton(info, level)
+    local function CreateMenuItem(text, command)
+        local btn = CreateFrame("Button", nil, menu)
+        btn:SetSize(144, 18)
+        btn:SetPoint("TOPLEFT", 8, yOffset)
 
-            -- Separator
-            info.text = ""
-            info.disabled = true
-            info.notCheckable = true
-            UIDropDownMenu_AddButton(info, level)
-            info.disabled = false
+        btn.bg = btn:CreateTexture(nil, "BACKGROUND")
+        btn.bg:SetAllPoints()
+        btn.bg:SetColorTexture(0.15, 0.15, 0.2, 0)
 
-            -- Report healing
-            info.text = "Healing (Party)"
-            info.func = function() Core:ReportToChat("report party healing 5") end
-            UIDropDownMenu_AddButton(info, level)
+        btn.text = btn:CreateFontString(nil, "OVERLAY")
+        btn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
+        btn.text:SetPoint("LEFT", 4, 0)
+        btn.text:SetText(text)
+        btn.text:SetTextColor(0.9, 0.9, 0.9, 1)
 
-            info.text = "Healing (Raid)"
-            info.func = function() Core:ReportToChat("report raid healing 5") end
-            UIDropDownMenu_AddButton(info, level)
+        btn:SetScript("OnEnter", function()
+            btn.bg:SetColorTexture(0.25, 0.25, 0.35, 1)
+        end)
+        btn:SetScript("OnLeave", function()
+            btn.bg:SetColorTexture(0.15, 0.15, 0.2, 0)
+        end)
+        btn:SetScript("OnClick", function()
+            Core:ReportToChat(command)
+            menu:Hide()
+        end)
 
-            -- Separator
-            info.text = ""
-            info.disabled = true
-            UIDropDownMenu_AddButton(info, level)
-            info.disabled = false
+        yOffset = yOffset - 20
+        return btn
+    end
 
-            -- Report own stats
-            info.text = "|cff6699ffMy Stats (Party)|r"
-            info.func = function() Core:ReportToChat("report party own") end
-            UIDropDownMenu_AddButton(info, level)
+    -- Build menu
+    CreateHeader("Report to Chat", "|cff00ff00")
 
-            info.text = "|cff6699ffMy Stats (Guild)|r"
-            info.func = function() Core:ReportToChat("report guild own") end
-            UIDropDownMenu_AddButton(info, level)
+    yOffset = yOffset - 4
+    CreateHeader("Damage", "|cffff6666")
+    CreateMenuItem("Say", "report say damage 5")
+    CreateMenuItem("Party", "report party damage 5")
+    CreateMenuItem("Raid", "report raid damage 5")
+    CreateMenuItem("Instance", "report instance damage 5")
 
-            -- Separator
-            info.text = ""
-            info.disabled = true
-            UIDropDownMenu_AddButton(info, level)
-            info.disabled = false
+    yOffset = yOffset - 4
+    CreateHeader("Healing", "|cff66ff66")
+    CreateMenuItem("Party", "report party healing 5")
+    CreateMenuItem("Raid", "report raid healing 5")
 
-            -- Cancel
-            info.text = "Cancel"
-            info.func = function() CloseDropDownMenus() end
-            UIDropDownMenu_AddButton(info, level)
+    yOffset = yOffset - 4
+    CreateHeader("My Stats", "|cff6699ff")
+    CreateMenuItem("Say", "report say own")
+    CreateMenuItem("Party", "report party own")
+    CreateMenuItem("Guild", "report guild own")
+
+    -- Adjust menu height
+    menu:SetHeight(-yOffset + 8)
+
+    -- Close on world click
+    menu:SetScript("OnUpdate", function()
+        if not menu:IsMouseOver() and IsMouseButtonDown("LeftButton") then
+            C_Timer.After(0.1, function()
+                if menu:IsShown() and not menu:IsMouseOver() then
+                    menu:Hide()
+                end
+            end)
         end
-    end
+    end)
 
-    UIDropDownMenu_Initialize(self.reportDropdown, InitializeMenu, "MENU")
-    ToggleDropDownMenu(1, nil, self.reportDropdown, parentFrame or "cursor", 0, 0)
+    menu:Hide()
+    return menu
 end
 
 -- Show window
