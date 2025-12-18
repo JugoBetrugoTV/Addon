@@ -227,9 +227,12 @@ function Core:OnCombatEnd()
     local segment = DB.Data.currentSegment
     if segment then
         segment.inCombat = false
-        -- Don't set endTime - keep segment active for continuous tracking
-        -- User must manually reset to clear data
         segment.duration = combatDuration
+        segment.endTime = GetTime()
+
+        -- Save current segment data to overall before potentially clearing
+        -- Overall keeps accumulating until manual reset or group change
+        -- Current segment data persists but shows last combat
     end
 
     -- Play sound
@@ -243,6 +246,55 @@ function Core:OnCombatEnd()
     end
 
     Utils.Debug("Combat ended, duration:", combatDuration)
+end
+
+-- Check if group/instance changed (should reset overall)
+function Core:CheckGroupChange()
+    local currentInstance = Utils.GetInstanceInfo()
+    local currentGroupType = self:GetGroupType()
+
+    -- Check if we're in a new instance/group
+    local shouldReset = false
+
+    if self.lastInstanceName and self.lastInstanceName ~= currentInstance.name then
+        if currentInstance.type ~= "none" then
+            shouldReset = true
+            Utils.Debug("Instance changed from", self.lastInstanceName, "to", currentInstance.name)
+        end
+    end
+
+    if self.lastGroupType and self.lastGroupType ~= currentGroupType then
+        if currentGroupType ~= "solo" then
+            shouldReset = true
+            Utils.Debug("Group changed from", self.lastGroupType, "to", currentGroupType)
+        end
+    end
+
+    -- Store current state
+    self.lastInstanceName = currentInstance.name
+    self.lastGroupType = currentGroupType
+
+    if shouldReset then
+        self:Print("New group/instance detected. Resetting data.")
+        DB:Reset()
+    end
+end
+
+-- Get current group type
+function Core:GetGroupType()
+    if IsInRaid() then
+        return "raid"
+    elseif IsInGroup() then
+        local instanceType = select(2, IsInInstance())
+        if instanceType == "pvp" then
+            return "battleground"
+        elseif instanceType == "arena" then
+            return "arena"
+        else
+            return "party"
+        end
+    end
+    return "solo"
 end
 
 -- Encounter start
@@ -278,6 +330,11 @@ end
 function Core:OnZoneChanged()
     local instance = Utils.GetInstanceInfo()
     Utils.Debug("Zone changed:", instance.name, "Type:", instance.type)
+
+    -- Check if we should auto-reset for new instance
+    C_Timer.After(1, function()
+        self:CheckGroupChange()
+    end)
 end
 
 -- Player entering world
@@ -285,18 +342,33 @@ function Core:OnPlayerEnteringWorld(event, isInitialLogin, isReloadingUi)
     if isInitialLogin or isReloadingUi then
         Utils.Debug("Player entering world")
 
+        -- Initialize tracking state
+        local instance = Utils.GetInstanceInfo()
+        self.lastInstanceName = instance.name
+        self.lastGroupType = self:GetGroupType()
+
         -- Refresh UI
         if EDM.UI then
             C_Timer.After(1, function()
                 EDM.UI:Refresh()
             end)
         end
+    else
+        -- Zone change (not login/reload)
+        C_Timer.After(1, function()
+            self:CheckGroupChange()
+        end)
     end
 end
 
 -- Group roster update
 function Core:OnGroupRosterUpdate()
     Utils.Debug("Group roster updated")
+
+    -- Check for group changes
+    C_Timer.After(0.5, function()
+        self:CheckGroupChange()
+    end)
 end
 
 -- Unit pet changed
@@ -377,67 +449,249 @@ function Core:CreateNewWindow()
     end
 end
 
--- Report to chat
+-- Report to chat with enhanced options
 function Core:ReportToChat(input)
-    -- Parse channel from input
+    -- Parse channel and mode from input
+    -- Format: /edm report [channel] [mode] [count]
+    -- Examples: /edm report party damage 5
+    --           /edm report raid healing
+    --           /edm report guild own
     local channel = "SAY"
-    local args = input:match("^report%s+(.+)$")
-    if args then
-        args = args:upper()
-        if args == "PARTY" or args == "P" then
-            channel = "PARTY"
-        elseif args == "RAID" or args == "R" then
-            channel = "RAID"
-        elseif args == "GUILD" or args == "G" then
-            channel = "GUILD"
-        elseif args == "INSTANCE" or args == "I" then
-            channel = "INSTANCE_CHAT"
-        elseif args == "WHISPER" or args == "W" then
-            channel = "WHISPER"
+    local reportMode = "damage" -- damage, healing, own
+    local reportCount = 5
+    local whisperTarget = nil
+
+    local args = input:match("^report%s*(.*)$")
+    if args and args ~= "" then
+        local parts = {}
+        for part in args:gmatch("%S+") do
+            table.insert(parts, part:lower())
+        end
+
+        -- Parse channel
+        if parts[1] then
+            local ch = parts[1]:upper()
+            if ch == "PARTY" or ch == "P" then
+                channel = "PARTY"
+            elseif ch == "RAID" or ch == "R" then
+                channel = "RAID"
+            elseif ch == "GUILD" or ch == "G" then
+                channel = "GUILD"
+            elseif ch == "INSTANCE" or ch == "I" then
+                channel = "INSTANCE_CHAT"
+            elseif ch == "SAY" or ch == "S" then
+                channel = "SAY"
+            elseif ch == "YELL" or ch == "Y" then
+                channel = "YELL"
+            elseif ch:match("^W:") then
+                channel = "WHISPER"
+                whisperTarget = ch:match("^W:(.+)$")
+            end
+        end
+
+        -- Parse mode
+        if parts[2] then
+            local mode = parts[2]
+            if mode == "damage" or mode == "dps" or mode == "d" then
+                reportMode = "damage"
+            elseif mode == "healing" or mode == "hps" or mode == "h" then
+                reportMode = "healing"
+            elseif mode == "own" or mode == "self" or mode == "me" then
+                reportMode = "own"
+            end
+        end
+
+        -- Parse count
+        if parts[3] then
+            reportCount = tonumber(parts[3]) or 5
+            reportCount = math.min(math.max(reportCount, 1), 15)
         end
     end
 
-    -- Get current segment data
+    -- Get segment data
     local segment = DB.Data.currentSegment
     if not segment then
         self:Print("No data to report")
         return
     end
 
-    -- Get sorted actors for damage
-    local actors = DB:GetSortedActors(segment, C.DISPLAY_MODE.DAMAGE_DONE)
-    if not actors or #actors == 0 then
-        self:Print("No damage data to report")
+    local duration = DB:GetSegmentDuration(segment)
+    if duration == 0 then duration = 1 end
+
+    -- Helper function to send message
+    local function SendMsg(msg)
+        if channel == "WHISPER" and whisperTarget then
+            SendChatMessage(msg, channel, nil, whisperTarget)
+        else
+            SendChatMessage(msg, channel)
+        end
+    end
+
+    -- Report own data
+    if reportMode == "own" then
+        local playerGuid = UnitGUID("player")
+        local playerActor = segment.actors[playerGuid]
+
+        if not playerActor then
+            self:Print("No personal data to report")
+            return
+        end
+
+        local dps = playerActor.damage / duration
+        local hps = playerActor.healing / duration
+
+        SendMsg(string.format("--- My Stats (%s) ---", Utils.FormatTime(duration)))
+        SendMsg(string.format("Damage: %s (%s DPS) | Healing: %s (%s HPS)",
+            Utils.FormatNumber(playerActor.damage),
+            Utils.FormatNumber(dps),
+            Utils.FormatNumber(playerActor.healing),
+            Utils.FormatNumber(hps)
+        ))
+
+        -- Top abilities
+        if playerActor.abilities and next(playerActor.abilities) then
+            local sortedAbilities = {}
+            for _, ability in pairs(playerActor.abilities) do
+                if ability.damage > 0 then
+                    table.insert(sortedAbilities, ability)
+                end
+            end
+            table.sort(sortedAbilities, function(a, b) return a.damage > b.damage end)
+
+            if #sortedAbilities > 0 then
+                local topAbilities = {}
+                for i = 1, math.min(3, #sortedAbilities) do
+                    table.insert(topAbilities, string.format("%s: %s", sortedAbilities[i].name, Utils.FormatNumber(sortedAbilities[i].damage)))
+                end
+                SendMsg("Top: " .. table.concat(topAbilities, " | "))
+            end
+        end
         return
     end
 
-    -- Get duration
-    local duration = DB:GetSegmentDuration(segment)
+    -- Report group data
+    local displayMode = reportMode == "healing" and C.DISPLAY_MODE.HEALING_DONE or C.DISPLAY_MODE.DAMAGE_DONE
+    local actors = DB:GetSortedActors(segment, displayMode)
 
-    -- Build report
-    local maxReport = math.min(5, #actors)
+    if not actors or #actors == 0 then
+        self:Print("No " .. reportMode .. " data to report")
+        return
+    end
 
-    SendChatMessage("--- EpicDamageMeter Report ---", channel)
+    local maxReport = math.min(reportCount, #actors)
+    local modeLabel = reportMode == "healing" and "Healing" or "Damage"
+    local psLabel = reportMode == "healing" and "HPS" or "DPS"
 
+    SendMsg(string.format("--- EpicDM %s Report (%s) ---", modeLabel, Utils.FormatTime(duration)))
+
+    local total = 0
     for i = 1, maxReport do
         local actor = actors[i]
-        local dps = duration > 0 and (actor.damage / duration) or 0
-        local msg = string.format("%d. %s - %s (%s DPS)",
+        local value = reportMode == "healing" and actor.healing or actor.damage
+        local perSecond = value / duration
+        total = total + value
+
+        local msg = string.format("%d. %s - %s (%s %s)",
             i,
             actor.name or "Unknown",
-            Utils.FormatNumber(actor.damage),
-            Utils.FormatNumber(dps)
+            Utils.FormatNumber(value),
+            Utils.FormatNumber(perSecond),
+            psLabel
         )
-        SendChatMessage(msg, channel)
+        SendMsg(msg)
     end
 
     -- Total line
-    local totalDPS = duration > 0 and (segment.totalDamage / duration) or 0
-    SendChatMessage(string.format("Total: %s damage in %s (%s DPS)",
-        Utils.FormatNumber(segment.totalDamage),
-        Utils.FormatTime(duration),
-        Utils.FormatNumber(totalDPS)
-    ), channel)
+    local segmentTotal = reportMode == "healing" and segment.totalHealing or segment.totalDamage
+    local totalPS = segmentTotal / duration
+    SendMsg(string.format("Total: %s %s (%s %s)",
+        Utils.FormatNumber(segmentTotal),
+        modeLabel:lower(),
+        Utils.FormatNumber(totalPS),
+        psLabel
+    ))
+end
+
+-- Show chat report menu (for UI button)
+function Core:ShowReportMenu(parentFrame)
+    if not self.reportDropdown then
+        self.reportDropdown = CreateFrame("Frame", "EDMReportDropdown", UIParent, "UIDropDownMenuTemplate")
+    end
+
+    local function InitializeMenu(frame, level)
+        level = level or 1
+        local info = UIDropDownMenu_CreateInfo()
+
+        if level == 1 then
+            -- Header
+            info.text = "|cff00ff00Report to Chat|r"
+            info.isTitle = true
+            info.notCheckable = true
+            UIDropDownMenu_AddButton(info, level)
+
+            info.isTitle = false
+            info.disabled = false
+
+            -- Report damage
+            info.text = "Damage (Party)"
+            info.notCheckable = true
+            info.func = function() Core:ReportToChat("report party damage 5") end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "Damage (Raid)"
+            info.func = function() Core:ReportToChat("report raid damage 5") end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "Damage (Instance)"
+            info.func = function() Core:ReportToChat("report instance damage 5") end
+            UIDropDownMenu_AddButton(info, level)
+
+            -- Separator
+            info.text = ""
+            info.disabled = true
+            info.notCheckable = true
+            UIDropDownMenu_AddButton(info, level)
+            info.disabled = false
+
+            -- Report healing
+            info.text = "Healing (Party)"
+            info.func = function() Core:ReportToChat("report party healing 5") end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "Healing (Raid)"
+            info.func = function() Core:ReportToChat("report raid healing 5") end
+            UIDropDownMenu_AddButton(info, level)
+
+            -- Separator
+            info.text = ""
+            info.disabled = true
+            UIDropDownMenu_AddButton(info, level)
+            info.disabled = false
+
+            -- Report own stats
+            info.text = "|cff6699ffMy Stats (Party)|r"
+            info.func = function() Core:ReportToChat("report party own") end
+            UIDropDownMenu_AddButton(info, level)
+
+            info.text = "|cff6699ffMy Stats (Guild)|r"
+            info.func = function() Core:ReportToChat("report guild own") end
+            UIDropDownMenu_AddButton(info, level)
+
+            -- Separator
+            info.text = ""
+            info.disabled = true
+            UIDropDownMenu_AddButton(info, level)
+            info.disabled = false
+
+            -- Cancel
+            info.text = "Cancel"
+            info.func = function() CloseDropDownMenus() end
+            UIDropDownMenu_AddButton(info, level)
+        end
+    end
+
+    UIDropDownMenu_Initialize(self.reportDropdown, InitializeMenu, "MENU")
+    ToggleDropDownMenu(1, nil, self.reportDropdown, parentFrame or "cursor", 0, 0)
 end
 
 -- Show window

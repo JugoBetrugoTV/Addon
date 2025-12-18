@@ -769,6 +769,251 @@ function Config:Close()
     AceConfigDialog:Close(ADDON_NAME)
 end
 
+--============================================================================
+-- QUICK SETTINGS PANEL (Nice inline UI)
+--============================================================================
+
+function Config:CreateQuickPanel()
+    if self.quickPanel then return end
+
+    local panel = CreateFrame("Frame", "EDMQuickSettings", UIParent, "BackdropTemplate")
+    panel:SetSize(320, 400)
+    panel:SetPoint("CENTER", 0, 50)
+    panel:SetFrameStrata("DIALOG")
+    panel:SetFrameLevel(100)
+    panel:SetMovable(true)
+    panel:EnableMouse(true)
+    panel:SetClampedToScreen(true)
+
+    panel:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 2,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 }
+    })
+    panel:SetBackdropColor(0.05, 0.05, 0.08, 0.98)
+    panel:SetBackdropBorderColor(0.3, 0.5, 0.8, 1)
+
+    -- Title bar with gradient
+    panel.titleBar = CreateFrame("Frame", nil, panel)
+    panel.titleBar:SetHeight(32)
+    panel.titleBar:SetPoint("TOPLEFT", 2, -2)
+    panel.titleBar:SetPoint("TOPRIGHT", -2, -2)
+
+    panel.titleBar.bg = panel.titleBar:CreateTexture(nil, "BACKGROUND")
+    panel.titleBar.bg:SetAllPoints()
+    panel.titleBar.bg:SetColorTexture(0.1, 0.15, 0.25, 1)
+
+    panel.titleBar.icon = panel.titleBar:CreateTexture(nil, "ARTWORK")
+    panel.titleBar.icon:SetSize(24, 24)
+    panel.titleBar.icon:SetPoint("LEFT", 8, 0)
+    panel.titleBar.icon:SetTexture("Interface\\Buttons\\UI-OptionsButton")
+
+    panel.titleBar.title = panel.titleBar:CreateFontString(nil, "OVERLAY")
+    panel.titleBar.title:SetPoint("LEFT", panel.titleBar.icon, "RIGHT", 8, 0)
+    panel.titleBar.title:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+    panel.titleBar.title:SetText("|cff00ff00Epic|r|cffff6600DM|r Settings")
+
+    -- Close button
+    panel.closeBtn = CreateFrame("Button", nil, panel.titleBar)
+    panel.closeBtn:SetSize(20, 20)
+    panel.closeBtn:SetPoint("RIGHT", -6, 0)
+    panel.closeBtn:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
+    panel.closeBtn:SetHighlightTexture("Interface\\Buttons\\UI-StopButton")
+    panel.closeBtn:GetHighlightTexture():SetVertexColor(1, 0.3, 0.3, 0.8)
+    panel.closeBtn:SetScript("OnClick", function() panel:Hide() end)
+
+    -- Advanced settings button
+    panel.advancedBtn = CreateFrame("Button", nil, panel.titleBar)
+    panel.advancedBtn:SetSize(20, 20)
+    panel.advancedBtn:SetPoint("RIGHT", panel.closeBtn, "LEFT", -4, 0)
+    panel.advancedBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-OfficerNote-Up")
+    panel.advancedBtn:SetHighlightTexture("Interface\\Buttons\\UI-GuildButton-OfficerNote-Up")
+    panel.advancedBtn:GetHighlightTexture():SetVertexColor(0.3, 0.8, 1, 0.8)
+    panel.advancedBtn:SetScript("OnClick", function()
+        panel:Hide()
+        Config:Open()
+    end)
+    panel.advancedBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:SetText("Advanced Settings")
+        GameTooltip:Show()
+    end)
+    panel.advancedBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Make draggable
+    panel.titleBar:EnableMouse(true)
+    panel.titleBar:RegisterForDrag("LeftButton")
+    panel.titleBar:SetScript("OnDragStart", function() panel:StartMoving() end)
+    panel.titleBar:SetScript("OnDragStop", function() panel:StopMovingOrSizing() end)
+
+    -- Content area
+    panel.content = CreateFrame("Frame", nil, panel)
+    panel.content:SetPoint("TOPLEFT", panel.titleBar, "BOTTOMLEFT", 10, -10)
+    panel.content:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
+
+    local yOffset = 0
+
+    -- Helper function to create a setting row
+    local function CreateToggle(label, dbKey, dbPath)
+        local row = CreateFrame("Frame", nil, panel.content)
+        row:SetSize(280, 28)
+        row:SetPoint("TOPLEFT", 0, -yOffset)
+
+        row.label = row:CreateFontString(nil, "OVERLAY")
+        row.label:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
+        row.label:SetPoint("LEFT", 0, 0)
+        row.label:SetTextColor(0.9, 0.9, 0.9, 1)
+        row.label:SetText(label)
+
+        row.checkbox = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+        row.checkbox:SetSize(24, 24)
+        row.checkbox:SetPoint("RIGHT", 0, 0)
+
+        local function GetValue()
+            local path = dbPath or "profile"
+            local keys = {strsplit(".", dbKey)}
+            local val = EDM.db[path]
+            for _, key in ipairs(keys) do
+                if val then val = val[key] end
+            end
+            return val
+        end
+
+        local function SetValue(newVal)
+            local path = dbPath or "profile"
+            local keys = {strsplit(".", dbKey)}
+            local tbl = EDM.db[path]
+            for i = 1, #keys - 1 do
+                if tbl then tbl = tbl[keys[i]] end
+            end
+            if tbl then tbl[keys[#keys]] = newVal end
+        end
+
+        row.checkbox:SetChecked(GetValue())
+        row.checkbox:SetScript("OnClick", function(self)
+            SetValue(self:GetChecked())
+            if EDM.UI then EDM.UI:ApplySettings() end
+        end)
+
+        yOffset = yOffset + 30
+        return row
+    end
+
+    local function CreateSlider(label, dbKey, minVal, maxVal, step, dbPath)
+        local row = CreateFrame("Frame", nil, panel.content)
+        row:SetSize(280, 40)
+        row:SetPoint("TOPLEFT", 0, -yOffset)
+
+        row.label = row:CreateFontString(nil, "OVERLAY")
+        row.label:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
+        row.label:SetPoint("TOPLEFT", 0, 0)
+        row.label:SetTextColor(0.9, 0.9, 0.9, 1)
+        row.label:SetText(label)
+
+        row.slider = CreateFrame("Slider", nil, row, "OptionsSliderTemplate")
+        row.slider:SetSize(160, 16)
+        row.slider:SetPoint("BOTTOMRIGHT", 0, 0)
+        row.slider:SetMinMaxValues(minVal, maxVal)
+        row.slider:SetValueStep(step)
+        row.slider:SetObeyStepOnDrag(true)
+        row.slider.Low:SetText(minVal)
+        row.slider.High:SetText(maxVal)
+
+        row.value = row:CreateFontString(nil, "OVERLAY")
+        row.value:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
+        row.value:SetPoint("TOPRIGHT", 0, 0)
+        row.value:SetTextColor(1, 0.8, 0.2, 1)
+
+        local function GetValue()
+            local path = dbPath or "profile"
+            local keys = {strsplit(".", dbKey)}
+            local val = EDM.db[path]
+            for _, key in ipairs(keys) do
+                if val then val = val[key] end
+            end
+            return val or minVal
+        end
+
+        local function SetValue(newVal)
+            local path = dbPath or "profile"
+            local keys = {strsplit(".", dbKey)}
+            local tbl = EDM.db[path]
+            for i = 1, #keys - 1 do
+                if tbl then tbl = tbl[keys[i]] end
+            end
+            if tbl then tbl[keys[#keys]] = newVal end
+        end
+
+        local currentVal = GetValue()
+        row.slider:SetValue(currentVal)
+        row.value:SetText(currentVal)
+        row.slider:SetScript("OnValueChanged", function(self, value)
+            value = math.floor(value / step + 0.5) * step
+            SetValue(value)
+            row.value:SetText(value)
+            if EDM.UI then EDM.UI:ApplySettings() end
+        end)
+
+        yOffset = yOffset + 45
+        return row
+    end
+
+    local function CreateHeader(text)
+        local header = panel.content:CreateFontString(nil, "OVERLAY")
+        header:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+        header:SetPoint("TOPLEFT", 0, -yOffset)
+        header:SetTextColor(0.4, 0.7, 1, 1)
+        header:SetText(text)
+
+        local line = panel.content:CreateTexture(nil, "ARTWORK")
+        line:SetSize(280, 1)
+        line:SetPoint("TOPLEFT", 0, -yOffset - 16)
+        line:SetColorTexture(0.3, 0.5, 0.8, 0.5)
+
+        yOffset = yOffset + 25
+    end
+
+    -- Create settings
+    CreateHeader("General")
+    CreateToggle("Lock Window Position", "locked")
+    CreateToggle("Show Minimap Icon", "minimap.hide")
+
+    CreateHeader("Window")
+    CreateSlider("Window Scale", "window.scale", 0.5, 2.0, 0.1)
+    CreateSlider("Window Opacity", "window.opacity", 0.2, 1.0, 0.1)
+
+    CreateHeader("Bars")
+    CreateSlider("Bar Height", "bars.height", 12, 32, 1)
+    CreateSlider("Bar Spacing", "bars.spacing", 0, 5, 1)
+    CreateToggle("Use Class Colors", "bars.useClassColors")
+    CreateToggle("Show Rank Numbers", "bars.showRank")
+
+    CreateHeader("Display")
+    CreateSlider("Max Bars Shown", "display.maxBars", 5, 50, 1)
+    CreateSlider("Refresh Rate (s)", "display.refreshRate", 0.1, 2.0, 0.1)
+
+    CreateHeader("Sounds")
+    CreateToggle("Combat Start Sound", "sounds.combatStart")
+    CreateToggle("Combat End Sound", "sounds.combatEnd")
+
+    panel:Hide()
+    self.quickPanel = panel
+end
+
+-- Show quick settings panel
+function Config:ShowQuickPanel()
+    if not self.quickPanel then
+        self:CreateQuickPanel()
+    end
+
+    if self.quickPanel:IsShown() then
+        self.quickPanel:Hide()
+    else
+        self.quickPanel:Show()
+    end
+end
+
 -- Initialize on load
 C_Timer.After(0, function()
     if EDM.db then

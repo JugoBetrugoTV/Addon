@@ -157,12 +157,18 @@ function Instance:CreateTitleBar()
     self.settingsBtn:GetHighlightTexture():SetVertexColor(0.3, 0.6, 1, 0.8)
     self.settingsBtn:SetScript("OnClick", function()
         if EDM.Config then
-            EDM.Config:Open()
+            if IsShiftKeyDown() then
+                EDM.Config:Open() -- Full AceConfig panel
+            else
+                EDM.Config:ShowQuickPanel() -- Quick settings panel
+            end
         end
     end)
     self.settingsBtn:SetScript("OnEnter", function(btn)
         GameTooltip:SetOwner(btn, "ANCHOR_TOP")
-        GameTooltip:SetText("Settings")
+        GameTooltip:AddLine("Settings")
+        GameTooltip:AddLine("Click: Quick settings", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Shift+Click: Advanced settings", 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     self.settingsBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -208,6 +214,26 @@ function Instance:CreateTitleBar()
         GameTooltip:Show()
     end)
     self.resetBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Report button (chat)
+    self.reportBtn = CreateFrame("Button", nil, self.titleBar)
+    self.reportBtn:SetSize(14, 14)
+    self.reportBtn:SetPoint("RIGHT", self.resetBtn, "LEFT", -3, 0)
+    self.reportBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-OfficerNote-Up")
+    self.reportBtn:SetHighlightTexture("Interface\\Buttons\\UI-GuildButton-OfficerNote-Up")
+    self.reportBtn:GetHighlightTexture():SetVertexColor(1, 0.8, 0.3, 0.8)
+    self.reportBtn:SetScript("OnClick", function(btn)
+        if EDM.Core then
+            EDM.Core:ShowReportMenu(btn)
+        end
+    end)
+    self.reportBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:SetText("Report to Chat")
+        GameTooltip:AddLine("Click to post data to chat", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    self.reportBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Draggable
     self.titleBar:EnableMouse(true)

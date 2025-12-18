@@ -18,6 +18,7 @@ DetailWindow.currentActor = nil
 DetailWindow.currentInstance = nil
 DetailWindow.abilityBars = {}
 DetailWindow.selectedSpell = nil
+DetailWindow.spellDetailFrame = nil
 
 -- Initialize detail window
 function DetailWindow:Initialize()
@@ -477,34 +478,18 @@ function DetailWindow:ShowDamageAbilities()
         bar.statusBar:SetValue(ability.damage / maxValue)
         bar.statusBar:SetStatusBarColor(0.8, 0.2, 0.2, 0.7)
 
-        -- Tooltip with detailed info
+        -- Enhanced tooltip with detailed info
+        local abilityRef = ability
+        local durationRef = duration
         bar:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(ability.name or "Unknown", 1, 1, 1)
-            GameTooltip:AddLine(" ")
-            GameTooltip:AddDoubleLine("Total Damage:", Utils.FormatNumber(ability.damage), 0.7, 0.7, 0.7, 1, 0.5, 0.5)
-            GameTooltip:AddDoubleLine("DPS:", string.format("%.1f", dps), 0.7, 0.7, 0.7, 1, 1, 1)
-            GameTooltip:AddDoubleLine("Hits:", string.format("%d", hits), 0.7, 0.7, 0.7, 1, 1, 1)
-            GameTooltip:AddDoubleLine("Crits:", string.format("%d (%.1f%%)", crits, critPercent), 0.7, 0.7, 0.7, 1, 0.5, 0.5)
-            GameTooltip:AddDoubleLine("Average:", Utils.FormatNumber(avgDamage), 0.7, 0.7, 0.7, 1, 1, 1)
-            GameTooltip:AddDoubleLine("Min:", Utils.FormatNumber(ability.damageMin or 0), 0.7, 0.7, 0.7, 0.5, 1, 0.5)
-            GameTooltip:AddDoubleLine("Max:", Utils.FormatNumber(ability.damageMax or 0), 0.7, 0.7, 0.7, 1, 0.5, 0.5)
-            if ability.misses then
-                local totalMisses = 0
-                for _, count in pairs(ability.misses) do totalMisses = totalMisses + count end
-                if totalMisses > 0 then
-                    GameTooltip:AddLine(" ")
-                    GameTooltip:AddLine("Misses:", 0.8, 0.8, 0.8)
-                    for missType, count in pairs(ability.misses) do
-                        if count > 0 then
-                            GameTooltip:AddDoubleLine(missType, count, 0.6, 0.6, 0.6, 1, 0.5, 0.5)
-                        end
-                    end
-                end
-            end
-            GameTooltip:Show()
+            DetailWindow:ShowSpellTooltip(self, abilityRef, true, durationRef)
         end)
         bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        -- Click to show spell detail popup
+        bar:SetScript("OnClick", function()
+            DetailWindow:ShowSpellDetail(abilityRef, true, durationRef)
+        end)
 
         yOffset = yOffset + 30
     end
@@ -576,20 +561,18 @@ function DetailWindow:ShowHealingAbilities()
         bar.statusBar:SetValue((ability.healing or 0) / maxValue)
         bar.statusBar:SetStatusBarColor(0.2, 0.8, 0.2, 0.7)
 
-        -- Tooltip
+        -- Enhanced tooltip
+        local abilityRef = ability
+        local durationRef = duration
         bar:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(ability.name or "Unknown", 1, 1, 1)
-            GameTooltip:AddLine(" ")
-            GameTooltip:AddDoubleLine("Effective Healing:", Utils.FormatNumber(ability.healing or 0), 0.7, 0.7, 0.7, 0.5, 1, 0.5)
-            GameTooltip:AddDoubleLine("Overhealing:", Utils.FormatNumber(overheal), 0.7, 0.7, 0.7, 0.7, 0.7, 0.7)
-            GameTooltip:AddDoubleLine("HPS:", string.format("%.1f", hps), 0.7, 0.7, 0.7, 1, 1, 1)
-            GameTooltip:AddDoubleLine("Hits:", string.format("%d", hits), 0.7, 0.7, 0.7, 1, 1, 1)
-            GameTooltip:AddDoubleLine("Crits:", string.format("%d (%.1f%%)", crits, critPercent), 0.7, 0.7, 0.7, 1, 0.5, 0.5)
-            GameTooltip:AddDoubleLine("Overheal %:", string.format("%.1f%%", overhealPct), 0.7, 0.7, 0.7, 0.7, 0.7, 0.7)
-            GameTooltip:Show()
+            DetailWindow:ShowSpellTooltip(self, abilityRef, false, durationRef)
         end)
         bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        -- Click to show spell detail popup
+        bar:SetScript("OnClick", function()
+            DetailWindow:ShowSpellDetail(abilityRef, false, durationRef)
+        end)
 
         yOffset = yOffset + 30
     end
@@ -704,4 +687,439 @@ function DetailWindow:Hide()
     if self.frame then
         self.frame:Hide()
     end
+end
+
+--============================================================================
+-- SPELL DETAIL POPUP
+--============================================================================
+
+-- Create mini-graph frame for tooltip
+function DetailWindow:CreateMiniGraph(parent)
+    local graph = CreateFrame("Frame", nil, parent)
+    graph:SetSize(180, 60)
+
+    graph.bg = graph:CreateTexture(nil, "BACKGROUND")
+    graph.bg:SetAllPoints()
+    graph.bg:SetColorTexture(0, 0, 0, 0.5)
+
+    graph.lines = {}
+
+    return graph
+end
+
+-- Draw mini-graph with damage data
+function DetailWindow:DrawMiniGraph(graph, ability, isDamage)
+    -- Clear existing lines
+    for _, line in ipairs(graph.lines) do
+        line:Hide()
+    end
+
+    if not ability or not ability.timeline or #(ability.timeline or {}) < 2 then
+        -- No timeline data, show placeholder
+        local noData = graph:CreateFontString(nil, "OVERLAY")
+        noData:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+        noData:SetPoint("CENTER")
+        noData:SetTextColor(0.5, 0.5, 0.5, 1)
+        noData:SetText("No timeline data")
+        return
+    end
+
+    local width, height = graph:GetSize()
+    local maxValue = 0
+    local points = ability.timeline
+
+    for _, val in ipairs(points) do
+        if val > maxValue then maxValue = val end
+    end
+    if maxValue == 0 then maxValue = 1 end
+
+    local color = isDamage and {0.9, 0.2, 0.2} or {0.2, 0.9, 0.2}
+    local lastX, lastY
+
+    for i, val in ipairs(points) do
+        local x = ((i - 1) / (#points - 1)) * width
+        local y = (val / maxValue) * (height - 10) + 5
+
+        if lastX and lastY then
+            local lineIndex = #graph.lines + 1
+            if not graph.lines[lineIndex] then
+                graph.lines[lineIndex] = graph:CreateLine(nil, "ARTWORK")
+                graph.lines[lineIndex]:SetThickness(1.5)
+            end
+            local line = graph.lines[lineIndex]
+            line:SetVertexColor(color[1], color[2], color[3], 1)
+            line:SetStartPoint("BOTTOMLEFT", graph, lastX, lastY)
+            line:SetEndPoint("BOTTOMLEFT", graph, x, y)
+            line:Show()
+        end
+
+        lastX, lastY = x, y
+    end
+end
+
+-- Show enhanced tooltip with mini-graph
+function DetailWindow:ShowSpellTooltip(bar, ability, isDamage, duration)
+    if not ability then return end
+
+    GameTooltip:SetOwner(bar, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(ability.name or "Unknown", 1, 1, 1)
+    GameTooltip:AddLine(" ")
+
+    if isDamage then
+        local dps = (ability.damage or 0) / (duration or 1)
+        local hits = ability.damageHits or 0
+        local crits = ability.damageCrits or 0
+        local critPct = hits > 0 and ((crits / hits) * 100) or 0
+        local avgDmg = hits > 0 and ((ability.damage or 0) / hits) or 0
+
+        GameTooltip:AddDoubleLine("Total Damage:", Utils.FormatNumber(ability.damage or 0), 0.7, 0.7, 0.7, 1, 0.5, 0.5)
+        GameTooltip:AddDoubleLine("DPS:", string.format("%.1f", dps), 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:AddDoubleLine("Total Hits:", string.format("%d", hits), 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:AddDoubleLine("Critical Hits:", string.format("%d (%.1f%%)", crits, critPct), 0.7, 0.7, 0.7, 1, 0.8, 0.2)
+        GameTooltip:AddDoubleLine("Average Hit:", Utils.FormatNumber(avgDmg), 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:AddDoubleLine("Min Hit:", Utils.FormatNumber(ability.damageMin or 0), 0.7, 0.7, 0.7, 0.5, 1, 0.5)
+        GameTooltip:AddDoubleLine("Max Hit:", Utils.FormatNumber(ability.damageMax or 0), 0.7, 0.7, 0.7, 1, 0.5, 0.5)
+
+        -- Miss types
+        if ability.misses then
+            local totalMisses = 0
+            for _, count in pairs(ability.misses) do totalMisses = totalMisses + count end
+            if totalMisses > 0 then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("Miss Breakdown:", 0.9, 0.6, 0.2)
+                for missType, count in pairs(ability.misses) do
+                    if count > 0 then
+                        GameTooltip:AddDoubleLine(missType, count, 0.6, 0.6, 0.6, 1, 0.5, 0.5)
+                    end
+                end
+            end
+        end
+    else
+        local hps = (ability.healing or 0) / (duration or 1)
+        local hits = ability.healingHits or 0
+        local crits = ability.healingCrits or 0
+        local critPct = hits > 0 and ((crits / hits) * 100) or 0
+        local overheal = ability.overhealing or 0
+        local totalHeal = (ability.healing or 0) + overheal
+        local overhealPct = totalHeal > 0 and ((overheal / totalHeal) * 100) or 0
+
+        GameTooltip:AddDoubleLine("Effective Healing:", Utils.FormatNumber(ability.healing or 0), 0.7, 0.7, 0.7, 0.5, 1, 0.5)
+        GameTooltip:AddDoubleLine("Overhealing:", Utils.FormatNumber(overheal), 0.7, 0.7, 0.7, 0.7, 0.7, 0.7)
+        GameTooltip:AddDoubleLine("Overheal %:", string.format("%.1f%%", overhealPct), 0.7, 0.7, 0.7, 0.7, 0.7, 0.7)
+        GameTooltip:AddDoubleLine("HPS:", string.format("%.1f", hps), 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:AddDoubleLine("Total Hits:", string.format("%d", hits), 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:AddDoubleLine("Critical Heals:", string.format("%d (%.1f%%)", crits, critPct), 0.7, 0.7, 0.7, 1, 0.8, 0.2)
+    end
+
+    -- Targets hit
+    if ability.targets and next(ability.targets) then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Targets Hit:", 0.9, 0.7, 0.3)
+        local targetCount = 0
+        local sortedTargets = {}
+        for guid, target in pairs(ability.targets) do
+            table.insert(sortedTargets, target)
+            targetCount = targetCount + 1
+        end
+        table.sort(sortedTargets, function(a, b)
+            return (isDamage and a.damage or a.healing or 0) > (isDamage and b.damage or b.healing or 0)
+        end)
+
+        for i = 1, math.min(5, #sortedTargets) do
+            local target = sortedTargets[i]
+            local val = isDamage and target.damage or (target.healing or 0)
+            GameTooltip:AddDoubleLine(target.name or "Unknown", Utils.FormatNumber(val), 0.6, 0.6, 0.6, 1, 1, 1)
+        end
+        if targetCount > 5 then
+            GameTooltip:AddLine(string.format("... and %d more", targetCount - 5), 0.5, 0.5, 0.5)
+        end
+    end
+
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cff66ff66Click|r for detailed breakdown", 0.5, 0.5, 0.5)
+    GameTooltip:Show()
+end
+
+-- Create spell detail popup window
+function DetailWindow:CreateSpellDetailFrame()
+    if self.spellDetailFrame then return end
+
+    local frame = CreateFrame("Frame", "EDMSpellDetailFrame", UIParent, "BackdropTemplate")
+    frame:SetSize(350, 400)
+    frame:SetPoint("CENTER", 300, 0)
+    frame:SetFrameStrata("DIALOG")
+    frame:SetFrameLevel(30)
+    frame:SetMovable(true)
+    frame:SetResizable(true)
+    frame:EnableMouse(true)
+    frame:SetClampedToScreen(true)
+    frame:SetResizeBounds(280, 300, 500, 600)
+
+    frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 }
+    })
+    frame:SetBackdropColor(0.02, 0.02, 0.04, 0.98)
+    frame:SetBackdropBorderColor(0.3, 0.3, 0.4, 1)
+
+    -- Title bar
+    frame.titleBar = CreateFrame("Frame", nil, frame)
+    frame.titleBar:SetHeight(26)
+    frame.titleBar:SetPoint("TOPLEFT", 0, 0)
+    frame.titleBar:SetPoint("TOPRIGHT", 0, 0)
+
+    frame.titleBar.bg = frame.titleBar:CreateTexture(nil, "BACKGROUND")
+    frame.titleBar.bg:SetAllPoints()
+    frame.titleBar.bg:SetColorTexture(0.1, 0.1, 0.15, 1)
+
+    frame.titleBar.icon = frame.titleBar:CreateTexture(nil, "ARTWORK")
+    frame.titleBar.icon:SetSize(20, 20)
+    frame.titleBar.icon:SetPoint("LEFT", 4, 0)
+    frame.titleBar.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+    frame.titleBar.title = frame.titleBar:CreateFontString(nil, "OVERLAY")
+    frame.titleBar.title:SetPoint("LEFT", frame.titleBar.icon, "RIGHT", 6, 0)
+    frame.titleBar.title:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+    frame.titleBar.title:SetTextColor(1, 1, 1, 1)
+
+    -- Close button
+    frame.closeBtn = CreateFrame("Button", nil, frame.titleBar)
+    frame.closeBtn:SetSize(18, 18)
+    frame.closeBtn:SetPoint("RIGHT", -4, 0)
+    frame.closeBtn:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
+    frame.closeBtn:SetHighlightTexture("Interface\\Buttons\\UI-StopButton")
+    frame.closeBtn:GetHighlightTexture():SetVertexColor(1, 0.3, 0.3, 0.8)
+    frame.closeBtn:SetScript("OnClick", function() frame:Hide() end)
+
+    -- Stats section
+    frame.statsFrame = CreateFrame("Frame", nil, frame)
+    frame.statsFrame:SetHeight(120)
+    frame.statsFrame:SetPoint("TOPLEFT", frame.titleBar, "BOTTOMLEFT", 8, -8)
+    frame.statsFrame:SetPoint("TOPRIGHT", frame.titleBar, "BOTTOMRIGHT", -8, -8)
+
+    frame.statsFrame.bg = frame.statsFrame:CreateTexture(nil, "BACKGROUND")
+    frame.statsFrame.bg:SetAllPoints()
+    frame.statsFrame.bg:SetColorTexture(0.04, 0.04, 0.06, 0.8)
+
+    -- Create stat labels
+    frame.statsLabels = {}
+    local statNames = {"Total", "Per Second", "Hits", "Crits", "Crit %", "Average", "Min", "Max"}
+    for i, name in ipairs(statNames) do
+        local row = math.ceil(i / 2)
+        local col = ((i - 1) % 2) + 1
+
+        local label = frame.statsFrame:CreateFontString(nil, "OVERLAY")
+        label:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
+        label:SetPoint("TOPLEFT", 8 + (col - 1) * 160, -8 - (row - 1) * 26)
+        label:SetTextColor(0.7, 0.7, 0.7, 1)
+        label:SetText(name .. ":")
+
+        local value = frame.statsFrame:CreateFontString(nil, "OVERLAY")
+        value:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+        value:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
+        value:SetTextColor(1, 1, 1, 1)
+
+        frame.statsLabels[name] = value
+    end
+
+    -- Mini graph
+    frame.miniGraph = CreateFrame("Frame", nil, frame)
+    frame.miniGraph:SetHeight(80)
+    frame.miniGraph:SetPoint("TOPLEFT", frame.statsFrame, "BOTTOMLEFT", 0, -8)
+    frame.miniGraph:SetPoint("TOPRIGHT", frame.statsFrame, "BOTTOMRIGHT", 0, -8)
+
+    frame.miniGraph.bg = frame.miniGraph:CreateTexture(nil, "BACKGROUND")
+    frame.miniGraph.bg:SetAllPoints()
+    frame.miniGraph.bg:SetColorTexture(0.03, 0.03, 0.05, 0.9)
+
+    frame.miniGraph.label = frame.miniGraph:CreateFontString(nil, "OVERLAY")
+    frame.miniGraph.label:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
+    frame.miniGraph.label:SetPoint("TOP", 0, -4)
+    frame.miniGraph.label:SetTextColor(0.7, 0.7, 0.7, 1)
+    frame.miniGraph.label:SetText("Damage Over Time")
+
+    frame.miniGraph.lines = {}
+
+    -- Targets section
+    frame.targetsLabel = frame:CreateFontString(nil, "OVERLAY")
+    frame.targetsLabel:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+    frame.targetsLabel:SetPoint("TOPLEFT", frame.miniGraph, "BOTTOMLEFT", 0, -12)
+    frame.targetsLabel:SetTextColor(0.9, 0.7, 0.3, 1)
+    frame.targetsLabel:SetText("Targets:")
+
+    -- Targets list (scrollable)
+    frame.targetsContent = CreateFrame("Frame", nil, frame)
+    frame.targetsContent:SetPoint("TOPLEFT", frame.targetsLabel, "BOTTOMLEFT", 0, -4)
+    frame.targetsContent:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 24)
+    frame.targetsContent:SetClipsChildren(true)
+
+    frame.targetsScroll = CreateFrame("Frame", nil, frame.targetsContent)
+    frame.targetsScroll:SetPoint("TOPLEFT", 0, 0)
+    frame.targetsScroll:SetWidth(frame.targetsContent:GetWidth() or 300)
+    frame.targetsScroll:SetHeight(1)
+
+    frame.targetBars = {}
+
+    -- Scroll
+    frame.targetsContent:EnableMouseWheel(true)
+    frame.targetsScrollOffset = 0
+    frame.targetsContent:SetScript("OnMouseWheel", function(_, delta)
+        local maxScroll = math.max(0, (frame.targetsScroll:GetHeight() or 0) - (frame.targetsContent:GetHeight() or 100))
+        frame.targetsScrollOffset = frame.targetsScrollOffset - (delta * 25)
+        frame.targetsScrollOffset = math.max(0, math.min(maxScroll, frame.targetsScrollOffset))
+        frame.targetsScroll:SetPoint("TOPLEFT", 0, frame.targetsScrollOffset)
+    end)
+
+    -- Resize handle
+    frame.resizeHandle = CreateFrame("Frame", nil, frame)
+    frame.resizeHandle:SetSize(16, 16)
+    frame.resizeHandle:SetPoint("BOTTOMRIGHT", 0, 0)
+    frame.resizeHandle:EnableMouse(true)
+    frame.resizeHandle.tex = frame.resizeHandle:CreateTexture(nil, "OVERLAY")
+    frame.resizeHandle.tex:SetAllPoints()
+    frame.resizeHandle.tex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    frame.resizeHandle:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" then frame:StartSizing("BOTTOMRIGHT") end
+    end)
+    frame.resizeHandle:SetScript("OnMouseUp", function() frame:StopMovingOrSizing() end)
+
+    -- Draggable
+    frame.titleBar:EnableMouse(true)
+    frame.titleBar:RegisterForDrag("LeftButton")
+    frame.titleBar:SetScript("OnDragStart", function() frame:StartMoving() end)
+    frame.titleBar:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
+
+    frame:Hide()
+    self.spellDetailFrame = frame
+end
+
+-- Show spell detail popup
+function DetailWindow:ShowSpellDetail(ability, isDamage, duration)
+    if not ability then return end
+
+    if not self.spellDetailFrame then
+        self:CreateSpellDetailFrame()
+    end
+
+    local frame = self.spellDetailFrame
+    local DB = EDM.Database
+    local segment = DB.Data.currentSegment
+    duration = duration or (segment and DB:GetSegmentDuration(segment) or 1)
+    if duration == 0 then duration = 1 end
+
+    -- Update title
+    local spellInfo = Utils.GetSpellInfo(ability.spellId)
+    frame.titleBar.icon:SetTexture(spellInfo and spellInfo.icon or ability.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+    frame.titleBar.title:SetText(ability.name or "Unknown Spell")
+
+    -- Update stats
+    if isDamage then
+        local hits = ability.damageHits or 0
+        local crits = ability.damageCrits or 0
+        local critPct = hits > 0 and ((crits / hits) * 100) or 0
+        local avgDmg = hits > 0 and ((ability.damage or 0) / hits) or 0
+        local dps = (ability.damage or 0) / duration
+
+        frame.statsLabels["Total"]:SetText("|cffff6666" .. Utils.FormatNumber(ability.damage or 0) .. "|r")
+        frame.statsLabels["Per Second"]:SetText(Utils.FormatNumber(dps) .. " DPS")
+        frame.statsLabels["Hits"]:SetText(tostring(hits))
+        frame.statsLabels["Crits"]:SetText(tostring(crits))
+        frame.statsLabels["Crit %"]:SetText(string.format("%.1f%%", critPct))
+        frame.statsLabels["Average"]:SetText(Utils.FormatNumber(avgDmg))
+        frame.statsLabels["Min"]:SetText(Utils.FormatNumber(ability.damageMin or 0))
+        frame.statsLabels["Max"]:SetText("|cffff0000" .. Utils.FormatNumber(ability.damageMax or 0) .. "|r")
+        frame.miniGraph.label:SetText("Damage Over Time")
+    else
+        local hits = ability.healingHits or 0
+        local crits = ability.healingCrits or 0
+        local critPct = hits > 0 and ((crits / hits) * 100) or 0
+        local overheal = ability.overhealing or 0
+        local totalHeal = (ability.healing or 0) + overheal
+        local overhealPct = totalHeal > 0 and ((overheal / totalHeal) * 100) or 0
+        local hps = (ability.healing or 0) / duration
+
+        frame.statsLabels["Total"]:SetText("|cff66ff66" .. Utils.FormatNumber(ability.healing or 0) .. "|r")
+        frame.statsLabels["Per Second"]:SetText(Utils.FormatNumber(hps) .. " HPS")
+        frame.statsLabels["Hits"]:SetText(tostring(hits))
+        frame.statsLabels["Crits"]:SetText(tostring(crits))
+        frame.statsLabels["Crit %"]:SetText(string.format("%.1f%%", critPct))
+        frame.statsLabels["Average"]:SetText("--")
+        frame.statsLabels["Min"]:SetText(Utils.FormatNumber(overheal) .. " OH")
+        frame.statsLabels["Max"]:SetText(string.format("%.1f%% OH", overhealPct))
+        frame.miniGraph.label:SetText("Healing Over Time")
+    end
+
+    -- Update targets
+    local targets = ability.targets or {}
+    local sortedTargets = {}
+    for guid, target in pairs(targets) do
+        table.insert(sortedTargets, target)
+    end
+    table.sort(sortedTargets, function(a, b)
+        local aVal = isDamage and (a.damage or 0) or (a.healing or 0)
+        local bVal = isDamage and (b.damage or 0) or (b.healing or 0)
+        return aVal > bVal
+    end)
+
+    local total = isDamage and (ability.damage or 1) or (ability.healing or 1)
+    if total == 0 then total = 1 end
+    local maxVal = sortedTargets[1] and (isDamage and sortedTargets[1].damage or sortedTargets[1].healing) or 1
+    if maxVal == 0 then maxVal = 1 end
+
+    local yOffset = 0
+    for i, target in ipairs(sortedTargets) do
+        if i > 20 then break end
+
+        local bar = frame.targetBars[i]
+        if not bar then
+            bar = CreateFrame("Frame", nil, frame.targetsScroll, "BackdropTemplate")
+            bar:SetHeight(22)
+            bar.bg = bar:CreateTexture(nil, "BACKGROUND")
+            bar.bg:SetAllPoints()
+            bar.bg:SetColorTexture(0.05, 0.05, 0.07, 0.9)
+            bar.statusBar = CreateFrame("StatusBar", nil, bar)
+            bar.statusBar:SetAllPoints()
+            bar.statusBar:SetMinMaxValues(0, 1)
+            bar.statusBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+            bar.statusBar:SetAlpha(0.6)
+            bar.name = bar:CreateFontString(nil, "OVERLAY")
+            bar.name:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+            bar.name:SetPoint("LEFT", 4, 0)
+            bar.name:SetTextColor(1, 1, 1, 1)
+            bar.value = bar:CreateFontString(nil, "OVERLAY")
+            bar.value:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+            bar.value:SetPoint("RIGHT", -4, 0)
+            bar.value:SetTextColor(1, 1, 1, 1)
+            frame.targetBars[i] = bar
+        end
+
+        local val = isDamage and (target.damage or 0) or (target.healing or 0)
+        local pct = (val / total) * 100
+
+        bar:ClearAllPoints()
+        bar:SetPoint("TOPLEFT", frame.targetsScroll, "TOPLEFT", 0, -yOffset)
+        bar:SetPoint("TOPRIGHT", frame.targetsScroll, "TOPRIGHT", 0, -yOffset)
+        bar.name:SetText(target.name or "Unknown")
+        bar.value:SetText(string.format("%s (%.1f%%)", Utils.FormatNumber(val), pct))
+        bar.statusBar:SetValue(val / maxVal)
+        bar.statusBar:SetStatusBarColor(isDamage and 0.8 or 0.2, isDamage and 0.3 or 0.8, isDamage and 0.3 or 0.2, 0.7)
+        bar:Show()
+
+        yOffset = yOffset + 24
+    end
+
+    -- Hide unused bars
+    for i = #sortedTargets + 1, #frame.targetBars do
+        if frame.targetBars[i] then
+            frame.targetBars[i]:Hide()
+        end
+    end
+
+    frame.targetsScroll:SetHeight(math.max(yOffset, 1))
+    frame.targetsScrollOffset = 0
+    frame.targetsScroll:SetPoint("TOPLEFT", 0, 0)
+
+    frame:Show()
 end
