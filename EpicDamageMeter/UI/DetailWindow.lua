@@ -24,9 +24,9 @@ DetailWindow.spellDetailFrame = nil
 function DetailWindow:Initialize()
     if self.frame then return end
 
-    -- Create frame
+    -- Create frame with fancy styling
     self.frame = CreateFrame("Frame", "EDMDetailWindow", UIParent, "BackdropTemplate")
-    self.frame:SetSize(400, 450)
+    self.frame:SetSize(420, 500)
     self.frame:SetPoint("CENTER", 200, 0)
     self.frame:SetFrameStrata("HIGH")
     self.frame:SetFrameLevel(20)
@@ -34,115 +34,202 @@ function DetailWindow:Initialize()
     self.frame:SetResizable(true)
     self.frame:EnableMouse(true)
     self.frame:SetClampedToScreen(true)
-    self.frame:SetResizeBounds(300, 250, 700, 800)
+    self.frame:SetResizeBounds(350, 300, 700, 800)
 
-    -- Apply backdrop
+    -- Apply fancy backdrop with nicer border
     self.frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 14,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 }
+    })
+    self.frame:SetBackdropColor(0.02, 0.02, 0.04, 0.98)
+    self.frame:SetBackdropBorderColor(0.4, 0.5, 0.7, 0.9)
+
+    -- Inner glow/shadow effect
+    self.frame.innerGlow = CreateFrame("Frame", nil, self.frame, "BackdropTemplate")
+    self.frame.innerGlow:SetPoint("TOPLEFT", 3, -3)
+    self.frame.innerGlow:SetPoint("BOTTOMRIGHT", -3, 3)
+    self.frame.innerGlow:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8X8",
         edgeFile = "Interface\\Buttons\\WHITE8X8",
         edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 }
     })
-    self.frame:SetBackdropColor(0.03, 0.03, 0.05, 0.95)
-    self.frame:SetBackdropBorderColor(0.2, 0.2, 0.3, 1)
+    self.frame.innerGlow:SetBackdropColor(0, 0, 0, 0)
+    self.frame.innerGlow:SetBackdropBorderColor(0.15, 0.25, 0.4, 0.5)
 
-    -- Title bar
+    -- Fancy title bar with gradient
     self.titleBar = CreateFrame("Frame", nil, self.frame)
-    self.titleBar:SetHeight(24)
-    self.titleBar:SetPoint("TOPLEFT", 0, 0)
-    self.titleBar:SetPoint("TOPRIGHT", 0, 0)
+    self.titleBar:SetHeight(32)
+    self.titleBar:SetPoint("TOPLEFT", 4, -4)
+    self.titleBar:SetPoint("TOPRIGHT", -4, -4)
 
     self.titleBar.bg = self.titleBar:CreateTexture(nil, "BACKGROUND")
     self.titleBar.bg:SetAllPoints()
-    self.titleBar.bg:SetColorTexture(0.08, 0.08, 0.12, 0.98)
+    self.titleBar.bg:SetColorTexture(0.08, 0.1, 0.15, 1)
+
+    -- Gradient overlay on title bar
+    self.titleBar.gradient = self.titleBar:CreateTexture(nil, "ARTWORK")
+    self.titleBar.gradient:SetAllPoints()
+    self.titleBar.gradient:SetTexture("Interface\\Buttons\\WHITE8X8")
+    self.titleBar.gradient:SetGradient("VERTICAL", CreateColor(0.12, 0.18, 0.28, 0.9), CreateColor(0.05, 0.07, 0.12, 0.9))
+
+    -- Title bar accent line
+    self.titleBar.accentLine = self.titleBar:CreateTexture(nil, "OVERLAY")
+    self.titleBar.accentLine:SetHeight(2)
+    self.titleBar.accentLine:SetPoint("BOTTOMLEFT", 0, 0)
+    self.titleBar.accentLine:SetPoint("BOTTOMRIGHT", 0, 0)
+    self.titleBar.accentLine:SetColorTexture(0.3, 0.5, 0.8, 0.8)
+
+    -- Title icon
+    self.titleBar.icon = self.titleBar:CreateTexture(nil, "ARTWORK")
+    self.titleBar.icon:SetSize(22, 22)
+    self.titleBar.icon:SetPoint("LEFT", 8, 0)
+    self.titleBar.icon:SetTexture("Interface\\Icons\\INV_Misc_Spyglass_03")
+    self.titleBar.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
     self.titleBar.title = self.titleBar:CreateFontString(nil, "OVERLAY")
-    self.titleBar.title:SetPoint("LEFT", 8, 0)
-    self.titleBar.title:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+    self.titleBar.title:SetPoint("LEFT", self.titleBar.icon, "RIGHT", 8, 0)
+    self.titleBar.title:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
     self.titleBar.title:SetTextColor(1, 1, 1, 1)
     self.titleBar.title:SetText("Player Details")
+    self.titleBar.title:SetShadowOffset(1, -1)
+    self.titleBar.title:SetShadowColor(0, 0, 0, 0.8)
 
-    -- Close button
-    self.closeBtn = CreateFrame("Button", nil, self.titleBar)
-    self.closeBtn:SetSize(16, 16)
+    -- Close button (fancy styled)
+    self.closeBtn = CreateFrame("Button", nil, self.titleBar, "BackdropTemplate")
+    self.closeBtn:SetSize(24, 24)
     self.closeBtn:SetPoint("RIGHT", -4, 0)
-    self.closeBtn:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
-    self.closeBtn:SetHighlightTexture("Interface\\Buttons\\UI-StopButton")
-    self.closeBtn:GetHighlightTexture():SetVertexColor(1, 0.3, 0.3, 0.8)
-    self.closeBtn:SetScript("OnClick", function()
-        self.frame:Hide()
-    end)
+    self.closeBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    self.closeBtn:SetBackdropColor(0.5, 0.1, 0.1, 0.5)
+    self.closeBtn:SetBackdropBorderColor(0.7, 0.2, 0.2, 0.7)
+    self.closeBtn.text = self.closeBtn:CreateFontString(nil, "OVERLAY")
+    self.closeBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+    self.closeBtn.text:SetPoint("CENTER", 0, 1)
+    self.closeBtn.text:SetText("X")
+    self.closeBtn.text:SetTextColor(1, 0.7, 0.7, 1)
+    self.closeBtn:SetScript("OnClick", function() self.frame:Hide() end)
+    self.closeBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.8, 0.2, 0.2, 0.8) end)
+    self.closeBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.5, 0.1, 0.1, 0.5) end)
 
-    -- Player header
+    -- Player header with better styling
     self.header = CreateFrame("Frame", nil, self.frame)
-    self.header:SetHeight(70)
+    self.header:SetHeight(80)
     self.header:SetPoint("TOPLEFT", self.titleBar, "BOTTOMLEFT", 0, 0)
     self.header:SetPoint("TOPRIGHT", self.titleBar, "BOTTOMRIGHT", 0, 0)
 
     self.header.bg = self.header:CreateTexture(nil, "BACKGROUND")
     self.header.bg:SetAllPoints()
-    self.header.bg:SetColorTexture(0.04, 0.04, 0.06, 0.95)
+    self.header.bg:SetColorTexture(0.03, 0.04, 0.06, 0.98)
+
+    -- Player icon with border frame
+    self.header.iconBorder = CreateFrame("Frame", nil, self.header, "BackdropTemplate")
+    self.header.iconBorder:SetSize(58, 58)
+    self.header.iconBorder:SetPoint("LEFT", 12, 0)
+    self.header.iconBorder:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 2,
+        insets = {left = 2, right = 2, top = 2, bottom = 2}
+    })
+    self.header.iconBorder:SetBackdropColor(0.1, 0.1, 0.15, 1)
+    self.header.iconBorder:SetBackdropBorderColor(0.3, 0.4, 0.6, 0.8)
 
     -- Player icon
-    self.header.icon = self.header:CreateTexture(nil, "ARTWORK")
+    self.header.icon = self.header.iconBorder:CreateTexture(nil, "ARTWORK")
     self.header.icon:SetSize(50, 50)
-    self.header.icon:SetPoint("LEFT", 10, 0)
+    self.header.icon:SetPoint("CENTER", 0, 0)
     self.header.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
     -- Player name
     self.header.name = self.header:CreateFontString(nil, "OVERLAY")
-    self.header.name:SetPoint("TOPLEFT", self.header.icon, "TOPRIGHT", 10, -2)
-    self.header.name:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+    self.header.name:SetPoint("TOPLEFT", self.header.iconBorder, "TOPRIGHT", 12, -4)
+    self.header.name:SetFont("Fonts\\FRIZQT__.TTF", 15, "OUTLINE")
+    self.header.name:SetShadowOffset(1, -1)
+    self.header.name:SetShadowColor(0, 0, 0, 0.8)
 
-    -- Player stats line 1 (Damage/Healing)
+    -- Player stats line 1 (Damage/Healing) - with icons
     self.header.stats1 = self.header:CreateFontString(nil, "OVERLAY")
-    self.header.stats1:SetPoint("TOPLEFT", self.header.name, "BOTTOMLEFT", 0, -4)
-    self.header.stats1:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
-    self.header.stats1:SetTextColor(0.9, 0.9, 0.9, 1)
+    self.header.stats1:SetPoint("TOPLEFT", self.header.name, "BOTTOMLEFT", 0, -6)
+    self.header.stats1:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    self.header.stats1:SetTextColor(0.95, 0.95, 0.95, 1)
 
     -- Player stats line 2 (Deaths/Interrupts/Dispels)
     self.header.stats2 = self.header:CreateFontString(nil, "OVERLAY")
-    self.header.stats2:SetPoint("TOPLEFT", self.header.stats1, "BOTTOMLEFT", 0, -2)
-    self.header.stats2:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
-    self.header.stats2:SetTextColor(0.7, 0.7, 0.7, 1)
+    self.header.stats2:SetPoint("TOPLEFT", self.header.stats1, "BOTTOMLEFT", 0, -4)
+    self.header.stats2:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+    self.header.stats2:SetTextColor(0.7, 0.75, 0.8, 1)
 
-    -- Tab buttons
+    -- Tab buttons with better styling and icons
     self.tabFrame = CreateFrame("Frame", nil, self.frame)
-    self.tabFrame:SetHeight(26)
+    self.tabFrame:SetHeight(32)
     self.tabFrame:SetPoint("TOPLEFT", self.header, "BOTTOMLEFT", 0, 0)
     self.tabFrame:SetPoint("TOPRIGHT", self.header, "BOTTOMRIGHT", 0, 0)
 
     self.tabFrame.bg = self.tabFrame:CreateTexture(nil, "BACKGROUND")
     self.tabFrame.bg:SetAllPoints()
-    self.tabFrame.bg:SetColorTexture(0.06, 0.06, 0.08, 0.95)
+    self.tabFrame.bg:SetColorTexture(0.04, 0.05, 0.07, 0.98)
 
     self.tabs = {}
     local tabNames = { "Damage", "Healing", "Targets", "Activity" }
+    local tabIcons = {
+        "Interface\\Icons\\Ability_Warrior_BloodFrenzy",
+        "Interface\\Icons\\Spell_Holy_FlashHeal",
+        "Interface\\Icons\\Ability_Creature_Cursed_02",
+        "Interface\\Icons\\Spell_Holy_MagicalSentry"
+    }
     local tabWidth = 85
 
     for i, name in ipairs(tabNames) do
         local tab = CreateFrame("Button", nil, self.tabFrame, "BackdropTemplate")
-        tab:SetSize(tabWidth, 22)
-        tab:SetPoint("LEFT", self.tabFrame, "LEFT", (i - 1) * (tabWidth + 2) + 4, 0)
-        tab:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
-        tab:SetBackdropColor(0.15, 0.15, 0.2, 1)
-        tab:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
+        tab:SetSize(tabWidth, 26)
+        tab:SetPoint("LEFT", self.tabFrame, "LEFT", (i - 1) * (tabWidth + 4) + 6, 0)
+        tab:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Buttons\\WHITE8X8",
+            edgeSize = 1,
+            insets = {left = 1, right = 1, top = 1, bottom = 1}
+        })
+        tab:SetBackdropColor(0.08, 0.1, 0.14, 0.95)
+        tab:SetBackdropBorderColor(0.2, 0.25, 0.35, 0.8)
 
+        -- Tab icon
+        tab.icon = tab:CreateTexture(nil, "ARTWORK")
+        tab.icon:SetSize(16, 16)
+        tab.icon:SetPoint("LEFT", 4, 0)
+        tab.icon:SetTexture(tabIcons[i])
+        tab.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+        -- Tab text
         tab.text = tab:CreateFontString(nil, "OVERLAY")
-        tab.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
-        tab.text:SetPoint("CENTER")
+        tab.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+        tab.text:SetPoint("LEFT", tab.icon, "RIGHT", 4, 0)
         tab.text:SetText(name)
-        tab.text:SetTextColor(0.9, 0.9, 0.9, 1)
+        tab.text:SetTextColor(0.85, 0.85, 0.9, 1)
+        tab.text:SetShadowOffset(1, -1)
+        tab.text:SetShadowColor(0, 0, 0, 0.8)
+
+        -- Bottom highlight line (shown when selected)
+        tab.highlight = tab:CreateTexture(nil, "OVERLAY")
+        tab.highlight:SetHeight(2)
+        tab.highlight:SetPoint("BOTTOMLEFT", 2, 1)
+        tab.highlight:SetPoint("BOTTOMRIGHT", -2, 1)
+        tab.highlight:SetColorTexture(0.4, 0.6, 1, 0.9)
+        tab.highlight:Hide()
 
         tab:SetScript("OnClick", function()
             self:SelectTab(i)
         end)
         tab:SetScript("OnEnter", function(btn)
-            btn:SetBackdropColor(0.2, 0.2, 0.25, 1)
+            if self.selectedTab ~= i then
+                btn:SetBackdropColor(0.12, 0.15, 0.22, 1)
+                btn:SetBackdropBorderColor(0.3, 0.4, 0.5, 0.9)
+            end
         end)
         tab:SetScript("OnLeave", function(btn)
             if self.selectedTab ~= i then
-                btn:SetBackdropColor(0.15, 0.15, 0.2, 1)
+                btn:SetBackdropColor(0.08, 0.1, 0.14, 0.95)
+                btn:SetBackdropBorderColor(0.2, 0.25, 0.35, 0.8)
             end
         end)
         self.tabs[i] = tab
@@ -319,11 +406,19 @@ function DetailWindow:SelectTab(index)
     -- Update tab button appearance
     for i, tab in ipairs(self.tabs) do
         if i == index then
-            tab:SetBackdropColor(0.3, 0.3, 0.4, 1)
-            tab:SetBackdropBorderColor(0.4, 0.6, 0.9, 1)
+            -- Selected tab - bright and highlighted
+            tab:SetBackdropColor(0.15, 0.2, 0.3, 1)
+            tab:SetBackdropBorderColor(0.4, 0.55, 0.8, 1)
+            tab.text:SetTextColor(1, 1, 1, 1)
+            tab.icon:SetVertexColor(1, 1, 1, 1)
+            if tab.highlight then tab.highlight:Show() end
         else
-            tab:SetBackdropColor(0.15, 0.15, 0.2, 1)
-            tab:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
+            -- Unselected tab - dimmer
+            tab:SetBackdropColor(0.08, 0.1, 0.14, 0.95)
+            tab:SetBackdropBorderColor(0.2, 0.25, 0.35, 0.8)
+            tab.text:SetTextColor(0.7, 0.7, 0.75, 1)
+            tab.icon:SetVertexColor(0.7, 0.7, 0.7, 1)
+            if tab.highlight then tab.highlight:Hide() end
         end
     end
 
@@ -352,29 +447,48 @@ end
 -- Create ability bar
 function DetailWindow:CreateAbilityBar(index)
     local bar = CreateFrame("Button", nil, self.scrollChild, "BackdropTemplate")
-    bar:SetHeight(28)
+    bar:SetHeight(32)
     bar:EnableMouse(true)
     bar:RegisterForClicks("AnyUp")
 
-    bar.bg = bar:CreateTexture(nil, "BACKGROUND")
-    bar.bg:SetAllPoints()
-    bar.bg:SetColorTexture(0.06, 0.06, 0.08, 0.9)
+    -- Fancy backdrop with subtle border
+    bar:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = {left = 1, right = 1, top = 1, bottom = 1}
+    })
+    bar:SetBackdropColor(0.04, 0.05, 0.07, 0.95)
+    bar:SetBackdropBorderColor(0.12, 0.15, 0.2, 0.6)
 
     bar.statusBar = CreateFrame("StatusBar", nil, bar)
-    bar.statusBar:SetAllPoints()
+    bar.statusBar:SetPoint("TOPLEFT", 1, -1)
+    bar.statusBar:SetPoint("BOTTOMRIGHT", -1, 1)
     bar.statusBar:SetMinMaxValues(0, 1)
     bar.statusBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
     bar.statusBar:SetStatusBarColor(0.3, 0.3, 0.6, 0.6)
-    bar.statusBar:SetAlpha(0.7)
+    bar.statusBar:SetAlpha(0.8)
     bar.statusBar:EnableMouse(false) -- Pass clicks through to parent button
 
-    bar.icon = bar:CreateTexture(nil, "OVERLAY")
+    -- Icon with border frame
+    bar.iconBorder = CreateFrame("Frame", nil, bar, "BackdropTemplate")
+    bar.iconBorder:SetSize(28, 28)
+    bar.iconBorder:SetPoint("LEFT", 3, 0)
+    bar.iconBorder:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    bar.iconBorder:SetBackdropColor(0, 0, 0, 0.8)
+    bar.iconBorder:SetBackdropBorderColor(0.25, 0.3, 0.4, 0.8)
+
+    bar.icon = bar.iconBorder:CreateTexture(nil, "ARTWORK")
     bar.icon:SetSize(24, 24)
-    bar.icon:SetPoint("LEFT", 2, 0)
-    bar.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    bar.icon:SetPoint("CENTER", 0, 0)
+    bar.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     bar.name = bar:CreateFontString(nil, "OVERLAY")
-    bar.name:SetPoint("LEFT", bar.icon, "RIGHT", 6, 4)
+    bar.name:SetPoint("TOPLEFT", bar.iconBorder, "TOPRIGHT", 8, -2)
     bar.name:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
     bar.name:SetTextColor(1, 1, 1, 1)
     bar.name:SetJustifyH("LEFT")
@@ -383,25 +497,32 @@ function DetailWindow:CreateAbilityBar(index)
 
     -- Sub text (hits, crits, etc.)
     bar.subText = bar:CreateFontString(nil, "OVERLAY")
-    bar.subText:SetPoint("TOPLEFT", bar.icon, "RIGHT", 6, -8)
+    bar.subText:SetPoint("BOTTOMLEFT", bar.iconBorder, "BOTTOMRIGHT", 8, 2)
     bar.subText:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
-    bar.subText:SetTextColor(0.7, 0.7, 0.7, 1)
+    bar.subText:SetTextColor(0.6, 0.65, 0.7, 1)
 
     bar.value = bar:CreateFontString(nil, "OVERLAY")
-    bar.value:SetPoint("RIGHT", -4, 4)
-    bar.value:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+    bar.value:SetPoint("TOPRIGHT", -6, -4)
+    bar.value:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
     bar.value:SetTextColor(1, 1, 1, 1)
     bar.value:SetShadowOffset(1, -1)
     bar.value:SetShadowColor(0, 0, 0, 1)
 
     bar.percent = bar:CreateFontString(nil, "OVERLAY")
-    bar.percent:SetPoint("RIGHT", -4, -8)
+    bar.percent:SetPoint("BOTTOMRIGHT", -6, 3)
     bar.percent:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
-    bar.percent:SetTextColor(0.8, 0.8, 0.8, 1)
+    bar.percent:SetTextColor(0.75, 0.8, 0.85, 1)
 
+    -- Subtle highlight effect
     bar.highlight = bar:CreateTexture(nil, "HIGHLIGHT")
     bar.highlight:SetAllPoints()
-    bar.highlight:SetColorTexture(1, 1, 1, 0.1)
+    bar.highlight:SetColorTexture(1, 1, 1, 0.08)
+
+    -- Left accent bar for visual flair
+    bar.accent = bar:CreateTexture(nil, "OVERLAY")
+    bar.accent:SetSize(3, 28)
+    bar.accent:SetPoint("LEFT", 0, 0)
+    bar.accent:SetColorTexture(0.4, 0.5, 0.8, 0.5)
 
     return bar
 end
@@ -492,7 +613,12 @@ function DetailWindow:ShowDamageAbilities()
             DetailWindow:ShowSpellDetail(abilityRef, true, durationRef)
         end)
 
-        yOffset = yOffset + 30
+        -- Color the accent bar based on damage type
+        if bar.accent then
+            bar.accent:SetColorTexture(0.9, 0.25, 0.2, 0.7)
+        end
+
+        yOffset = yOffset + 34
     end
 
     self.scrollChild:SetHeight(math.max(yOffset, 1))
@@ -575,7 +701,12 @@ function DetailWindow:ShowHealingAbilities()
             DetailWindow:ShowSpellDetail(abilityRef, false, durationRef)
         end)
 
-        yOffset = yOffset + 30
+        -- Color the accent bar for healing
+        if bar.accent then
+            bar.accent:SetColorTexture(0.2, 0.9, 0.3, 0.7)
+        end
+
+        yOffset = yOffset + 34
     end
 
     if #sorted == 0 then
@@ -629,7 +760,12 @@ function DetailWindow:ShowTargets()
         bar:SetScript("OnEnter", function() end)
         bar:SetScript("OnLeave", function() end)
 
-        yOffset = yOffset + 30
+        -- Color the accent bar for targets (orange)
+        if bar.accent then
+            bar.accent:SetColorTexture(0.95, 0.6, 0.2, 0.7)
+        end
+
+        yOffset = yOffset + 34
     end
 
     self.scrollChild:SetHeight(math.max(yOffset, 1))
@@ -659,10 +795,11 @@ function DetailWindow:ShowActivity()
         headerBar.value:SetText("")
         headerBar.percent:SetText("")
         headerBar.statusBar:SetValue(0)
+        if headerBar.accent then headerBar.accent:SetColorTexture(0, 0.8, 1, 0.7) end
         headerBar:SetScript("OnEnter", nil)
         headerBar:SetScript("OnLeave", nil)
         headerBar:SetScript("OnClick", nil)
-        yOffset = yOffset + 30
+        yOffset = yOffset + 36
         barIndex = barIndex + 1
 
         -- Show interrupt spells
@@ -670,8 +807,8 @@ function DetailWindow:ShowActivity()
             if barIndex > 50 then break end
             local bar = self:GetAbilityBar(barIndex)
             bar:ClearAllPoints()
-            bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 10, -yOffset)
-            bar:SetWidth(contentWidth - 18)
+            bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 12, -yOffset)
+            bar:SetWidth(contentWidth - 20)
             local spellInfo = Utils.GetSpellInfo(spellId)
             bar.icon:SetTexture(spellInfo and spellInfo.icon or "Interface\\Icons\\Ability_Kick")
             bar.name:SetText(data.name or "Unknown")
@@ -679,10 +816,11 @@ function DetailWindow:ShowActivity()
             bar.value:SetText("")
             bar.percent:SetText("")
             bar.statusBar:SetValue(0)
+            if bar.accent then bar.accent:SetColorTexture(0, 0.6, 0.8, 0.5) end
             bar:SetScript("OnEnter", nil)
             bar:SetScript("OnLeave", nil)
             bar:SetScript("OnClick", nil)
-            yOffset = yOffset + 30
+            yOffset = yOffset + 34
             barIndex = barIndex + 1
         end
     end
@@ -702,18 +840,19 @@ function DetailWindow:ShowActivity()
         headerBar.value:SetText("")
         headerBar.percent:SetText("")
         headerBar.statusBar:SetValue(0)
+        if headerBar.accent then headerBar.accent:SetColorTexture(0.2, 1, 0.3, 0.7) end
         headerBar:SetScript("OnEnter", nil)
         headerBar:SetScript("OnLeave", nil)
         headerBar:SetScript("OnClick", nil)
-        yOffset = yOffset + 30
+        yOffset = yOffset + 36
         barIndex = barIndex + 1
 
         for spellId, data in pairs(dispelSpells) do
             if barIndex > 50 then break end
             local bar = self:GetAbilityBar(barIndex)
             bar:ClearAllPoints()
-            bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 10, -yOffset)
-            bar:SetWidth(contentWidth - 18)
+            bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 12, -yOffset)
+            bar:SetWidth(contentWidth - 20)
             local spellInfo = Utils.GetSpellInfo(spellId)
             bar.icon:SetTexture(spellInfo and spellInfo.icon or "Interface\\Icons\\Spell_Holy_DispelMagic")
             bar.name:SetText(data.name or "Unknown")
@@ -721,10 +860,11 @@ function DetailWindow:ShowActivity()
             bar.value:SetText("")
             bar.percent:SetText("")
             bar.statusBar:SetValue(0)
+            if bar.accent then bar.accent:SetColorTexture(0.2, 0.8, 0.3, 0.5) end
             bar:SetScript("OnEnter", nil)
             bar:SetScript("OnLeave", nil)
             bar:SetScript("OnClick", nil)
-            yOffset = yOffset + 30
+            yOffset = yOffset + 34
             barIndex = barIndex + 1
         end
     end
@@ -742,10 +882,11 @@ function DetailWindow:ShowActivity()
         headerBar.value:SetText(Utils.FormatNumber(absorbs))
         headerBar.percent:SetText("")
         headerBar.statusBar:SetValue(0)
+        if headerBar.accent then headerBar.accent:SetColorTexture(1, 0.9, 0.2, 0.7) end
         headerBar:SetScript("OnEnter", nil)
         headerBar:SetScript("OnLeave", nil)
         headerBar:SetScript("OnClick", nil)
-        yOffset = yOffset + 30
+        yOffset = yOffset + 36
         barIndex = barIndex + 1
     end
 
@@ -763,10 +904,11 @@ function DetailWindow:ShowActivity()
         headerBar.percent:SetText("")
         headerBar.statusBar:SetValue(0)
         headerBar.statusBar:SetStatusBarColor(0.8, 0.1, 0.1, 0.5)
+        if headerBar.accent then headerBar.accent:SetColorTexture(1, 0.2, 0.2, 0.8) end
         headerBar:SetScript("OnEnter", nil)
         headerBar:SetScript("OnLeave", nil)
         headerBar:SetScript("OnClick", nil)
-        yOffset = yOffset + 30
+        yOffset = yOffset + 36
         barIndex = barIndex + 1
     end
 
@@ -947,7 +1089,7 @@ function DetailWindow:CreateSpellDetailFrame()
     if self.spellDetailFrame then return end
 
     local frame = CreateFrame("Frame", "EDMSpellDetailFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(350, 400)
+    frame:SetSize(370, 420)
     frame:SetPoint("CENTER", 300, 0)
     frame:SetFrameStrata("DIALOG")
     frame:SetFrameLevel(30)
@@ -955,55 +1097,100 @@ function DetailWindow:CreateSpellDetailFrame()
     frame:SetResizable(true)
     frame:EnableMouse(true)
     frame:SetClampedToScreen(true)
-    frame:SetResizeBounds(280, 300, 500, 600)
+    frame:SetResizeBounds(300, 320, 520, 620)
 
+    -- Beautiful backdrop with tooltip-style border
     frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 14,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 }
+    })
+    frame:SetBackdropColor(0.02, 0.02, 0.04, 0.98)
+    frame:SetBackdropBorderColor(0.45, 0.55, 0.75, 0.9)
+
+    -- Inner glow effect
+    frame.innerGlow = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+    frame.innerGlow:SetPoint("TOPLEFT", 3, -3)
+    frame.innerGlow:SetPoint("BOTTOMRIGHT", -3, 3)
+    frame.innerGlow:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8X8",
         edgeFile = "Interface\\Buttons\\WHITE8X8",
         edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 }
     })
-    frame:SetBackdropColor(0.02, 0.02, 0.04, 0.98)
-    frame:SetBackdropBorderColor(0.3, 0.3, 0.4, 1)
+    frame.innerGlow:SetBackdropColor(0, 0, 0, 0)
+    frame.innerGlow:SetBackdropBorderColor(0.2, 0.3, 0.5, 0.4)
 
-    -- Title bar
+    -- Title bar with gradient
     frame.titleBar = CreateFrame("Frame", nil, frame)
-    frame.titleBar:SetHeight(26)
-    frame.titleBar:SetPoint("TOPLEFT", 0, 0)
-    frame.titleBar:SetPoint("TOPRIGHT", 0, 0)
+    frame.titleBar:SetHeight(30)
+    frame.titleBar:SetPoint("TOPLEFT", 4, -4)
+    frame.titleBar:SetPoint("TOPRIGHT", -4, -4)
 
     frame.titleBar.bg = frame.titleBar:CreateTexture(nil, "BACKGROUND")
     frame.titleBar.bg:SetAllPoints()
-    frame.titleBar.bg:SetColorTexture(0.1, 0.1, 0.15, 1)
+    frame.titleBar.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    frame.titleBar.bg:SetGradient("VERTICAL", CreateColor(0.12, 0.18, 0.28, 1), CreateColor(0.06, 0.08, 0.12, 1))
 
-    frame.titleBar.icon = frame.titleBar:CreateTexture(nil, "ARTWORK")
-    frame.titleBar.icon:SetSize(20, 20)
-    frame.titleBar.icon:SetPoint("LEFT", 4, 0)
-    frame.titleBar.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    -- Accent line under title
+    frame.titleBar.accent = frame.titleBar:CreateTexture(nil, "OVERLAY")
+    frame.titleBar.accent:SetHeight(2)
+    frame.titleBar.accent:SetPoint("BOTTOMLEFT", 0, 0)
+    frame.titleBar.accent:SetPoint("BOTTOMRIGHT", 0, 0)
+    frame.titleBar.accent:SetColorTexture(0.35, 0.55, 0.85, 0.8)
+
+    -- Icon with border
+    frame.titleBar.iconBorder = CreateFrame("Frame", nil, frame.titleBar, "BackdropTemplate")
+    frame.titleBar.iconBorder:SetSize(26, 26)
+    frame.titleBar.iconBorder:SetPoint("LEFT", 4, 0)
+    frame.titleBar.iconBorder:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    frame.titleBar.iconBorder:SetBackdropColor(0, 0, 0, 0.8)
+    frame.titleBar.iconBorder:SetBackdropBorderColor(0.3, 0.4, 0.6, 0.8)
+
+    frame.titleBar.icon = frame.titleBar.iconBorder:CreateTexture(nil, "ARTWORK")
+    frame.titleBar.icon:SetSize(22, 22)
+    frame.titleBar.icon:SetPoint("CENTER", 0, 0)
+    frame.titleBar.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     frame.titleBar.title = frame.titleBar:CreateFontString(nil, "OVERLAY")
-    frame.titleBar.title:SetPoint("LEFT", frame.titleBar.icon, "RIGHT", 6, 0)
-    frame.titleBar.title:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+    frame.titleBar.title:SetPoint("LEFT", frame.titleBar.iconBorder, "RIGHT", 8, 0)
+    frame.titleBar.title:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
     frame.titleBar.title:SetTextColor(1, 1, 1, 1)
+    frame.titleBar.title:SetShadowOffset(1, -1)
+    frame.titleBar.title:SetShadowColor(0, 0, 0, 0.8)
 
-    -- Close button
-    frame.closeBtn = CreateFrame("Button", nil, frame.titleBar)
-    frame.closeBtn:SetSize(18, 18)
+    -- Close button (styled)
+    frame.closeBtn = CreateFrame("Button", nil, frame.titleBar, "BackdropTemplate")
+    frame.closeBtn:SetSize(22, 22)
     frame.closeBtn:SetPoint("RIGHT", -4, 0)
-    frame.closeBtn:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
-    frame.closeBtn:SetHighlightTexture("Interface\\Buttons\\UI-StopButton")
-    frame.closeBtn:GetHighlightTexture():SetVertexColor(1, 0.3, 0.3, 0.8)
+    frame.closeBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    frame.closeBtn:SetBackdropColor(0.5, 0.1, 0.1, 0.5)
+    frame.closeBtn:SetBackdropBorderColor(0.7, 0.2, 0.2, 0.7)
+    frame.closeBtn.text = frame.closeBtn:CreateFontString(nil, "OVERLAY")
+    frame.closeBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
+    frame.closeBtn.text:SetPoint("CENTER", 0, 1)
+    frame.closeBtn.text:SetText("X")
+    frame.closeBtn.text:SetTextColor(1, 0.7, 0.7, 1)
     frame.closeBtn:SetScript("OnClick", function() frame:Hide() end)
+    frame.closeBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.8, 0.2, 0.2, 0.8) end)
+    frame.closeBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.5, 0.1, 0.1, 0.5) end)
 
-    -- Stats section
-    frame.statsFrame = CreateFrame("Frame", nil, frame)
+    -- Stats section with backdrop
+    frame.statsFrame = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     frame.statsFrame:SetHeight(120)
-    frame.statsFrame:SetPoint("TOPLEFT", frame.titleBar, "BOTTOMLEFT", 8, -8)
-    frame.statsFrame:SetPoint("TOPRIGHT", frame.titleBar, "BOTTOMRIGHT", -8, -8)
-
-    frame.statsFrame.bg = frame.statsFrame:CreateTexture(nil, "BACKGROUND")
-    frame.statsFrame.bg:SetAllPoints()
-    frame.statsFrame.bg:SetColorTexture(0.04, 0.04, 0.06, 0.8)
+    frame.statsFrame:SetPoint("TOPLEFT", frame.titleBar, "BOTTOMLEFT", 4, -8)
+    frame.statsFrame:SetPoint("TOPRIGHT", frame.titleBar, "BOTTOMRIGHT", -4, -8)
+    frame.statsFrame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    frame.statsFrame:SetBackdropColor(0.03, 0.04, 0.06, 0.9)
+    frame.statsFrame:SetBackdropBorderColor(0.12, 0.15, 0.22, 0.6)
 
     -- Create stat labels
     frame.statsLabels = {}
@@ -1026,21 +1213,25 @@ function DetailWindow:CreateSpellDetailFrame()
         frame.statsLabels[name] = value
     end
 
-    -- Mini graph
-    frame.miniGraph = CreateFrame("Frame", nil, frame)
+    -- Mini graph with styled backdrop
+    frame.miniGraph = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     frame.miniGraph:SetHeight(80)
     frame.miniGraph:SetPoint("TOPLEFT", frame.statsFrame, "BOTTOMLEFT", 0, -8)
     frame.miniGraph:SetPoint("TOPRIGHT", frame.statsFrame, "BOTTOMRIGHT", 0, -8)
-
-    frame.miniGraph.bg = frame.miniGraph:CreateTexture(nil, "BACKGROUND")
-    frame.miniGraph.bg:SetAllPoints()
-    frame.miniGraph.bg:SetColorTexture(0.03, 0.03, 0.05, 0.9)
+    frame.miniGraph:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    frame.miniGraph:SetBackdropColor(0.02, 0.03, 0.05, 0.95)
+    frame.miniGraph:SetBackdropBorderColor(0.12, 0.15, 0.22, 0.6)
 
     frame.miniGraph.label = frame.miniGraph:CreateFontString(nil, "OVERLAY")
-    frame.miniGraph.label:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
+    frame.miniGraph.label:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
     frame.miniGraph.label:SetPoint("TOP", 0, -4)
-    frame.miniGraph.label:SetTextColor(0.7, 0.7, 0.7, 1)
+    frame.miniGraph.label:SetTextColor(0.8, 0.85, 0.9, 1)
     frame.miniGraph.label:SetText("Damage Over Time")
+    frame.miniGraph.label:SetShadowOffset(1, -1)
 
     frame.miniGraph.lines = {}
 
