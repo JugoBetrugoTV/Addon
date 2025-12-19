@@ -733,30 +733,21 @@ function Config:GetOptions()
     return options
 end
 
--- Register options
+-- Register options (only for chat command and standalone dialog, NOT Blizzard options)
 function Config:Register()
     local options = self:GetOptions()
     AceConfig:RegisterOptionsTable(ADDON_NAME, options)
 
-    -- Add to Blizzard options
-    self.optionsFrame = AceConfigDialog:AddToBlizOptions(ADDON_NAME, "EpicDamageMeter")
-
-    -- Create sub-categories
-    AceConfigDialog:AddToBlizOptions(ADDON_NAME, "Window", "EpicDamageMeter", "window")
-    AceConfigDialog:AddToBlizOptions(ADDON_NAME, "Bars", "EpicDamageMeter", "bars")
-    AceConfigDialog:AddToBlizOptions(ADDON_NAME, "Graph", "EpicDamageMeter", "graph")
-    AceConfigDialog:AddToBlizOptions(ADDON_NAME, "Sounds", "EpicDamageMeter", "sounds")
-    AceConfigDialog:AddToBlizOptions(ADDON_NAME, "Display", "EpicDamageMeter", "display")
-    AceConfigDialog:AddToBlizOptions(ADDON_NAME, "Advanced", "EpicDamageMeter", "advanced")
-
-    -- Register chat command
+    -- Register chat command only (no Blizzard options to avoid duplicates)
     AceConfigCmd:CreateChatCommand("edm config", ADDON_NAME)
+
+    self.registered = true
 end
 
--- Open config
+-- Open config (advanced AceConfig dialog)
 function Config:Open()
     -- Register if not already done
-    if not self.optionsFrame then
+    if not self.registered then
         self:Register()
     end
 
@@ -1290,29 +1281,28 @@ function Config:BuildTabContents()
         row.value:SetPoint("TOPRIGHT", -10, -6)
         row.value:SetTextColor(1, 0.85, 0.3, 1)
 
-        -- Custom slider
-        row.slider = CreateFrame("Slider", nil, row, "BackdropTemplate")
-        row.slider:SetSize(row:GetWidth() - 30, 12)
-        row.slider:SetPoint("BOTTOMLEFT", 10, 8)
-        row.slider:SetPoint("BOTTOMRIGHT", -10, 8)
+        -- Custom slider using proper WoW slider template
+        row.slider = CreateFrame("Slider", nil, row, "OptionsSliderTemplate")
+        row.slider:SetHeight(16)
+        row.slider:SetPoint("BOTTOMLEFT", 10, 6)
+        row.slider:SetPoint("BOTTOMRIGHT", -10, 6)
+        row.slider:SetOrientation("HORIZONTAL")
         row.slider:SetMinMaxValues(minVal, maxVal)
         row.slider:SetValueStep(step)
         row.slider:SetObeyStepOnDrag(true)
+        row.slider.Low:SetText("")
+        row.slider.High:SetText("")
+        row.slider.Text:SetText("")
 
-        row.slider:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8"})
-        row.slider:SetBackdropColor(0.1, 0.12, 0.18, 1)
-
-        row.slider.thumb = row.slider:CreateTexture(nil, "OVERLAY")
-        row.slider.thumb:SetSize(14, 14)
-        row.slider.thumb:SetTexture("Interface\\Buttons\\WHITE8X8")
-        row.slider.thumb:SetVertexColor(0.4, 0.7, 1, 1)
-        row.slider:SetThumbTexture(row.slider.thumb)
-
-        row.slider.fill = row.slider:CreateTexture(nil, "ARTWORK")
-        row.slider.fill:SetHeight(12)
-        row.slider.fill:SetPoint("LEFT", 0, 0)
-        row.slider.fill:SetTexture("Interface\\Buttons\\WHITE8X8")
-        row.slider.fill:SetVertexColor(0.2, 0.5, 0.8, 0.7)
+        -- Custom styling for the slider track
+        row.slider:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Buttons\\WHITE8X8",
+            edgeSize = 1,
+            insets = {left = 0, right = 0, top = 0, bottom = 0}
+        })
+        row.slider:SetBackdropColor(0.08, 0.1, 0.15, 1)
+        row.slider:SetBackdropBorderColor(0.2, 0.3, 0.4, 0.8)
 
         local function GetDbValue()
             local keys = {strsplit(".", dbKey)}
@@ -1337,12 +1327,6 @@ function Config:BuildTabContents()
             row.value:SetText(displayVal .. (suffix or ""))
         end
 
-        local function UpdateFill()
-            local val = row.slider:GetValue()
-            local pct = (val - minVal) / (maxVal - minVal)
-            row.slider.fill:SetWidth(math.max(1, pct * (row.slider:GetWidth() or 200)))
-        end
-
         local currentVal = GetDbValue()
         row.slider:SetValue(currentVal)
         UpdateValueText(currentVal)
@@ -1351,12 +1335,9 @@ function Config:BuildTabContents()
             value = math.floor(value / step + 0.5) * step
             SetDbValue(value)
             UpdateValueText(value)
-            UpdateFill()
             if callback then callback() end
             if EDM.UI then EDM.UI:ApplySettings() end
         end)
-
-        C_Timer.After(0, UpdateFill)
 
         if tooltip then
             row:EnableMouse(true)

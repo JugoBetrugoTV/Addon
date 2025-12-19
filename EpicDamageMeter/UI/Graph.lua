@@ -86,14 +86,19 @@ function Graph:Initialize(parent)
     self.closeButton:SetScript("OnClick", function() self.frame:Hide() end)
 
     -- Canvas for drawing
-    self.canvas = CreateFrame("Frame", nil, self.frame)
+    self.canvas = CreateFrame("Frame", nil, self.frame, "BackdropTemplate")
     self.canvas:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 50, -30)
-    self.canvas:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -15, 35)
+    self.canvas:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -15, 30)
 
-    -- Canvas background
-    self.canvas.bg = self.canvas:CreateTexture(nil, "BACKGROUND")
-    self.canvas.bg:SetAllPoints()
-    self.canvas.bg:SetColorTexture(0.02, 0.02, 0.04, 0.9)
+    -- Canvas background with border
+    self.canvas:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = {left = 1, right = 1, top = 1, bottom = 1}
+    })
+    self.canvas:SetBackdropColor(0.02, 0.02, 0.04, 0.95)
+    self.canvas:SetBackdropBorderColor(0.15, 0.2, 0.3, 0.8)
 
     -- Create grid lines
     self:CreateGrid()
@@ -200,39 +205,26 @@ function Graph:CreateAxisLabels()
     local skin = Skins:Get()
     local graphSettings = skin and skin.graph or {}
 
-    -- Y-axis labels (values)
+    -- Y-axis labels (values) - positioned on left side with fixed width
     self.yLabels = {}
     for i = 0, 4 do
         local label = self.frame:CreateFontString(nil, "OVERLAY")
-        label:SetFont(graphSettings.legendFont or "Fonts\\FRIZQT__.TTF", graphSettings.legendFontSize or 10, "")
-        label:SetTextColor(0.7, 0.7, 0.7, 1)
+        label:SetFont(graphSettings.legendFont or "Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
+        label:SetTextColor(0.8, 0.8, 0.8, 1)
         label:SetJustifyH("RIGHT")
+        label:SetWidth(42)
         self.yLabels[i] = label
     end
 
-    -- X-axis labels (time)
+    -- X-axis labels (time) - positioned below canvas
     self.xLabels = {}
     for i = 0, 5 do
         local label = self.frame:CreateFontString(nil, "OVERLAY")
-        label:SetFont(graphSettings.legendFont or "Fonts\\FRIZQT__.TTF", graphSettings.legendFontSize or 10, "")
-        label:SetTextColor(0.7, 0.7, 0.7, 1)
+        label:SetFont(graphSettings.legendFont or "Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
+        label:SetTextColor(0.8, 0.8, 0.8, 1)
         label:SetJustifyH("CENTER")
         self.xLabels[i] = label
     end
-
-    -- Y-axis title
-    self.yTitle = self.frame:CreateFontString(nil, "OVERLAY")
-    self.yTitle:SetFont(graphSettings.legendFont or "Fonts\\FRIZQT__.TTF", graphSettings.legendFontSize or 10, "")
-    self.yTitle:SetTextColor(0.8, 0.8, 0.8, 1)
-    self.yTitle:SetText("Value")
-    self.yTitle:SetPoint("LEFT", self.frame, "LEFT", 5, 0)
-
-    -- X-axis title
-    self.xTitle = self.frame:CreateFontString(nil, "OVERLAY")
-    self.xTitle:SetFont(graphSettings.legendFont or "Fonts\\FRIZQT__.TTF", graphSettings.legendFontSize or 10, "")
-    self.xTitle:SetTextColor(0.8, 0.8, 0.8, 1)
-    self.xTitle:SetText("Time")
-    self.xTitle:SetPoint("BOTTOM", self.frame, "BOTTOM", 0, 5)
 end
 
 -- Position axis labels
@@ -240,23 +232,35 @@ function Graph:LayoutAxisLabels(maxValue, duration)
     local width = self.canvas:GetWidth() or 300
     local height = self.canvas:GetHeight() or 150
 
-    -- Y-axis labels (positioned from bottom to top)
+    -- Y-axis labels (positioned from bottom to top along left edge)
     for i = 0, 4 do
         local label = self.yLabels[i]
-        local yPos = (i / 4) * height
+        local yOffset = (i / 4) * height
         label:ClearAllPoints()
-        label:SetPoint("RIGHT", self.canvas, "BOTTOMLEFT", -6, yPos)
-        label:SetText(Utils.FormatNumber((i / 4) * maxValue))
+        -- Anchor right edge of label to left edge of canvas, then offset up from bottom
+        label:SetPoint("BOTTOMRIGHT", self.canvas, "BOTTOMLEFT", -4, yOffset - 6)
+        local value = (i / 4) * maxValue
+        if value >= 1000000 then
+            label:SetText(string.format("%.1fM", value / 1000000))
+        elseif value >= 1000 then
+            label:SetText(string.format("%.1fK", value / 1000))
+        else
+            label:SetText(string.format("%.0f", value))
+        end
     end
 
-    -- X-axis labels (positioned left to right)
+    -- X-axis labels (positioned left to right below canvas)
     for i = 0, 5 do
         local label = self.xLabels[i]
-        local xPos = (i / 5) * width
+        local xOffset = (i / 5) * width
         label:ClearAllPoints()
-        label:SetPoint("TOP", self.canvas, "BOTTOMLEFT", xPos, -6)
+        label:SetPoint("TOP", self.canvas, "BOTTOMLEFT", xOffset, -4)
         local time = (i / 5) * duration
-        label:SetText(string.format("%d:%02d", math.floor(time / 60), math.floor(time % 60)))
+        if time >= 60 then
+            label:SetText(string.format("%d:%02d", math.floor(time / 60), math.floor(time % 60)))
+        else
+            label:SetText(string.format(":%02d", math.floor(time)))
+        end
     end
 end
 
