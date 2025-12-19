@@ -1008,6 +1008,7 @@ function UI:CreateBar()
     bar.statusBar:SetValue(0)
     bar.statusBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
     bar.statusBar:SetAlpha(0.7) -- Reduced alpha so text is readable
+    bar.statusBar:EnableMouse(false) -- Pass clicks through to parent button
 
     -- Dark overlay on top of status bar for better text contrast
     bar.overlay = bar:CreateTexture(nil, "ARTWORK", nil, 1)

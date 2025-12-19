@@ -43,6 +43,7 @@ function Bars:CreateBar(parent, index)
     bar.statusBar:SetAllPoints()
     bar.statusBar:SetMinMaxValues(0, 1)
     bar.statusBar:SetValue(0)
+    bar.statusBar:EnableMouse(false) -- Pass clicks through to parent button
 
     -- Get texture
     local texturePath = barSettings.texture or "Interface\\TargetingFrame\\UI-StatusBar"
