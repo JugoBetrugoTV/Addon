@@ -318,9 +318,9 @@ function Graph:GetLineTexture()
         end
     end
 
-    -- Create new line
-    local line = self.canvas:CreateLine(nil, "ARTWORK")
-    line:SetThickness(2)
+    -- Create new line using CreateLine API (works in modern WoW)
+    local line = self.canvas:CreateLine(nil, "OVERLAY", nil, 7)
+    line:SetThickness(3)
     line.inUse = true
     table.insert(self.linePool, line)
     return line
@@ -391,20 +391,25 @@ function Graph:Draw()
     -- Update axis labels
     self:LayoutAxisLabels(maxValue, duration)
 
-    -- Draw DPS line (red)
+    -- Get line width from settings
+    local lineWidth = EDM.db and EDM.db.profile.graph.lineWidth or graphSettings.lineWidth or 3
+
+    -- Draw DPS line (red/orange) - more visible colors
     local lastX, lastY
-    local damageR = graphSettings.damageColor and graphSettings.damageColor.r or 0.9
-    local damageG = graphSettings.damageColor and graphSettings.damageColor.g or 0.2
-    local damageB = graphSettings.damageColor and graphSettings.damageColor.b or 0.2
+    local damageR = 1.0
+    local damageG = 0.3
+    local damageB = 0.2
 
     for i, point in ipairs(self.dataPoints) do
         local x = ((point.time - startTime) / duration) * width
-        local y = (point.dps / maxValue) * height
+        local y = math.max(1, (point.dps / maxValue) * height) -- Ensure minimum height of 1
 
-        if lastX and lastY and x ~= lastX then
+        if lastX and lastY then
             local line = self:GetLineTexture()
+            line:SetColorTexture(damageR, damageG, damageB, 1)
             line:SetVertexColor(damageR, damageG, damageB, 1)
-            line:SetThickness(graphSettings.lineWidth or 2)
+            line:SetThickness(lineWidth)
+            line:ClearAllPoints()
             line:SetStartPoint("BOTTOMLEFT", self.canvas, lastX, lastY)
             line:SetEndPoint("BOTTOMLEFT", self.canvas, x, y)
         end
@@ -412,20 +417,22 @@ function Graph:Draw()
         lastX, lastY = x, y
     end
 
-    -- Draw HPS line (green)
+    -- Draw HPS line (green) - brighter green
     lastX, lastY = nil, nil
-    local healingR = graphSettings.healingColor and graphSettings.healingColor.r or 0.2
-    local healingG = graphSettings.healingColor and graphSettings.healingColor.g or 0.9
-    local healingB = graphSettings.healingColor and graphSettings.healingColor.b or 0.2
+    local healingR = 0.2
+    local healingG = 1.0
+    local healingB = 0.3
 
     for i, point in ipairs(self.dataPoints) do
         local x = ((point.time - startTime) / duration) * width
-        local y = (point.hps / maxValue) * height
+        local y = math.max(1, (point.hps / maxValue) * height) -- Ensure minimum height of 1
 
-        if lastX and lastY and x ~= lastX then
+        if lastX and lastY then
             local line = self:GetLineTexture()
+            line:SetColorTexture(healingR, healingG, healingB, 1)
             line:SetVertexColor(healingR, healingG, healingB, 1)
-            line:SetThickness(graphSettings.lineWidth or 2)
+            line:SetThickness(lineWidth)
+            line:ClearAllPoints()
             line:SetStartPoint("BOTTOMLEFT", self.canvas, lastX, lastY)
             line:SetEndPoint("BOTTOMLEFT", self.canvas, x, y)
         end

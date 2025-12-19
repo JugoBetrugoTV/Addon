@@ -34,6 +34,10 @@ function DB.CreateActorData(guid, name, class, flags)
         interrupts = 0,
         dispels = 0,
 
+        -- Activity tracking (for Activity tab)
+        interruptSpells = {}, -- spellId -> {name, count}
+        dispelSpells = {},    -- spellId -> {name, count, removedSpell}
+
         -- Time tracking
         activeTime = 0,
         lastActivity = 0,
@@ -424,12 +428,26 @@ function DB:RecordDeath(segment, timestamp, victimGuid, victimName, killerName, 
 end
 
 -- Record interrupt
-function DB:RecordInterrupt(segment, sourceGuid, sourceName, sourceClass, sourceFlags, spellId)
+function DB:RecordInterrupt(segment, sourceGuid, sourceName, sourceClass, sourceFlags, spellId, spellName, extraSpellId, extraSpellName)
     if not segment then return end
 
     local actor = self:GetActor(segment, sourceGuid, sourceName, sourceClass, sourceFlags)
     if actor then
         actor.interrupts = actor.interrupts + 1
+        -- Track the interrupt spell used
+        if spellId then
+            if not actor.interruptSpells then actor.interruptSpells = {} end
+            if not actor.interruptSpells[spellId] then
+                local spellInfo = EDM.Utils.GetSpellInfo(spellId)
+                actor.interruptSpells[spellId] = {
+                    name = spellName or (spellInfo and spellInfo.name) or "Unknown",
+                    count = 0,
+                    icon = spellInfo and spellInfo.icon,
+                    interruptedSpell = extraSpellName or "Unknown"
+                }
+            end
+            actor.interruptSpells[spellId].count = actor.interruptSpells[spellId].count + 1
+        end
     end
 
     -- Overall
@@ -437,17 +455,44 @@ function DB:RecordInterrupt(segment, sourceGuid, sourceName, sourceClass, source
         local overallActor = self:GetActor(self.Data.overallSegment, sourceGuid, sourceName, sourceClass, sourceFlags)
         if overallActor then
             overallActor.interrupts = overallActor.interrupts + 1
+            if spellId then
+                if not overallActor.interruptSpells then overallActor.interruptSpells = {} end
+                if not overallActor.interruptSpells[spellId] then
+                    local spellInfo = EDM.Utils.GetSpellInfo(spellId)
+                    overallActor.interruptSpells[spellId] = {
+                        name = spellName or (spellInfo and spellInfo.name) or "Unknown",
+                        count = 0,
+                        icon = spellInfo and spellInfo.icon,
+                        interruptedSpell = extraSpellName or "Unknown"
+                    }
+                end
+                overallActor.interruptSpells[spellId].count = overallActor.interruptSpells[spellId].count + 1
+            end
         end
     end
 end
 
 -- Record dispel
-function DB:RecordDispel(segment, sourceGuid, sourceName, sourceClass, sourceFlags, spellId)
+function DB:RecordDispel(segment, sourceGuid, sourceName, sourceClass, sourceFlags, spellId, spellName, extraSpellId, extraSpellName)
     if not segment then return end
 
     local actor = self:GetActor(segment, sourceGuid, sourceName, sourceClass, sourceFlags)
     if actor then
         actor.dispels = actor.dispels + 1
+        -- Track the dispel spell used
+        if spellId then
+            if not actor.dispelSpells then actor.dispelSpells = {} end
+            if not actor.dispelSpells[spellId] then
+                local spellInfo = EDM.Utils.GetSpellInfo(spellId)
+                actor.dispelSpells[spellId] = {
+                    name = spellName or (spellInfo and spellInfo.name) or "Unknown",
+                    count = 0,
+                    icon = spellInfo and spellInfo.icon,
+                    removedSpell = extraSpellName or "Unknown"
+                }
+            end
+            actor.dispelSpells[spellId].count = actor.dispelSpells[spellId].count + 1
+        end
     end
 
     -- Overall
@@ -455,6 +500,19 @@ function DB:RecordDispel(segment, sourceGuid, sourceName, sourceClass, sourceFla
         local overallActor = self:GetActor(self.Data.overallSegment, sourceGuid, sourceName, sourceClass, sourceFlags)
         if overallActor then
             overallActor.dispels = overallActor.dispels + 1
+            if spellId then
+                if not overallActor.dispelSpells then overallActor.dispelSpells = {} end
+                if not overallActor.dispelSpells[spellId] then
+                    local spellInfo = EDM.Utils.GetSpellInfo(spellId)
+                    overallActor.dispelSpells[spellId] = {
+                        name = spellName or (spellInfo and spellInfo.name) or "Unknown",
+                        count = 0,
+                        icon = spellInfo and spellInfo.icon,
+                        removedSpell = extraSpellName or "Unknown"
+                    }
+                end
+                overallActor.dispelSpells[spellId].count = overallActor.dispelSpells[spellId].count + 1
+            end
         end
     end
 end

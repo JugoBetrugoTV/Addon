@@ -525,8 +525,8 @@ function Parser:ProcessInterrupt(segment, timestamp, sourceGUID, sourceName, sou
     -- Get source class
     local sourceClass = self:GetClass(effSourceGUID)
 
-    -- Record interrupt
-    DB:RecordInterrupt(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags, spellId)
+    -- Record interrupt with spell info
+    DB:RecordInterrupt(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags, spellId, spellName, extraSpellId, extraSpellName)
 
     Utils.Debug("Interrupt recorded for:", effSourceName, "->", extraSpellName)
 end
@@ -545,8 +545,8 @@ function Parser:ProcessDispel(segment, timestamp, sourceGUID, sourceName, source
     -- Get source class
     local sourceClass = self:GetClass(effSourceGUID)
 
-    -- Record dispel
-    DB:RecordDispel(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags, spellId)
+    -- Record dispel with spell info
+    DB:RecordDispel(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags, spellId, spellName, extraSpellId, extraSpellName)
 
     Utils.Debug("Dispel recorded for:", effSourceName, "->", extraSpellName)
 end

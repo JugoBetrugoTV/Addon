@@ -719,6 +719,271 @@ Skins.list["Ember"] = {
 }
 
 --============================================================================
+-- DETAILS SKIN - Inspired by Details! Damage Meter
+--============================================================================
+Skins.list["Details"] = {
+    name = "Details",
+    description = "Inspired by Details! Damage Meter",
+
+    window = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.02, g = 0.02, b = 0.02, a = 0.85 },
+        border = "Interface\\Buttons\\WHITE8X8",
+        borderColor = { r = 0.15, g = 0.15, b = 0.15, a = 1 },
+        borderSize = 1,
+        inset = 1,
+    },
+
+    titleBar = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.12, g = 0.12, b = 0.12, a = 1 },
+        height = 20,
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 0.82, b = 0, a = 1 },
+        gradientStart = { r = 0.2, g = 0.2, b = 0.2, a = 1 },
+        gradientEnd = { r = 0.08, g = 0.08, b = 0.08, a = 1 },
+    },
+
+    bar = {
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+        height = 16,
+        spacing = 0,
+        backgroundColor = { r = 0.05, g = 0.05, b = 0.05, a = 0.9 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 1, b = 1, a = 1 },
+        rankFont = "Fonts\\FRIZQT__.TTF",
+        rankFontSize = 9,
+        iconSize = 14,
+        padding = 0,
+        showShadow = true,
+        shadowColor = { r = 0, g = 0, b = 0, a = 0.7 },
+        shadowOffset = 1,
+        glowOnHover = true,
+        glowColor = { r = 1, g = 1, b = 1, a = 0.15 },
+    },
+
+    tooltip = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.05, g = 0.05, b = 0.05, a = 0.98 },
+        borderColor = { r = 0.3, g = 0.3, b = 0.3, a = 1 },
+        headerFont = "Fonts\\FRIZQT__.TTF",
+        headerFontSize = 12,
+        headerFontFlags = "OUTLINE",
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "",
+        padding = 8,
+    },
+
+    scrollbar = {
+        width = 6,
+        backgroundColor = { r = 0.1, g = 0.1, b = 0.1, a = 0.8 },
+        thumbColor = { r = 0.35, g = 0.35, b = 0.35, a = 1 },
+        thumbHoverColor = { r = 0.5, g = 0.5, b = 0.5, a = 1 },
+    },
+
+    button = {
+        backgroundColor = { r = 0.15, g = 0.15, b = 0.15, a = 1 },
+        hoverColor = { r = 0.25, g = 0.25, b = 0.25, a = 1 },
+        pressedColor = { r = 0.08, g = 0.08, b = 0.08, a = 1 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "OUTLINE",
+    },
+
+    graph = {
+        backgroundColor = { r = 0.02, g = 0.02, b = 0.02, a = 0.95 },
+        gridColor = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 },
+        lineWidth = 2,
+        damageColor = { r = 1, g = 0.3, b = 0.3, a = 1 },
+        healingColor = { r = 0.3, g = 1, b = 0.4, a = 1 },
+        legendFont = "Fonts\\FRIZQT__.TTF",
+        legendFontSize = 9,
+    },
+}
+
+--============================================================================
+-- RECOUNT SKIN - Inspired by Recount
+--============================================================================
+Skins.list["Recount"] = {
+    name = "Recount",
+    description = "Inspired by Recount style",
+
+    window = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.1, g = 0.1, b = 0.1, a = 0.9 },
+        border = "Interface\\Tooltips\\UI-Tooltip-Border",
+        borderColor = { r = 0.6, g = 0.6, b = 0.6, a = 0.8 },
+        borderSize = 12,
+        inset = 4,
+    },
+
+    titleBar = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.15, g = 0.15, b = 0.15, a = 1 },
+        height = 24,
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 12,
+        fontFlags = "",
+        fontColor = { r = 1, g = 0.9, b = 0.4, a = 1 },
+        gradientStart = { r = 0.25, g = 0.25, b = 0.25, a = 1 },
+        gradientEnd = { r = 0.12, g = 0.12, b = 0.12, a = 1 },
+    },
+
+    bar = {
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+        height = 18,
+        spacing = 1,
+        backgroundColor = { r = 0.15, g = 0.15, b = 0.15, a = 0.85 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "",
+        fontColor = { r = 1, g = 1, b = 1, a = 1 },
+        rankFont = "Fonts\\FRIZQT__.TTF",
+        rankFontSize = 9,
+        iconSize = 16,
+        padding = 2,
+        showShadow = true,
+        shadowColor = { r = 0, g = 0, b = 0, a = 0.6 },
+        shadowOffset = 1,
+        glowOnHover = true,
+        glowColor = { r = 1, g = 1, b = 0.6, a = 0.25 },
+    },
+
+    tooltip = {
+        background = "Interface\\Tooltips\\UI-Tooltip-Background",
+        backgroundColor = { r = 0, g = 0, b = 0, a = 0.95 },
+        borderColor = { r = 0.6, g = 0.6, b = 0.6, a = 1 },
+        headerFont = "Fonts\\FRIZQT__.TTF",
+        headerFontSize = 12,
+        headerFontFlags = "",
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "",
+        padding = 10,
+    },
+
+    scrollbar = {
+        width = 8,
+        backgroundColor = { r = 0.12, g = 0.12, b = 0.12, a = 0.8 },
+        thumbColor = { r = 0.4, g = 0.4, b = 0.4, a = 1 },
+        thumbHoverColor = { r = 0.55, g = 0.55, b = 0.55, a = 1 },
+    },
+
+    button = {
+        backgroundColor = { r = 0.2, g = 0.2, b = 0.2, a = 1 },
+        hoverColor = { r = 0.3, g = 0.3, b = 0.3, a = 1 },
+        pressedColor = { r = 0.15, g = 0.15, b = 0.15, a = 1 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "",
+    },
+
+    graph = {
+        backgroundColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.95 },
+        gridColor = { r = 0.2, g = 0.2, b = 0.2, a = 0.5 },
+        lineWidth = 2,
+        damageColor = { r = 0.9, g = 0.2, b = 0.2, a = 1 },
+        healingColor = { r = 0.2, g = 0.9, b = 0.3, a = 1 },
+        legendFont = "Fonts\\FRIZQT__.TTF",
+        legendFontSize = 10,
+    },
+}
+
+--============================================================================
+-- SKADA SKIN - Inspired by Skada
+--============================================================================
+Skins.list["Skada"] = {
+    name = "Skada",
+    description = "Inspired by Skada style",
+
+    window = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.88 },
+        border = "Interface\\Buttons\\WHITE8X8",
+        borderColor = { r = 0.3, g = 0.3, b = 0.3, a = 0.8 },
+        borderSize = 1,
+        inset = 2,
+    },
+
+    titleBar = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.18, g = 0.18, b = 0.18, a = 1 },
+        height = 22,
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 0.85, b = 0.1, a = 1 },
+        gradientStart = { r = 0.25, g = 0.25, b = 0.25, a = 1 },
+        gradientEnd = { r = 0.1, g = 0.1, b = 0.1, a = 1 },
+    },
+
+    bar = {
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+        height = 17,
+        spacing = 0,
+        backgroundColor = { r = 0.1, g = 0.1, b = 0.1, a = 0.85 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 1, b = 1, a = 1 },
+        rankFont = "Fonts\\FRIZQT__.TTF",
+        rankFontSize = 9,
+        iconSize = 15,
+        padding = 1,
+        showShadow = false,
+        glowOnHover = true,
+        glowColor = { r = 1, g = 1, b = 1, a = 0.12 },
+    },
+
+    tooltip = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.05, g = 0.05, b = 0.05, a = 0.98 },
+        borderColor = { r = 0.3, g = 0.3, b = 0.3, a = 1 },
+        headerFont = "Fonts\\FRIZQT__.TTF",
+        headerFontSize = 12,
+        headerFontFlags = "OUTLINE",
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "",
+        padding = 8,
+    },
+
+    scrollbar = {
+        width = 6,
+        backgroundColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.9 },
+        thumbColor = { r = 0.3, g = 0.3, b = 0.3, a = 1 },
+        thumbHoverColor = { r = 0.45, g = 0.45, b = 0.45, a = 1 },
+    },
+
+    button = {
+        backgroundColor = { r = 0.15, g = 0.15, b = 0.15, a = 1 },
+        hoverColor = { r = 0.22, g = 0.22, b = 0.22, a = 1 },
+        pressedColor = { r = 0.1, g = 0.1, b = 0.1, a = 1 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "OUTLINE",
+    },
+
+    graph = {
+        backgroundColor = { r = 0.05, g = 0.05, b = 0.05, a = 0.95 },
+        gridColor = { r = 0.18, g = 0.18, b = 0.18, a = 0.5 },
+        lineWidth = 2,
+        damageColor = { r = 0.95, g = 0.25, b = 0.25, a = 1 },
+        healingColor = { r = 0.25, g = 0.95, b = 0.35, a = 1 },
+        legendFont = "Fonts\\FRIZQT__.TTF",
+        legendFontSize = 9,
+    },
+}
+
+--============================================================================
 -- SKIN FUNCTIONS
 --============================================================================
 
