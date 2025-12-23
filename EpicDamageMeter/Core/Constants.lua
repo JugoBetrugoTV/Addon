@@ -268,6 +268,9 @@ C.DEFAULT_SETTINGS = {
             mergePlayerPets = true,
             showOnlyBosses = false,
             minCombatTime = 5,
+            trackAllPlayers = false,       -- Track all nearby players (not just group)
+            trackBGEnemies = true,         -- Track enemy players in battlegrounds
+            trackArenaOpponents = true,    -- Always track arena opponents (always enabled)
         },
 
         -- Display

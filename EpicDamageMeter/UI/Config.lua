@@ -771,6 +771,17 @@ function Config:BuildGeneralTab()
         function() return EDM.db.profile.combat.minCombatTime end,
         function(v) EDM.db.profile.combat.minCombatTime = v end, 1, 30, 1, "s")
 
+    y = y + self:CreateSectionHeader(y, "Player Tracking (PvP)")
+    y = y + self:CreateToggleRow(y, "Track All Players", "Track ALL nearby players, not just group members. Useful for open world PvP and duels.",
+        function() return EDM.db.profile.combat.trackAllPlayers end,
+        function(v) EDM.db.profile.combat.trackAllPlayers = v end)
+    y = y + self:CreateToggleRow(y, "Track Arena Opponents", "Always track enemy players in arenas (recommended)",
+        function() return EDM.db.profile.combat.trackArenaOpponents end,
+        function(v) EDM.db.profile.combat.trackArenaOpponents = v end)
+    y = y + self:CreateToggleRow(y, "Track BG Enemies", "Track enemy players in battlegrounds",
+        function() return EDM.db.profile.combat.trackBGEnemies end,
+        function(v) EDM.db.profile.combat.trackBGEnemies = v end)
+
     y = y + self:CreateSectionHeader(y, "Theme / Skin")
     local skinOptions = {}
     if EDM.Skins then

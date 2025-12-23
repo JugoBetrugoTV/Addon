@@ -185,17 +185,51 @@ function Parser:GetGroupCount()
     return count
 end
 
--- Check if GUID is in our group
+-- Check if GUID is in our group (or should be tracked)
 function Parser:IsInGroup(guid)
     if not guid then return false end
 
-    -- Check cache
+    -- Check cache first
     if groupGUIDs[guid] then
         return true
     end
 
-    -- Dynamic pet discovery from combat log
+    -- Check if we should track all players
+    local trackAll = EDM.db and EDM.db.profile.combat and EDM.db.profile.combat.trackAllPlayers
+
+    -- Check GUID type
     local guidType = self:GetGUIDType(guid)
+
+    -- Track all players if enabled
+    if trackAll and guidType == "Player" then
+        -- Add to tracking dynamically
+        local name = self:GetNameFromGUID(guid) or "Unknown"
+        local class = self:GetClass(guid) or "UNKNOWN"
+        groupGUIDs[guid] = { name = name, class = class, type = "player" }
+        return true
+    end
+
+    -- Track arena opponents (enabled by default via setting)
+    local trackArena = EDM.db and EDM.db.profile.combat and (EDM.db.profile.combat.trackArenaOpponents ~= false)
+    local inArena = IsActiveBattlefieldArena and IsActiveBattlefieldArena()
+    if trackArena and inArena and guidType == "Player" then
+        local name = self:GetNameFromGUID(guid) or "Unknown"
+        local class = self:GetClass(guid) or "UNKNOWN"
+        groupGUIDs[guid] = { name = name, class = class, type = "arena_opponent" }
+        return true
+    end
+
+    -- Track battleground enemies if setting enabled
+    local trackBGEnemies = EDM.db and EDM.db.profile.combat and EDM.db.profile.combat.trackBGEnemies
+    local inBattleground = UnitInBattleground("player") ~= nil
+    if trackBGEnemies and inBattleground and guidType == "Player" then
+        local name = self:GetNameFromGUID(guid) or "Unknown"
+        local class = self:GetClass(guid) or "UNKNOWN"
+        groupGUIDs[guid] = { name = name, class = class, type = "bg_enemy" }
+        return true
+    end
+
+    -- Dynamic pet discovery from combat log
     if guidType == "Pet" or guidType == "Creature" then
         -- Try to find owner via GUID parsing
         local ownerGUID = self:FindPetOwner(guid)
@@ -205,6 +239,13 @@ function Parser:IsInGroup(guid)
             groupGUIDs[guid] = { name = name or "Pet", type = "pet", owner = ownerGUID }
             guidTypeCache[guid] = "pet"
             petOwners[guid] = ownerGUID
+            return true
+        end
+
+        -- If tracking all players, also track their pets
+        if trackAll then
+            local name = self:GetNameFromGUID(guid)
+            groupGUIDs[guid] = { name = name or "Pet", type = "pet" }
             return true
         end
     end
