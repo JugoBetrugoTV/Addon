@@ -38,7 +38,7 @@ Core.graphTimer = nil
 local dataBroker = LDB:NewDataObject(ADDON_NAME, {
     type = "data source",
     text = C.ADDON_SHORT,
-    icon = "Interface\\AddOns\\EpicDamageMeter\\Textures\\icon",
+    icon = "Interface\\Icons\\Ability_Warrior_Bladestorm", -- Cool sword icon for damage meter
     OnClick = function(self, button)
         if button == "LeftButton" then
             if IsShiftKeyDown() then

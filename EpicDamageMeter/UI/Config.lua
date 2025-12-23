@@ -808,37 +808,97 @@ end
 function Config:BuildWindowTab()
     local y = 0
 
+    -- Helper function to apply to all window instances
+    local function ApplyToAllWindows(func)
+        if EDM.UI and EDM.UI.instances then
+            for _, instance in pairs(EDM.UI.instances) do
+                if instance.frame then
+                    func(instance)
+                end
+            end
+        end
+    end
+
     y = y + self:CreateSectionHeader(y, "Window Size & Position")
     y = y + self:CreateSliderRow(y, "Width", "Window width in pixels",
         function() return EDM.db.profile.window.width end,
-        function(v) EDM.db.profile.window.width = v; if EDM.UI and EDM.UI.mainFrame then EDM.UI.mainFrame:SetWidth(v); EDM.UI:Refresh() end end,
+        function(v)
+            EDM.db.profile.window.width = v
+            ApplyToAllWindows(function(inst)
+                inst.frame:SetWidth(v)
+                inst:UpdateLayout()
+            end)
+        end,
         150, 600, 5, "px")
     y = y + self:CreateSliderRow(y, "Height", "Window height in pixels",
         function() return EDM.db.profile.window.height end,
-        function(v) EDM.db.profile.window.height = v; if EDM.UI and EDM.UI.mainFrame then EDM.UI.mainFrame:SetHeight(v); EDM.UI:Refresh() end end,
+        function(v)
+            EDM.db.profile.window.height = v
+            ApplyToAllWindows(function(inst)
+                inst.frame:SetHeight(v)
+                inst:UpdateLayout()
+            end)
+        end,
         100, 800, 5, "px")
     y = y + self:CreateSliderRow(y, "Scale", "Window scale multiplier",
         function() return EDM.db.profile.window.scale end,
-        function(v) EDM.db.profile.window.scale = v; if EDM.UI and EDM.UI.mainFrame then EDM.UI.mainFrame:SetScale(v) end end,
+        function(v)
+            EDM.db.profile.window.scale = v
+            ApplyToAllWindows(function(inst)
+                inst.frame:SetScale(v)
+            end)
+        end,
         0.5, 2.0, 0.05, "x")
     y = y + self:CreateSliderRow(y, "Opacity", "Window transparency",
         function() return EDM.db.profile.window.opacity end,
-        function(v) EDM.db.profile.window.opacity = v; if EDM.UI and EDM.UI.mainFrame then EDM.UI.mainFrame:SetAlpha(v) end end,
+        function(v)
+            EDM.db.profile.window.opacity = v
+            ApplyToAllWindows(function(inst)
+                inst.frame:SetAlpha(v)
+            end)
+        end,
         0.2, 1.0, 0.05, "")
 
     y = y + self:CreateSectionHeader(y, "Appearance")
     y = y + self:CreateToggleRow(y, "Show Title Bar", "Display the title bar",
         function() return EDM.db.profile.window.showTitle end,
-        function(v) EDM.db.profile.window.showTitle = v end)
+        function(v)
+            EDM.db.profile.window.showTitle = v
+            ApplyToAllWindows(function(inst)
+                if inst.titleBar then inst.titleBar:SetShown(v) end
+            end)
+        end)
     y = y + self:CreateToggleRow(y, "Show Background", "Show window background",
         function() return EDM.db.profile.window.showBackground end,
-        function(v) EDM.db.profile.window.showBackground = v end)
+        function(v)
+            EDM.db.profile.window.showBackground = v
+            ApplyToAllWindows(function(inst)
+                local bgColor = EDM.db.profile.window.backgroundColor
+                if v then
+                    inst.frame:SetBackdropColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a or 0.9)
+                else
+                    inst.frame:SetBackdropColor(0, 0, 0, 0)
+                end
+            end)
+        end)
     y = y + self:CreateColorRow(y, "Background Color", "Window background color",
         function() return EDM.db.profile.window.backgroundColor end,
-        function(v) EDM.db.profile.window.backgroundColor = v end)
+        function(v)
+            EDM.db.profile.window.backgroundColor = v
+            ApplyToAllWindows(function(inst)
+                if EDM.db.profile.window.showBackground then
+                    inst.frame:SetBackdropColor(v.r, v.g, v.b, v.a or 0.9)
+                end
+            end)
+        end)
     y = y + self:CreateColorRow(y, "Border Color", "Window border color",
         function() return EDM.db.profile.window.borderColor end,
-        function(v) EDM.db.profile.window.borderColor = v end)
+        function(v)
+            EDM.db.profile.window.borderColor = v
+            ApplyToAllWindows(function(inst)
+                inst.frame:SetBackdropBorderColor(v.r, v.g, v.b, v.a or 1)
+            end)
+        end)
 
     self.quickPanel.scrollChild:SetHeight(y + 30)
 end
@@ -846,35 +906,56 @@ end
 function Config:BuildBarsTab()
     local y = 0
 
+    -- Helper function to apply bar settings
+    local function ApplyBarSettings()
+        -- Apply to bar pool in UI
+        if EDM.UI and EDM.UI.barPool then
+            local fontSize = EDM.db.profile.bars.fontSize or 11
+            local barHeight = EDM.db.profile.bars.height or 18
+            for _, bar in ipairs(EDM.UI.barPool) do
+                bar:SetHeight(barHeight)
+                bar.icon:SetSize(barHeight - 2, barHeight - 2)
+                bar.nameText:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE")
+                bar.valueText:SetFont("Fonts\\FRIZQT__.TTF", fontSize - 1, "OUTLINE")
+                bar.rankText:SetFont("Fonts\\FRIZQT__.TTF", fontSize - 2, "OUTLINE")
+                -- Show/hide elements
+                if bar.rankText then bar.rankText:SetShown(EDM.db.profile.bars.showRank ~= false) end
+                if bar.icon then bar.icon:SetShown(EDM.db.profile.bars.showIcon ~= false) end
+            end
+        end
+        -- Refresh all instances
+        if EDM.UI then EDM.UI:Refresh() end
+    end
+
     y = y + self:CreateSectionHeader(y, "Bar Dimensions")
     y = y + self:CreateSliderRow(y, "Bar Height", "Height of each bar",
         function() return EDM.db.profile.bars.height end,
-        function(v) EDM.db.profile.bars.height = v; if EDM.UI then EDM.UI:Refresh() end end, 12, 32, 1, "px")
+        function(v) EDM.db.profile.bars.height = v; ApplyBarSettings() end, 12, 32, 1, "px")
     y = y + self:CreateSliderRow(y, "Bar Spacing", "Space between bars",
         function() return EDM.db.profile.bars.spacing end,
-        function(v) EDM.db.profile.bars.spacing = v; if EDM.UI then EDM.UI:Refresh() end end, 0, 5, 1, "px")
+        function(v) EDM.db.profile.bars.spacing = v; ApplyBarSettings() end, 0, 5, 1, "px")
 
     y = y + self:CreateSectionHeader(y, "Bar Display")
     y = y + self:CreateToggleRow(y, "Use Class Colors", "Color bars by player class",
         function() return EDM.db.profile.bars.useClassColors end,
-        function(v) EDM.db.profile.bars.useClassColors = v end)
+        function(v) EDM.db.profile.bars.useClassColors = v; ApplyBarSettings() end)
     y = y + self:CreateToggleRow(y, "Show Rank", "Show ranking number on bars",
         function() return EDM.db.profile.bars.showRank end,
-        function(v) EDM.db.profile.bars.showRank = v end)
+        function(v) EDM.db.profile.bars.showRank = v; ApplyBarSettings() end)
     y = y + self:CreateToggleRow(y, "Show Percent", "Show percentage on bars",
         function() return EDM.db.profile.bars.showPercent end,
-        function(v) EDM.db.profile.bars.showPercent = v end)
+        function(v) EDM.db.profile.bars.showPercent = v; ApplyBarSettings() end)
     y = y + self:CreateToggleRow(y, "Show Value", "Show damage/healing value",
         function() return EDM.db.profile.bars.showValue end,
-        function(v) EDM.db.profile.bars.showValue = v end)
+        function(v) EDM.db.profile.bars.showValue = v; ApplyBarSettings() end)
     y = y + self:CreateToggleRow(y, "Show Icon", "Show class/spec icon",
         function() return EDM.db.profile.bars.showIcon end,
-        function(v) EDM.db.profile.bars.showIcon = v end)
+        function(v) EDM.db.profile.bars.showIcon = v; ApplyBarSettings() end)
 
     y = y + self:CreateSectionHeader(y, "Font Settings")
     y = y + self:CreateSliderRow(y, "Font Size", "Size of bar text",
         function() return EDM.db.profile.bars.fontSize end,
-        function(v) EDM.db.profile.bars.fontSize = v; if EDM.Bars then EDM.Bars:ApplySettings() end end, 8, 18, 1, "pt")
+        function(v) EDM.db.profile.bars.fontSize = v; ApplyBarSettings() end, 8, 18, 1, "pt")
 
     y = y + self:CreateSectionHeader(y, "Animation")
     y = y + self:CreateToggleRow(y, "Enable Animation", "Animate bar value changes",
@@ -1051,11 +1132,48 @@ function Config:BuildCreditsTab()
 
     y = y + 90
 
+    -- Changelog section
+    y = y + self:CreateSectionHeader(y, "Changelog")
+
+    local changelogRow = CreateFrame("Frame", nil, panel.scrollChild)
+    changelogRow:SetHeight(200)
+    changelogRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
+    changelogRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
+
+    changelogRow.bg = changelogRow:CreateTexture(nil, "BACKGROUND")
+    changelogRow.bg:SetAllPoints()
+    changelogRow.bg:SetColorTexture(0.05, 0.07, 0.1, 0.6)
+
+    changelogRow.text = changelogRow:CreateFontString(nil, "OVERLAY")
+    changelogRow.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
+    changelogRow.text:SetPoint("TOPLEFT", 10, -10)
+    changelogRow.text:SetPoint("RIGHT", changelogRow, "RIGHT", -10, 0)
+    changelogRow.text:SetTextColor(0.8, 0.8, 0.85, 1)
+    changelogRow.text:SetJustifyH("LEFT")
+    changelogRow.text:SetText(
+        "|cff00ff00v1.0.5 - Latest|r\n" ..
+        "  - Fixed settings panel (all tabs now work)\n" ..
+        "  - Added PvP player tracking (arena, BG)\n" ..
+        "  - Fixed font size slider\n" ..
+        "  - Fixed window size/opacity settings\n" ..
+        "  - Added new minimap icon\n\n" ..
+        "|cffccccccv1.0.4|r\n" ..
+        "  - Major settings rewrite with tabs\n" ..
+        "  - Fixed graph line visibility\n" ..
+        "  - Added 11 custom skins\n\n" ..
+        "|cffccccccv1.0.3|r\n" ..
+        "  - Enhanced DetailWindow styling\n" ..
+        "  - Fixed menu click issues\n" ..
+        "  - Improved bar display"
+    )
+
+    y = y + 210
+
     -- Version info
     y = y + self:CreateSectionHeader(y, "Version Info")
 
     local versionRow = CreateFrame("Frame", nil, panel.scrollChild)
-    versionRow:SetHeight(50)
+    versionRow:SetHeight(60)
     versionRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
     versionRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
 
@@ -1067,9 +1185,9 @@ function Config:BuildCreditsTab()
     versionRow.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
     versionRow.text:SetPoint("LEFT", 10, 0)
     versionRow.text:SetTextColor(0.6, 0.6, 0.7, 1)
-    versionRow.text:SetText("EpicDamageMeter v1.0.0 BETA\nInterface Version: 110207\nBuilt with love for the WoW community")
+    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.5 BETA\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
 
-    y = y + 60
+    y = y + 70
 
     panel.scrollChild:SetHeight(y + 30)
 end

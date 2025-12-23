@@ -16,9 +16,11 @@ local Widgets = EDM.Widgets
 Graph.frame = nil
 Graph.canvas = nil
 Graph.dataPoints = {}
-Graph.maxPoints = 300
-Graph.updateInterval = 1
+Graph.maxPoints = 600     -- More data points for smoother graph
+Graph.updateInterval = 0.5 -- Faster updates for more detail
 Graph.lastUpdate = 0
+Graph.peakDPS = 0
+Graph.peakHPS = 0
 
 -- Line data
 Graph.lines = {
@@ -264,25 +266,20 @@ function Graph:LayoutAxisLabels(maxValue, duration)
     end
 end
 
--- Create legend
+-- Create legend with current values
 function Graph:CreateLegend()
     local skin = Skins:Get()
     local graphSettings = skin and skin.graph or {}
 
     self.legend = CreateFrame("Frame", nil, self.frame)
-    self.legend:SetSize(150, 40)
+    self.legend:SetSize(250, 40)
     self.legend:SetPoint("TOPRIGHT", self.titleBar, "TOPRIGHT", -30, 0)
 
     -- Damage legend
     self.legend.damageBox = self.legend:CreateTexture(nil, "ARTWORK")
     self.legend.damageBox:SetSize(12, 12)
     self.legend.damageBox:SetPoint("TOPLEFT", 0, -4)
-    self.legend.damageBox:SetColorTexture(
-        graphSettings.damageColor and graphSettings.damageColor.r or 0.9,
-        graphSettings.damageColor and graphSettings.damageColor.g or 0.2,
-        graphSettings.damageColor and graphSettings.damageColor.b or 0.2,
-        1
-    )
+    self.legend.damageBox:SetColorTexture(1.0, 0.3, 0.2, 1)
 
     self.legend.damageLabel = self.legend:CreateFontString(nil, "OVERLAY")
     self.legend.damageLabel:SetFont(graphSettings.legendFont or "Fonts\\FRIZQT__.TTF", 9, "")
@@ -290,22 +287,58 @@ function Graph:CreateLegend()
     self.legend.damageLabel:SetText("DPS")
     self.legend.damageLabel:SetTextColor(0.9, 0.9, 0.9, 1)
 
+    -- Current DPS value
+    self.legend.dpsValue = self.legend:CreateFontString(nil, "OVERLAY")
+    self.legend.dpsValue:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    self.legend.dpsValue:SetPoint("LEFT", self.legend.damageLabel, "RIGHT", 6, 0)
+    self.legend.dpsValue:SetTextColor(1, 0.5, 0.3, 1)
+    self.legend.dpsValue:SetText("0")
+
     -- Healing legend
     self.legend.healingBox = self.legend:CreateTexture(nil, "ARTWORK")
     self.legend.healingBox:SetSize(12, 12)
-    self.legend.healingBox:SetPoint("TOPLEFT", 70, -4)
-    self.legend.healingBox:SetColorTexture(
-        graphSettings.healingColor and graphSettings.healingColor.r or 0.2,
-        graphSettings.healingColor and graphSettings.healingColor.g or 0.9,
-        graphSettings.healingColor and graphSettings.healingColor.b or 0.2,
-        1
-    )
+    self.legend.healingBox:SetPoint("TOPLEFT", 100, -4)
+    self.legend.healingBox:SetColorTexture(0.2, 1.0, 0.3, 1)
 
     self.legend.healingLabel = self.legend:CreateFontString(nil, "OVERLAY")
     self.legend.healingLabel:SetFont(graphSettings.legendFont or "Fonts\\FRIZQT__.TTF", 9, "")
     self.legend.healingLabel:SetPoint("LEFT", self.legend.healingBox, "RIGHT", 4, 0)
     self.legend.healingLabel:SetText("HPS")
     self.legend.healingLabel:SetTextColor(0.9, 0.9, 0.9, 1)
+
+    -- Current HPS value
+    self.legend.hpsValue = self.legend:CreateFontString(nil, "OVERLAY")
+    self.legend.hpsValue:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    self.legend.hpsValue:SetPoint("LEFT", self.legend.healingLabel, "RIGHT", 6, 0)
+    self.legend.hpsValue:SetTextColor(0.3, 1, 0.5, 1)
+    self.legend.hpsValue:SetText("0")
+
+    -- Peak values display (below canvas)
+    self.peakLabel = self.frame:CreateFontString(nil, "OVERLAY")
+    self.peakLabel:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
+    self.peakLabel:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 55, 5)
+    self.peakLabel:SetTextColor(0.7, 0.7, 0.7, 1)
+    self.peakLabel:SetText("Peak DPS: 0 | Peak HPS: 0")
+end
+
+-- Update legend values
+function Graph:UpdateLegendValues(currentDPS, currentHPS)
+    if self.legend then
+        if self.legend.dpsValue then
+            self.legend.dpsValue:SetText(Utils.FormatNumber(currentDPS))
+        end
+        if self.legend.hpsValue then
+            self.legend.hpsValue:SetText(Utils.FormatNumber(currentHPS))
+        end
+    end
+    -- Update peak values
+    if currentDPS > self.peakDPS then self.peakDPS = currentDPS end
+    if currentHPS > self.peakHPS then self.peakHPS = currentHPS end
+    if self.peakLabel then
+        self.peakLabel:SetText(string.format("|cffff6644Peak DPS:|r %s  |  |cff44ff66Peak HPS:|r %s",
+            Utils.FormatNumber(self.peakDPS),
+            Utils.FormatNumber(self.peakHPS)))
+    end
 end
 
 -- Get line texture from pool
@@ -462,6 +495,9 @@ function Graph:Update()
     -- Add data point (always record, even if not visible)
     self:AddDataPoint(now, totalDPS, totalHPS)
 
+    -- Update legend with current values
+    self:UpdateLegendValues(totalDPS, totalHPS)
+
     -- Redraw only if visible
     if self.frame and self.frame:IsShown() then
         self:Draw()
@@ -472,6 +508,13 @@ end
 function Graph:Clear()
     wipe(self.dataPoints)
     self:ReleaseLines()
+    -- Reset peak values
+    self.peakDPS = 0
+    self.peakHPS = 0
+    if self.peakLabel then
+        self.peakLabel:SetText("Peak DPS: 0 | Peak HPS: 0")
+    end
+    self:UpdateLegendValues(0, 0)
 end
 
 -- Toggle visibility
