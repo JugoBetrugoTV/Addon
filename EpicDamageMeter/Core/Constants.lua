@@ -12,7 +12,7 @@ local C = EDM.Constants
 -- Addon Info
 C.ADDON_NAME = "EpicDamageMeter"
 C.ADDON_SHORT = "EDM"
-C.VERSION = "1.0.0"
+C.VERSION = "1.0.6"
 C.INTERFACE_VERSION = 110207
 
 -- Display Modes (Extended like Details!)
@@ -263,14 +263,13 @@ C.DEFAULT_SETTINGS = {
 
         -- Combat
         combat = {
-            autoReset = true,
+            autoReset = false,             -- Don't auto-reset on combat end (like Recount/Details)
             maxSegments = 10,
             mergePlayerPets = true,
             showOnlyBosses = false,
-            minCombatTime = 5,
-            trackAllPlayers = false,       -- Track all nearby players (DISABLED by default - only for duels)
-            trackBGEnemies = true,         -- Track enemy players in battlegrounds
-            trackArenaOpponents = true,    -- Track arena opponents (recommended)
+            minCombatTime = 3,
+            combatTimeout = 3,             -- Seconds of no combat before segment ends
+            keepDataMinutes = 30,          -- Keep data for 30 minutes (like Recount/Details)
         },
 
         -- Display

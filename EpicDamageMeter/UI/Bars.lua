@@ -261,37 +261,64 @@ function Bars:SetBarData(bar, actor, rank, total, duration, mode)
     local percent = total > 0 and (value / total) or 0
     bar.targetValue = percent
 
-    -- Set color based on class
+    -- Set color based on class (default) or rank colors
     local r, g, b = Utils.GetClassColor(actor.class)
-    bar.statusBar:SetStatusBarColor(r, g, b, 1)
+    local useClassColors = EDM.db and EDM.db.profile.bars.useClassColors ~= false
 
-    -- Special colors for top 3
-    if EDM.db and EDM.db.profile.bars.useClassColors then
-        -- Keep class color
-    elseif rank == 1 then
-        bar.statusBar:SetStatusBarColor(1, 0.84, 0, 1) -- Gold
-    elseif rank == 2 then
-        bar.statusBar:SetStatusBarColor(0.75, 0.75, 0.75, 1) -- Silver
-    elseif rank == 3 then
-        bar.statusBar:SetStatusBarColor(0.80, 0.50, 0.20, 1) -- Bronze
+    if useClassColors then
+        -- Use class colors
+        bar.statusBar:SetStatusBarColor(r, g, b, 1)
+    else
+        -- Use rank-based colors (gold/silver/bronze for top 3, grey for rest)
+        if rank == 1 then
+            bar.statusBar:SetStatusBarColor(1, 0.84, 0, 1) -- Gold
+        elseif rank == 2 then
+            bar.statusBar:SetStatusBarColor(0.75, 0.75, 0.75, 1) -- Silver
+        elseif rank == 3 then
+            bar.statusBar:SetStatusBarColor(0.80, 0.50, 0.20, 1) -- Bronze
+        else
+            bar.statusBar:SetStatusBarColor(0.4, 0.4, 0.5, 1) -- Grey
+        end
     end
 
-    -- Set rank
-    bar.rank:SetText(rank)
+    -- Highlight player's own bar
+    if EDM.db and EDM.db.profile.display.highlightSelf and actor.name == UnitName("player") then
+        bar.bg:SetColorTexture(0.2, 0.3, 0.4, 0.8)
+    else
+        bar.bg:SetColorTexture(0.1, 0.1, 0.1, 0.6)
+    end
+
+    -- Set rank - respect showRank setting
+    local showRank = EDM.db and EDM.db.profile.bars.showRank ~= false
+    bar.rank:SetText(showRank and rank or "")
+    bar.rank:SetShown(showRank)
 
     -- Set name with class color
     local coloredName = Utils.ClassColorText(actor.name, actor.class)
     bar.name:SetText(coloredName)
 
-    -- Set value text
-    if mode == C.DISPLAY_MODE.DPS or mode == C.DISPLAY_MODE.HPS then
-        bar.value:SetText(Utils.FormatNumber(perSecond) .. "/s")
+    -- Set value text - respect showValue setting and number format
+    local showValue = EDM.db and EDM.db.profile.bars.showValue ~= false
+    local numberFormat = EDM.db and EDM.db.profile.display.numberFormat or "SHORT"
+    if showValue then
+        if mode == C.DISPLAY_MODE.DPS or mode == C.DISPLAY_MODE.HPS then
+            bar.value:SetText(Utils.FormatNumber(perSecond, numberFormat) .. "/s")
+        else
+            bar.value:SetText(Utils.FormatNumber(value, numberFormat))
+        end
     else
-        bar.value:SetText(Utils.FormatNumber(value))
+        bar.value:SetText("")
     end
+    bar.value:SetShown(showValue)
 
-    -- Set percent
-    bar.percent:SetText(Utils.FormatPercent(value, total))
+    -- Set percent - respect showPercent setting
+    local showPercent = EDM.db and EDM.db.profile.bars.showPercent ~= false
+    if showPercent then
+        bar.percent:SetText(Utils.FormatPercent(value, total))
+    else
+        bar.percent:SetText("")
+    end
+    bar.percent:SetShown(showPercent)
 
     -- Set icon (using class icon if no specific spell icon)
     local icon = actor.class and ("Interface\\Icons\\ClassIcon_" .. actor.class) or "Interface\\Icons\\INV_Misc_QuestionMark"

@@ -281,7 +281,7 @@ function Config:CreateQuickPanel()
     panel.bottomBar.version:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
     panel.bottomBar.version:SetPoint("LEFT", 10, 0)
     panel.bottomBar.version:SetTextColor(0.5, 0.5, 0.6, 1)
-    panel.bottomBar.version:SetText("EpicDamageMeter v1.0 | Interface 110207")
+    panel.bottomBar.version:SetText("EpicDamageMeter v1.0.6 | Interface 110207")
 
     -- Save & Reload button
     panel.bottomBar.saveBtn = CreateFrame("Button", nil, panel.bottomBar, "BackdropTemplate")
@@ -771,16 +771,13 @@ function Config:BuildGeneralTab()
         function() return EDM.db.profile.combat.minCombatTime end,
         function(v) EDM.db.profile.combat.minCombatTime = v end, 1, 30, 1, "s")
 
-    y = y + self:CreateSectionHeader(y, "Player Tracking (PvP)")
-    y = y + self:CreateToggleRow(y, "Track All Players", "Track ALL nearby players, not just group members. Useful for open world PvP and duels.",
-        function() return EDM.db.profile.combat.trackAllPlayers end,
-        function(v) EDM.db.profile.combat.trackAllPlayers = v end)
-    y = y + self:CreateToggleRow(y, "Track Arena Opponents", "Always track enemy players in arenas (recommended)",
-        function() return EDM.db.profile.combat.trackArenaOpponents end,
-        function(v) EDM.db.profile.combat.trackArenaOpponents = v end)
-    y = y + self:CreateToggleRow(y, "Track BG Enemies", "Track enemy players in battlegrounds",
-        function() return EDM.db.profile.combat.trackBGEnemies end,
-        function(v) EDM.db.profile.combat.trackBGEnemies = v end)
+    y = y + self:CreateSectionHeader(y, "Data Persistence")
+    y = y + self:CreateSliderRow(y, "Keep Data (minutes)", "How long to keep combat data before clearing",
+        function() return EDM.db.profile.combat.keepDataMinutes or 30 end,
+        function(v) EDM.db.profile.combat.keepDataMinutes = v end, 5, 120, 5, " min")
+    y = y + self:CreateSliderRow(y, "Combat Timeout", "Seconds of no combat before segment ends",
+        function() return EDM.db.profile.combat.combatTimeout or 3 end,
+        function(v) EDM.db.profile.combat.combatTimeout = v end, 1, 10, 1, "s")
 
     y = y + self:CreateSectionHeader(y, "Theme / Skin")
     local skinOptions = {}
@@ -908,19 +905,43 @@ function Config:BuildBarsTab()
 
     -- Helper function to apply bar settings
     local function ApplyBarSettings()
-        -- Apply to bar pool in UI
-        if EDM.UI and EDM.UI.barPool then
-            local fontSize = EDM.db.profile.bars.fontSize or 11
-            local barHeight = EDM.db.profile.bars.height or 18
-            for _, bar in ipairs(EDM.UI.barPool) do
+        -- Get font path from selection
+        local fontName = EDM.db.profile.bars.font or "Friz Quadrata TT"
+        local fontPaths = {
+            ["Friz Quadrata TT"] = "Fonts\\FRIZQT__.TTF",
+            ["Arial Narrow"] = "Fonts\\ARIALN.TTF",
+            ["Morpheus"] = "Fonts\\MORPHEUS.TTF",
+            ["Skurri"] = "Fonts\\SKURRI.TTF",
+            ["2002"] = "Fonts\\2002.TTF",
+            ["2002 Bold"] = "Fonts\\2002B.TTF",
+        }
+        local fontPath = fontPaths[fontName] or "Fonts\\FRIZQT__.TTF"
+        local fontSize = EDM.db.profile.bars.fontSize or 11
+        local barHeight = EDM.db.profile.bars.height or 18
+        local fontFlags = EDM.db.profile.bars.fontFlags or "OUTLINE"
+
+        -- Apply to Bars pool
+        if EDM.Bars and EDM.Bars.pool then
+            for _, bar in pairs(EDM.Bars.pool) do
                 bar:SetHeight(barHeight)
-                bar.icon:SetSize(barHeight - 2, barHeight - 2)
-                bar.nameText:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE")
-                bar.valueText:SetFont("Fonts\\FRIZQT__.TTF", fontSize - 1, "OUTLINE")
-                bar.rankText:SetFont("Fonts\\FRIZQT__.TTF", fontSize - 2, "OUTLINE")
-                -- Show/hide elements
-                if bar.rankText then bar.rankText:SetShown(EDM.db.profile.bars.showRank ~= false) end
-                if bar.icon then bar.icon:SetShown(EDM.db.profile.bars.showIcon ~= false) end
+                if bar.icon then
+                    bar.icon:SetSize(barHeight - 2, barHeight - 2)
+                    bar.icon:SetShown(EDM.db.profile.bars.showIcon ~= false)
+                end
+                if bar.name then
+                    bar.name:SetFont(fontPath, fontSize, fontFlags)
+                end
+                if bar.value then
+                    bar.value:SetFont(fontPath, fontSize - 1, fontFlags)
+                    bar.value:SetShown(EDM.db.profile.bars.showValue ~= false)
+                end
+                if bar.rank then
+                    bar.rank:SetFont(fontPath, fontSize - 2, fontFlags)
+                    bar.rank:SetShown(EDM.db.profile.bars.showRank ~= false)
+                end
+                if bar.percent then
+                    bar.percent:SetShown(EDM.db.profile.bars.showPercent ~= false)
+                end
             end
         end
         -- Refresh all instances
@@ -953,6 +974,19 @@ function Config:BuildBarsTab()
         function(v) EDM.db.profile.bars.showIcon = v; ApplyBarSettings() end)
 
     y = y + self:CreateSectionHeader(y, "Font Settings")
+    y = y + self:CreateDropdownRow(y, "Font", "Choose bar text font",
+        function() return EDM.db.profile.bars.font or "Friz Quadrata TT" end,
+        function(v)
+            EDM.db.profile.bars.font = v
+            ApplyBarSettings()
+        end, {
+            ["Friz Quadrata TT"] = "Friz Quadrata",
+            ["Arial Narrow"] = "Arial Narrow",
+            ["Morpheus"] = "Morpheus",
+            ["Skurri"] = "Skurri",
+            ["2002"] = "2002",
+            ["2002 Bold"] = "2002 Bold",
+        })
     y = y + self:CreateSliderRow(y, "Font Size", "Size of bar text",
         function() return EDM.db.profile.bars.fontSize end,
         function(v) EDM.db.profile.bars.fontSize = v; ApplyBarSettings() end, 8, 18, 1, "pt")
@@ -1001,16 +1035,84 @@ function Config:BuildDisplayTab()
         function() return EDM.db.profile.graph.lineWidth end,
         function(v) EDM.db.profile.graph.lineWidth = v end, 1, 5, 0.5, "px")
 
-    y = y + self:CreateSectionHeader(y, "Sound Settings")
-    y = y + self:CreateToggleRow(y, "Combat Start Sound", "Play sound when combat starts",
-        function() return EDM.db.profile.sounds.combatStart end,
-        function(v) EDM.db.profile.sounds.combatStart = v end)
-    y = y + self:CreateToggleRow(y, "Combat End Sound", "Play sound when combat ends",
-        function() return EDM.db.profile.sounds.combatEnd end,
-        function(v) EDM.db.profile.sounds.combatEnd = v end)
-    y = y + self:CreateSliderRow(y, "Sound Volume", "Volume of addon sounds",
-        function() return EDM.db.profile.sounds.volume end,
-        function(v) EDM.db.profile.sounds.volume = v end, 0, 1, 0.1, "")
+    y = y + self:CreateSectionHeader(y, "Quick Actions")
+
+    -- Quick action buttons
+    local actionsRow = CreateFrame("Frame", nil, self.quickPanel.scrollChild)
+    actionsRow:SetHeight(40)
+    actionsRow:SetPoint("TOPLEFT", self.quickPanel.scrollChild, "TOPLEFT", 8, -y)
+    actionsRow:SetPoint("TOPRIGHT", self.quickPanel.scrollChild, "TOPRIGHT", -8, -y)
+
+    actionsRow.bg = actionsRow:CreateTexture(nil, "BACKGROUND")
+    actionsRow.bg:SetAllPoints()
+    actionsRow.bg:SetColorTexture(0.05, 0.07, 0.1, 0.6)
+
+    -- Toggle Graph button
+    local graphBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
+    graphBtn:SetSize(100, 28)
+    graphBtn:SetPoint("LEFT", 10, 0)
+    graphBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    graphBtn:SetBackdropColor(0.2, 0.4, 0.6, 0.8)
+    graphBtn:SetBackdropBorderColor(0.3, 0.5, 0.8, 1)
+    graphBtn.text = graphBtn:CreateFontString(nil, "OVERLAY")
+    graphBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    graphBtn.text:SetPoint("CENTER")
+    graphBtn.text:SetText("Toggle Graph")
+    graphBtn.text:SetTextColor(1, 1, 1, 1)
+    graphBtn:SetScript("OnClick", function()
+        if EDM.Core then EDM.Core:ToggleGraph() end
+    end)
+    graphBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.3, 0.5, 0.7, 1) end)
+    graphBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.2, 0.4, 0.6, 0.8) end)
+
+    -- Report button
+    local reportBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
+    reportBtn:SetSize(100, 28)
+    reportBtn:SetPoint("LEFT", graphBtn, "RIGHT", 10, 0)
+    reportBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    reportBtn:SetBackdropColor(0.5, 0.4, 0.2, 0.8)
+    reportBtn:SetBackdropBorderColor(0.7, 0.6, 0.3, 1)
+    reportBtn.text = reportBtn:CreateFontString(nil, "OVERLAY")
+    reportBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    reportBtn.text:SetPoint("CENTER")
+    reportBtn.text:SetText("Report Menu")
+    reportBtn.text:SetTextColor(1, 1, 1, 1)
+    reportBtn:SetScript("OnClick", function()
+        if EDM.Core then EDM.Core:ShowReportMenu(reportBtn) end
+    end)
+    reportBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.6, 0.5, 0.3, 1) end)
+    reportBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.5, 0.4, 0.2, 0.8) end)
+
+    -- New Window button
+    local newWinBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
+    newWinBtn:SetSize(100, 28)
+    newWinBtn:SetPoint("LEFT", reportBtn, "RIGHT", 10, 0)
+    newWinBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    newWinBtn:SetBackdropColor(0.3, 0.5, 0.3, 0.8)
+    newWinBtn:SetBackdropBorderColor(0.4, 0.7, 0.4, 1)
+    newWinBtn.text = newWinBtn:CreateFontString(nil, "OVERLAY")
+    newWinBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    newWinBtn.text:SetPoint("CENTER")
+    newWinBtn.text:SetText("New Window")
+    newWinBtn.text:SetTextColor(1, 1, 1, 1)
+    newWinBtn:SetScript("OnClick", function()
+        if EDM.Core then EDM.Core:CreateNewWindow() end
+    end)
+    newWinBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.4, 0.6, 0.4, 1) end)
+    newWinBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.3, 0.5, 0.3, 0.8) end)
+
+    y = y + 45
+
+    y = y + self:CreateSectionHeader(y, "Performance Overlay")
+    y = y + self:CreateToggleRow(y, "Show Current DPS", "Display live DPS in title bar",
+        function() return EDM.db.profile.display.showCurrentDPS ~= false end,
+        function(v) EDM.db.profile.display.showCurrentDPS = v end)
+    y = y + self:CreateToggleRow(y, "Show Fight Duration", "Display combat time in title bar",
+        function() return EDM.db.profile.display.showDuration ~= false end,
+        function(v) EDM.db.profile.display.showDuration = v end)
+    y = y + self:CreateToggleRow(y, "Highlight Self", "Highlight your own bar",
+        function() return EDM.db.profile.display.highlightSelf end,
+        function(v) EDM.db.profile.display.highlightSelf = v end)
 
     self.quickPanel.scrollChild:SetHeight(y + 30)
 end
@@ -1151,20 +1253,22 @@ function Config:BuildCreditsTab()
     changelogRow.text:SetTextColor(0.8, 0.8, 0.85, 1)
     changelogRow.text:SetJustifyH("LEFT")
     changelogRow.text:SetText(
-        "|cff00ff00v1.0.5 - Latest|r\n" ..
-        "  - Fixed settings panel (all tabs now work)\n" ..
-        "  - Added PvP player tracking (arena, BG)\n" ..
+        "|cff00ff00v1.0.6 - Latest|r\n" ..
+        "  - Simplified tracking (group/raid only like Recount)\n" ..
+        "  - Fixed data persistence (no more quick resets)\n" ..
+        "  - Fixed all bar settings (class colors, percent, value)\n" ..
+        "  - Added font selection dropdown\n" ..
+        "  - Fixed number format options\n" ..
+        "  - Added Quick Actions in Display tab\n" ..
+        "  - Removed sound settings\n\n" ..
+        "|cffccccccv1.0.5|r\n" ..
+        "  - Fixed settings panel tabs\n" ..
         "  - Fixed font size slider\n" ..
         "  - Fixed window size/opacity settings\n" ..
-        "  - Added new minimap icon\n\n" ..
+        "  - New minimap icon\n\n" ..
         "|cffccccccv1.0.4|r\n" ..
         "  - Major settings rewrite with tabs\n" ..
-        "  - Fixed graph line visibility\n" ..
-        "  - Added 11 custom skins\n\n" ..
-        "|cffccccccv1.0.3|r\n" ..
-        "  - Enhanced DetailWindow styling\n" ..
-        "  - Fixed menu click issues\n" ..
-        "  - Improved bar display"
+        "  - Added 11 custom skins"
     )
 
     y = y + 210
@@ -1185,7 +1289,7 @@ function Config:BuildCreditsTab()
     versionRow.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
     versionRow.text:SetPoint("LEFT", 10, 0)
     versionRow.text:SetTextColor(0.6, 0.6, 0.7, 1)
-    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.5 BETA\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
+    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.6 BETA\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
 
     y = y + 70
 

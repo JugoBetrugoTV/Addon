@@ -202,22 +202,30 @@ function Core:OnCombatStart()
     self.inCombat = true
     self.combatStartTime = GetTime()
 
-    -- CURRENT segment: Clear old data and start fresh for this combat
-    -- OVERALL segment: Keep accumulating (never auto-cleared)
-    DB:StartNewCurrentSegment()
+    -- Cancel any pending segment timeout
+    if self.segmentTimeoutTimer then
+        self:CancelTimer(self.segmentTimeoutTimer)
+        self.segmentTimeoutTimer = nil
+    end
 
+    -- Check if current segment exists and has data - DON'T reset if recent combat
+    -- This behaves like Recount/Details - data persists across combat sessions
     local segment = DB.Data.currentSegment
+    if not segment then
+        -- No segment exists, create one
+        DB:StartNewCurrentSegment()
+        segment = DB.Data.currentSegment
+    end
+
     if segment then
         segment.inCombat = true
-        segment.startTime = self.combatStartTime
+        -- Only update start time if this is a fresh segment
+        if not segment.startTime or segment.startTime == 0 then
+            segment.startTime = self.combatStartTime
+        end
     end
 
-    -- Play sound
-    if self.db.profile.sounds.combatStart then
-        self:PlaySound("Combat Start")
-    end
-
-    Utils.Debug("Combat started - Current segment reset")
+    Utils.Debug("Combat started - Data preserved")
 end
 
 -- Combat end
@@ -226,28 +234,22 @@ function Core:OnCombatEnd()
 
     self.inCombat = false
     local combatDuration = GetTime() - (self.combatStartTime or GetTime())
-    self.combatStartTime = nil
 
     local segment = DB.Data.currentSegment
     if segment then
         segment.inCombat = false
-        segment.duration = combatDuration
-        segment.endTime = GetTime()
-        -- Current segment data preserved until next combat starts
-        -- Overall never cleared except by user reset
+        -- Update total duration (accumulate across multiple combat sessions)
+        segment.duration = (segment.duration or 0) + combatDuration
+        segment.lastCombatEnd = GetTime()
+        -- Don't set endTime - segment stays active for more combat
     end
 
-    -- Play sound
-    if self.db.profile.sounds.combatEnd then
-        self:PlaySound("Combat End")
-    end
-
-    -- Update UI (data stays visible after combat)
+    -- Update UI (data stays visible after combat - like Recount/Details)
     if EDM.UI then
         EDM.UI:Refresh()
     end
 
-    Utils.Debug("Combat ended, duration:", combatDuration)
+    Utils.Debug("Combat ended, session duration:", combatDuration, "total:", segment and segment.duration or 0)
 end
 
 -- Check if group/instance changed (should reset overall)
