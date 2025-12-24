@@ -6,7 +6,17 @@ if not CallbackHandler then return end
 
 local meta = {__index = function(tbl, key) tbl[key] = {} return tbl[key] end}
 
-function CallbackHandler.New(self, target, RegisterName, UnregisterName, UnregisterAllName)
+function CallbackHandler:New(target, RegisterName, UnregisterName, UnregisterAllName)
+    -- Handle both CallbackHandler.New(target) and CallbackHandler:New(target) call patterns
+    -- If called as .New(target), then 'self' is actually the target and 'target' is nil
+    if self ~= CallbackHandler then
+        -- Called as .New(target, ...) - shift arguments
+        UnregisterAllName = UnregisterName
+        UnregisterName = RegisterName
+        RegisterName = target
+        target = self
+    end
+
     RegisterName = RegisterName or "RegisterCallback"
     UnregisterName = UnregisterName or "UnregisterCallback"
     UnregisterAllName = UnregisterAllName or "UnregisterAllCallbacks"
