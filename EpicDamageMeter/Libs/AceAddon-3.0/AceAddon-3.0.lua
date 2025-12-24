@@ -97,14 +97,16 @@ function AceAddon:EmbedLibrary(object, libname, silent, offset)
 end
 
 function AceAddon:InitializeAddon(addon)
+    if self.statuses[addon.name] == "initialized" then return end
     safecall(addon.OnInitialize, addon)
+    self.statuses[addon.name] = "initialized"
 end
 
 function AceAddon:EnableAddon(addon)
     if type(addon) == "string" then addon = AceAddon:GetAddon(addon) end
-    if self.statuses[addon.name] then return false end
+    if self.statuses[addon.name] == "enabled" then return false end
 
-    self.statuses[addon.name] = true
+    self.statuses[addon.name] = "enabled"
 
     safecall(addon.OnEnable, addon)
 
@@ -122,23 +124,24 @@ function AceAddon:IterateEmbedsOnAddon(addon) return pairs(self.embeds[addon]) e
 
 local function onEvent(frame, event, arg1)
     if event == "ADDON_LOADED" then
-        for i, addon in ipairs(AceAddon.initializequeue) do
-            if IsAddOnLoaded(addon.name) then
+        -- Iterate backwards to safely remove during iteration
+        for i = #AceAddon.initializequeue, 1, -1 do
+            local addon = AceAddon.initializequeue[i]
+            if addon and IsAddOnLoaded(addon.name) then
                 AceAddon:InitializeAddon(addon)
                 table.remove(AceAddon.initializequeue, i)
             end
         end
     elseif event == "PLAYER_LOGIN" then
+        -- Initialize any addons not yet initialized
         for name, addon in pairs(AceAddon.addons) do
             if not AceAddon.statuses[name] then
-                AceAddon.initializequeue[#AceAddon.initializequeue + 1] = addon
+                AceAddon:InitializeAddon(addon)
             end
-        end
-        for i, addon in ipairs(AceAddon.initializequeue) do
-            AceAddon:InitializeAddon(addon)
         end
         wipe(AceAddon.initializequeue)
 
+        -- Enable all addons
         for name, addon in pairs(AceAddon.addons) do
             AceAddon:EnableAddon(addon)
         end
