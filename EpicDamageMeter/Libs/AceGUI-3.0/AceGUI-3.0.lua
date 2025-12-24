@@ -203,8 +203,14 @@ function AceGUI:Create(widgetType)
     end
 
     local widget = reg()
-    widget.userdata = {}
-    widget.events = {}
+
+    -- Safety check: constructor might return nil
+    if not widget then
+        return nil
+    end
+
+    widget.userdata = widget.userdata or {}
+    widget.events = widget.events or {}
     widget.type = widgetType
 
     for method, func in pairs(WidgetBase) do
@@ -217,7 +223,9 @@ function AceGUI:Create(widgetType)
         end
     end
 
-    widget:OnAcquire()
+    if widget.OnAcquire then
+        widget:OnAcquire()
+    end
 
     return widget
 end

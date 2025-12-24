@@ -82,25 +82,45 @@ function Core:OnInitialize()
             end)
         end
     else
-        -- Fallback: create minimal database structure
-        print("|cffff0000EpicDamageMeter:|r Database initialization failed, using defaults.")
-        local defaultDB = {
-            profile = C.DEFAULT_SETTINGS.profile or {},
-        }
-        -- Ensure defaults are deep copied
-        if C.DEFAULT_SETTINGS.profile then
-            for k, v in pairs(C.DEFAULT_SETTINGS.profile) do
+        -- Fallback: create minimal database structure using actual SavedVariables
+        print("|cffff0000EpicDamageMeter:|r Database initialization failed, using fallback.")
+
+        -- Use the actual saved variables table so data persists
+        local sv = _G["EpicDamageMeterDB"] or {}
+        _G["EpicDamageMeterDB"] = sv
+
+        -- Initialize structure if needed
+        sv.profiles = sv.profiles or {}
+        sv.profiles.Default = sv.profiles.Default or {}
+        sv.char = sv.char or {}
+
+        local playerName = UnitName("player") or "Unknown"
+        local realmName = GetRealmName() or "Unknown"
+        local charKey = playerName .. " - " .. realmName
+        sv.char[charKey] = sv.char[charKey] or {}
+
+        -- Deep copy defaults into profile
+        local function deepCopy(src, dest)
+            for k, v in pairs(src) do
                 if type(v) == "table" then
-                    defaultDB.profile[k] = {}
-                    for k2, v2 in pairs(v) do
-                        defaultDB.profile[k][k2] = v2
-                    end
-                else
-                    defaultDB.profile[k] = v
+                    dest[k] = dest[k] or {}
+                    deepCopy(v, dest[k])
+                elseif dest[k] == nil then
+                    dest[k] = v
                 end
             end
         end
-        self.db = defaultDB
+
+        if C.DEFAULT_SETTINGS and C.DEFAULT_SETTINGS.profile then
+            deepCopy(C.DEFAULT_SETTINGS.profile, sv.profiles.Default)
+        end
+
+        -- Create db object that mirrors AceDB structure
+        self.db = {
+            profile = sv.profiles.Default,
+            char = sv.char[charKey],
+            sv = sv,
+        }
         EDM.db = self.db
     end
 
