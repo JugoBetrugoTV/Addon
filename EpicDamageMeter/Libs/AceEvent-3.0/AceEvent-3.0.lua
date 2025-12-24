@@ -8,23 +8,44 @@ AceEvent.frame = AceEvent.frame or CreateFrame("Frame")
 AceEvent.embeds = AceEvent.embeds or {}
 
 local CallbackHandler = LibStub("CallbackHandler-1.0")
-AceEvent.events = AceEvent.events or CallbackHandler.New(AceEvent, AceEvent.frame, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents")
-AceEvent.messages = AceEvent.messages or CallbackHandler.New(AceEvent, AceEvent.frame, "RegisterMessage", "UnregisterMessage", "UnregisterAllMessages")
 
-function AceEvent.events:OnUsed(target, eventname)
-    target:RegisterEvent(eventname)
+-- Create separate callback handler objects for events and messages
+-- Each gets its own Fire function and events storage
+if not AceEvent.eventHandler then
+    local handler, events, registry = CallbackHandler:New({}, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents")
+    AceEvent.eventHandler = handler
+
+    -- Copy methods to AceEvent for embedding
+    AceEvent.RegisterEvent = handler.RegisterEvent
+    AceEvent.UnregisterEvent = handler.UnregisterEvent
+    AceEvent.UnregisterAllEvents = handler.UnregisterAllEvents
+
+    -- When an event is first registered, register the frame for that event
+    registry.OnUsed = function(self, usedTarget, eventname)
+        AceEvent.frame:RegisterEvent(eventname)
+    end
+    -- When no more handlers exist for an event, unregister the frame
+    registry.OnUnused = function(self, usedTarget, eventname)
+        AceEvent.frame:UnregisterEvent(eventname)
+    end
 end
 
-function AceEvent.events:OnUnused(target, eventname)
-    target:UnregisterEvent(eventname)
+if not AceEvent.messageHandler then
+    local handler, messages, registry = CallbackHandler:New({}, "RegisterMessage", "UnregisterMessage", "UnregisterAllMessages")
+    AceEvent.messageHandler = handler
+
+    -- Copy methods to AceEvent for embedding
+    AceEvent.RegisterMessage = handler.RegisterMessage
+    AceEvent.UnregisterMessage = handler.UnregisterMessage
+    AceEvent.UnregisterAllMessages = handler.UnregisterAllMessages
 end
 
 AceEvent.frame:SetScript("OnEvent", function(self, event, ...)
-    AceEvent.events:Fire(event, ...)
+    AceEvent.eventHandler:Fire(event, ...)
 end)
 
 local function SendMessage(self, message, ...)
-    AceEvent.messages:Fire(message, ...)
+    AceEvent.messageHandler:Fire(message, ...)
 end
 
 local mixins = {
@@ -38,7 +59,7 @@ function AceEvent:Embed(target)
         if v == "SendMessage" then
             target[v] = SendMessage
         else
-            target[v] = self[v] or self.events[v] or self.messages[v]
+            target[v] = self[v]
         end
     end
     self.embeds[target] = true
