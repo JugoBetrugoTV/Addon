@@ -235,13 +235,20 @@ function AceDB:New(tbl, defaults, defaultProfile)
 
     defaultProfile = defaultProfile or "Default"
 
-    local charKey = UnitName("player") .. " - " .. GetRealmName()
-    local realmKey = GetRealmName()
-    local classKey = select(2, UnitClass("player"))
-    local raceKey = select(2, UnitRace("player"))
-    local factionKey = UnitFactionGroup("player")
-    local factionrealmKey = factionKey .. " - " .. GetRealmName()
-    local localeKey = GetLocale()
+    -- Handle nil values at load time gracefully
+    local playerName = UnitName("player") or "Unknown"
+    local realmName = GetRealmName() or "Unknown"
+    local className = select(2, UnitClass("player")) or "UNKNOWN"
+    local raceName = select(2, UnitRace("player")) or "Unknown"
+    local factionName = UnitFactionGroup("player") or "Neutral"
+
+    local charKey = playerName .. " - " .. realmName
+    local realmKey = realmName
+    local classKey = className
+    local raceKey = raceName
+    local factionKey = factionName
+    local factionrealmKey = factionName .. " - " .. realmName
+    local localeKey = GetLocale() or "enUS"
 
     if not tbl.profileKeys then tbl.profileKeys = {} end
     if not tbl.profiles then tbl.profiles = {} end
@@ -265,7 +272,7 @@ function AceDB:New(tbl, defaults, defaultProfile)
         defaults = {
             profile = {},
         },
-        callbacks = CallbackHandler.New({}),
+        callbacks = CallbackHandler.New(nil, nil, "RegisterCallback", "UnregisterCallback", "UnregisterAllCallbacks"),
         parent = self,
     }, dbmt)
 
@@ -275,6 +282,30 @@ function AceDB:New(tbl, defaults, defaultProfile)
 
     for funcName, func in pairs(DBObjectLib) do
         db[funcName] = func
+    end
+
+    -- Expose callback methods directly on db object (like real AceDB)
+    -- db.RegisterCallback(target, event, method) registers target to receive event callbacks
+    db.RegisterCallback = function(target, event, method, ...)
+        -- When called as db.RegisterCallback(self, event, method)
+        -- target = the object that wants callbacks (e.g. Core)
+        -- event = the event name (e.g. "OnProfileChanged")
+        -- method = the method to call (e.g. "OnProfileChanged")
+        if type(target) == "table" and type(event) == "string" then
+            -- Use the target's own method for registering via callbacks table
+            target[event] = target[event] or (type(method) == "string" and target[method] or method)
+            db.callbacks.RegisterCallback(target, event, method or event)
+        end
+    end
+    db.UnregisterCallback = function(target, event, ...)
+        if type(target) == "table" and type(event) == "string" then
+            db.callbacks.UnregisterCallback(target, event)
+        end
+    end
+    db.UnregisterAllCallbacks = function(target, ...)
+        if type(target) == "table" then
+            db.callbacks.UnregisterAllCallbacks(target)
+        end
     end
 
     AceDB.db_registry[db] = true

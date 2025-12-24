@@ -4,6 +4,9 @@ local AceAddon, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not AceAddon then return end
 
+-- Compatibility for WoW 11.x API changes
+local IsAddOnLoaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+
 AceAddon.frame = AceAddon.frame or CreateFrame("Frame")
 AceAddon.addons = AceAddon.addons or {}
 AceAddon.statuses = AceAddon.statuses or {}
