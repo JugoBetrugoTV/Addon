@@ -92,6 +92,11 @@ function Core:OnEnable()
     -- Register events
     self:RegisterEvents()
 
+    -- Initialize Parser (must be done after player is loaded)
+    if EDM.Parser then
+        EDM.Parser:Initialize()
+    end
+
     -- Create UI
     if EDM.UI then
         EDM.UI:Initialize()

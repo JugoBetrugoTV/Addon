@@ -56,15 +56,21 @@ function Parser:UpdateGroupGUIDs()
     wipe(groupGUIDs)
     wipe(guidTypeCache)
 
-    -- Add player
+    -- Add player - always get fresh values
     local pGUID = UnitGUID("player")
-    if pGUID then
+    local pName = UnitName("player")
+
+    -- Update cached values if available
+    if pGUID then playerGUID = pGUID end
+    if pName then playerName = pName end
+
+    if pGUID and playerName then
         groupGUIDs[pGUID] = { name = playerName, type = "player", owner = nil }
         guidTypeCache[pGUID] = "player"
     end
 
-    -- Add player's pet
-    self:AddPetForUnit("player", pGUID)
+    -- Add player's pet (unit is "pet" for player's pet)
+    self:AddPetForUnit("pet", pGUID)
 
     -- Determine group type
     local inRaid = IsInRaid()
@@ -626,5 +632,5 @@ function Parser:GetGroupMembers()
     return members
 end
 
--- Initialize on load
-Parser:Initialize()
+-- Note: Parser:Initialize() is called from Core:OnEnable() after player is loaded
+-- Do NOT initialize here as playerGUID/playerName won't be available yet
