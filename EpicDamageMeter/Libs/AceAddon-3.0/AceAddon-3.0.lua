@@ -5,7 +5,16 @@ local AceAddon, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 if not AceAddon then return end
 
 -- Compatibility for WoW 11.x API changes
-local IsAddOnLoaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+-- C_AddOns.IsAddOnLoaded is the new API, fallback to old global if available
+local IsAddOnLoaded
+if C_AddOns and C_AddOns.IsAddOnLoaded then
+    IsAddOnLoaded = C_AddOns.IsAddOnLoaded
+elseif _G.IsAddOnLoaded then
+    IsAddOnLoaded = _G.IsAddOnLoaded
+else
+    -- Fallback: always return true (will initialize on PLAYER_LOGIN anyway)
+    IsAddOnLoaded = function(name) return true end
+end
 
 AceAddon.frame = AceAddon.frame or CreateFrame("Frame")
 AceAddon.addons = AceAddon.addons or {}

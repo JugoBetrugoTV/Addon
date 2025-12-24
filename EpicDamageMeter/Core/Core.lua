@@ -64,20 +64,57 @@ local dataBroker = LDB:NewDataObject(ADDON_NAME, {
 
 -- Addon initialization
 function Core:OnInitialize()
-    -- Initialize database
-    self.db = AceDB:New("EpicDamageMeterDB", C.DEFAULT_SETTINGS, true)
-    EDM.db = self.db
+    -- Initialize database with error handling
+    local success, db = pcall(function()
+        return AceDB:New("EpicDamageMeterDB", C.DEFAULT_SETTINGS, true)
+    end)
 
-    -- Setup profile callbacks
-    self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
-    self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
-    self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")
+    if success and db then
+        self.db = db
+        EDM.db = self.db
+
+        -- Setup profile callbacks with error handling
+        if self.db.RegisterCallback then
+            pcall(function()
+                self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
+                self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
+                self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")
+            end)
+        end
+    else
+        -- Fallback: create minimal database structure
+        print("|cffff0000EpicDamageMeter:|r Database initialization failed, using defaults.")
+        local defaultDB = {
+            profile = C.DEFAULT_SETTINGS.profile or {},
+        }
+        -- Ensure defaults are deep copied
+        if C.DEFAULT_SETTINGS.profile then
+            for k, v in pairs(C.DEFAULT_SETTINGS.profile) do
+                if type(v) == "table" then
+                    defaultDB.profile[k] = {}
+                    for k2, v2 in pairs(v) do
+                        defaultDB.profile[k][k2] = v2
+                    end
+                else
+                    defaultDB.profile[k] = v
+                end
+            end
+        end
+        self.db = defaultDB
+        EDM.db = self.db
+    end
 
     -- Initialize database structures
-    DB:Initialize()
+    if DB and DB.Initialize then
+        pcall(DB.Initialize, DB)
+    end
 
-    -- Register minimap icon
-    LDBIcon:Register(ADDON_NAME, dataBroker, self.db.profile.minimap)
+    -- Register minimap icon (with error handling)
+    if LDBIcon and self.db.profile and self.db.profile.minimap then
+        pcall(function()
+            LDBIcon:Register(ADDON_NAME, dataBroker, self.db.profile.minimap)
+        end)
+    end
 
     -- Register slash commands
     self:RegisterChatCommand("edm", "SlashCommand")
@@ -136,38 +173,90 @@ end
 
 -- Register all events
 function Core:RegisterEvents()
-    -- Combat events
-    self:RegisterEvent("PLAYER_REGEN_DISABLED", "OnCombatStart")
-    self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnCombatEnd")
+    -- Try AceEvent-based registration first
+    local aceEventSuccess = pcall(function()
+        -- Combat events
+        self:RegisterEvent("PLAYER_REGEN_DISABLED", "OnCombatStart")
+        self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnCombatEnd")
 
-    -- Combat log
-    self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", "OnCombatLogEvent")
+        -- Combat log
+        self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", "OnCombatLogEvent")
 
-    -- Encounter events
-    self:RegisterEvent("ENCOUNTER_START", "OnEncounterStart")
-    self:RegisterEvent("ENCOUNTER_END", "OnEncounterEnd")
+        -- Encounter events
+        self:RegisterEvent("ENCOUNTER_START", "OnEncounterStart")
+        self:RegisterEvent("ENCOUNTER_END", "OnEncounterEnd")
 
-    -- Zone events
-    self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnZoneChanged")
-    self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerEnteringWorld")
+        -- Zone events
+        self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnZoneChanged")
+        self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerEnteringWorld")
 
-    -- Group events
-    self:RegisterEvent("GROUP_ROSTER_UPDATE", "OnGroupRosterUpdate")
+        -- Group events
+        self:RegisterEvent("GROUP_ROSTER_UPDATE", "OnGroupRosterUpdate")
 
-    -- Pet events
-    self:RegisterEvent("UNIT_PET", "OnUnitPet")
+        -- Pet events
+        self:RegisterEvent("UNIT_PET", "OnUnitPet")
+    end)
+
+    -- Fallback: Create direct frame-based event registration
+    -- This ensures combat log is captured even if AceEvent fails
+    if not self.eventFrame then
+        self.eventFrame = CreateFrame("Frame")
+        self.eventFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+        self.eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+        self.eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+        self.eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+        self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+        self.eventFrame:RegisterEvent("UNIT_PET")
+
+        self.eventFrame:SetScript("OnEvent", function(frame, event, ...)
+            if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+                if Core.initialized and EDM.Parser then
+                    EDM.Parser:OnCombatLogEvent()
+                end
+            elseif event == "PLAYER_REGEN_DISABLED" then
+                Core:OnCombatStart()
+            elseif event == "PLAYER_REGEN_ENABLED" then
+                Core:OnCombatEnd()
+            elseif event == "GROUP_ROSTER_UPDATE" then
+                Core:OnGroupRosterUpdate()
+            elseif event == "PLAYER_ENTERING_WORLD" then
+                Core:OnPlayerEnteringWorld(event, ...)
+            elseif event == "UNIT_PET" then
+                Core:OnUnitPet(event, ...)
+            end
+        end)
+
+        Utils.Debug("Fallback event frame created")
+    end
 
     Utils.Debug("Events registered")
 end
 
 -- Start update timer
 function Core:StartUpdateTimer()
+    -- Cancel existing timer
     if self.updateTimer then
-        self:CancelTimer(self.updateTimer)
+        pcall(function() self:CancelTimer(self.updateTimer) end)
+    end
+    if self.fallbackTicker then
+        self.fallbackTicker:Cancel()
+        self.fallbackTicker = nil
     end
 
-    local interval = self.db.profile.display.refreshRate or C.UPDATE_INTERVAL
-    self.updateTimer = self:ScheduleRepeatingTimer("OnUpdateTimer", interval)
+    local interval = (self.db and self.db.profile and self.db.profile.display and self.db.profile.display.refreshRate) or C.UPDATE_INTERVAL or 0.5
+
+    -- Try AceTimer first
+    local success = pcall(function()
+        self.updateTimer = self:ScheduleRepeatingTimer("OnUpdateTimer", interval)
+    end)
+
+    -- Fallback: Use C_Timer directly
+    if not success then
+        self.fallbackTicker = C_Timer.NewTicker(interval, function()
+            Core:OnUpdateTimer()
+        end)
+        Utils.Debug("Using fallback C_Timer for updates")
+    end
 
     Utils.Debug("Update timer started with interval:", interval)
 end
@@ -891,3 +980,30 @@ end
 
 -- Make Core globally accessible
 _G.EpicDamageMeterCore = Core
+
+-- Fallback initialization in case AceAddon fails to call OnInitialize/OnEnable
+-- This ensures the addon works even if library initialization has issues
+local fallbackFrame = CreateFrame("Frame")
+fallbackFrame:RegisterEvent("PLAYER_LOGIN")
+fallbackFrame:SetScript("OnEvent", function(self, event)
+    self:UnregisterEvent("PLAYER_LOGIN")
+
+    -- Give AceAddon a moment to initialize first
+    C_Timer.After(0.5, function()
+        -- Check if initialization happened
+        if not EDM.db then
+            print("|cff00ff00EpicDamageMeter:|r Fallback initialization triggered")
+            -- Force initialize if AceAddon didn't do it
+            if Core.OnInitialize and not Core.initialized then
+                Core:OnInitialize()
+            end
+        end
+
+        -- Check if enable happened
+        if EDM.db and not Core.initialized then
+            if Core.OnEnable then
+                Core:OnEnable()
+            end
+        end
+    end)
+end)
