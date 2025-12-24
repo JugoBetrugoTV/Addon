@@ -746,9 +746,21 @@ end
 function Config:BuildGeneralTab()
     local y = 0
 
+    -- Safety check - if db not ready, show error message
+    if not EDM.db or not EDM.db.profile then
+        y = y + self:CreateSectionHeader(y, "Error")
+        local errorLabel = self.quickPanel.scrollChild:CreateFontString(nil, "OVERLAY")
+        errorLabel:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+        errorLabel:SetPoint("TOPLEFT", 10, -y - 10)
+        errorLabel:SetTextColor(1, 0.3, 0.3, 1)
+        errorLabel:SetText("Database not initialized. Please reload the UI (/reload).")
+        self.quickPanel.scrollChild:SetHeight(y + 50)
+        return
+    end
+
     y = y + self:CreateSectionHeader(y, "General Options")
     y = y + self:CreateToggleRow(y, "Enable Addon", "Enable or disable the damage meter",
-        function() return EDM.db.profile.enabled end,
+        function() return EDM.db and EDM.db.profile and EDM.db.profile.enabled or false end,
         function(v) EDM.db.profile.enabled = v; if v then EDM.Core:OnEnable() else EDM.Core:OnDisable() end end)
     y = y + self:CreateToggleRow(y, "Lock Window", "Prevent the window from being moved",
         function() return EDM.db.profile.locked end,
