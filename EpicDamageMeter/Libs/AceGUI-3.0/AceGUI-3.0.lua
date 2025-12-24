@@ -247,6 +247,18 @@ function AceGUI:GetWidgetVersion(name)
     return AceGUI.WidgetVersions[name] or 0
 end
 
+-- Register a widget as a container - adds container base methods
+function AceGUI:RegisterAsContainer(widget)
+    widget.children = widget.children or {}
+    for method, func in pairs(WidgetContainerBase) do
+        widget[method] = widget[method] or func
+    end
+    -- Also ensure base methods are present
+    for method, func in pairs(WidgetBase) do
+        widget[method] = widget[method] or func
+    end
+end
+
 function AceGUI:RegisterLayout(name, layoutFunc)
     LayoutRegistry[name] = layoutFunc
 end

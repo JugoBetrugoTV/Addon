@@ -16,17 +16,22 @@ if not AceEvent.eventHandler then
     AceEvent.eventHandler = handler
 
     -- Copy methods to AceEvent for embedding
-    AceEvent.RegisterEvent = handler.RegisterEvent
-    AceEvent.UnregisterEvent = handler.UnregisterEvent
-    AceEvent.UnregisterAllEvents = handler.UnregisterAllEvents
+    if handler then
+        AceEvent.RegisterEvent = handler.RegisterEvent
+        AceEvent.UnregisterEvent = handler.UnregisterEvent
+        AceEvent.UnregisterAllEvents = handler.UnregisterAllEvents
+    end
 
     -- When an event is first registered, register the frame for that event
-    registry.OnUsed = function(self, usedTarget, eventname)
-        AceEvent.frame:RegisterEvent(eventname)
-    end
-    -- When no more handlers exist for an event, unregister the frame
-    registry.OnUnused = function(self, usedTarget, eventname)
-        AceEvent.frame:UnregisterEvent(eventname)
+    -- Safety check: registry might be nil if CallbackHandler version differs
+    if registry then
+        registry.OnUsed = function(self, usedTarget, eventname)
+            AceEvent.frame:RegisterEvent(eventname)
+        end
+        -- When no more handlers exist for an event, unregister the frame
+        registry.OnUnused = function(self, usedTarget, eventname)
+            AceEvent.frame:UnregisterEvent(eventname)
+        end
     end
 end
 
@@ -35,9 +40,11 @@ if not AceEvent.messageHandler then
     AceEvent.messageHandler = handler
 
     -- Copy methods to AceEvent for embedding
-    AceEvent.RegisterMessage = handler.RegisterMessage
-    AceEvent.UnregisterMessage = handler.UnregisterMessage
-    AceEvent.UnregisterAllMessages = handler.UnregisterAllMessages
+    if handler then
+        AceEvent.RegisterMessage = handler.RegisterMessage
+        AceEvent.UnregisterMessage = handler.UnregisterMessage
+        AceEvent.UnregisterAllMessages = handler.UnregisterAllMessages
+    end
 end
 
 AceEvent.frame:SetScript("OnEvent", function(self, event, ...)
