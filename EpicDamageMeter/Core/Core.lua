@@ -234,29 +234,23 @@ end
 
 -- Start update timer
 function Core:StartUpdateTimer()
-    -- Cancel existing timer
+    -- Cancel existing timers
     if self.updateTimer then
         pcall(function() self:CancelTimer(self.updateTimer) end)
+        self.updateTimer = nil
     end
-    if self.fallbackTicker then
-        self.fallbackTicker:Cancel()
-        self.fallbackTicker = nil
+    if self.updateTicker then
+        pcall(function() self.updateTicker:Cancel() end)
+        self.updateTicker = nil
     end
 
     local interval = (self.db and self.db.profile and self.db.profile.display and self.db.profile.display.refreshRate) or C.UPDATE_INTERVAL or 0.5
 
-    -- Try AceTimer first
-    local success = pcall(function()
-        self.updateTimer = self:ScheduleRepeatingTimer("OnUpdateTimer", interval)
+    -- Always use C_Timer.NewTicker as primary - more reliable than AceTimer
+    -- because we can't control which version of AceTimer is loaded
+    self.updateTicker = C_Timer.NewTicker(interval, function()
+        Core:OnUpdateTimer()
     end)
-
-    -- Fallback: Use C_Timer directly
-    if not success then
-        self.fallbackTicker = C_Timer.NewTicker(interval, function()
-            Core:OnUpdateTimer()
-        end)
-        Utils.Debug("Using fallback C_Timer for updates")
-    end
 
     Utils.Debug("Update timer started with interval:", interval)
 end

@@ -8,7 +8,7 @@ AceConfigRegistry.tables = AceConfigRegistry.tables or {}
 
 local CallbackHandler = LibStub("CallbackHandler-1.0")
 if not AceConfigRegistry.callbacks then
-    AceConfigRegistry.callbacks = CallbackHandler.New(AceConfigRegistry)
+    AceConfigRegistry.callbacks = CallbackHandler:New(AceConfigRegistry)
 end
 
 local function validateType(optType)

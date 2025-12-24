@@ -243,6 +243,10 @@ function AceGUI:RegisterWidgetType(name, constructor, version)
     end
 end
 
+function AceGUI:GetWidgetVersion(name)
+    return AceGUI.WidgetVersions[name] or 0
+end
+
 function AceGUI:RegisterLayout(name, layoutFunc)
     LayoutRegistry[name] = layoutFunc
 end

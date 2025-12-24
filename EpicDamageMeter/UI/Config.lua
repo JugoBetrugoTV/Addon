@@ -62,9 +62,26 @@ end
 
 -- Register options
 function Config:Register()
+    -- Safety check - AceConfig might not be fully loaded if another addon's higher version takes over
+    if not AceConfig or not AceConfig.RegisterOptionsTable then
+        -- Retry after a short delay
+        C_Timer.After(1, function()
+            if AceConfig and AceConfig.RegisterOptionsTable then
+                Config:Register()
+            end
+        end)
+        return
+    end
+
     local options = self:GetOptions()
-    AceConfig:RegisterOptionsTable(ADDON_NAME, options)
-    AceConfigCmd:CreateChatCommand("edm config", ADDON_NAME)
+    pcall(function()
+        AceConfig:RegisterOptionsTable(ADDON_NAME, options)
+    end)
+    pcall(function()
+        if AceConfigCmd and AceConfigCmd.CreateChatCommand then
+            AceConfigCmd:CreateChatCommand("edm config", ADDON_NAME)
+        end
+    end)
     self.registered = true
 end
 
@@ -1321,9 +1338,11 @@ function Config:ShowQuickPanel()
     end
 end
 
--- Initialize on load
-C_Timer.After(0, function()
+-- Initialize on load - delay to ensure libraries are fully loaded
+C_Timer.After(2, function()
     if EDM.db then
-        Config:Register()
+        pcall(function()
+            Config:Register()
+        end)
     end
 end)
