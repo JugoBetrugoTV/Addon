@@ -23,16 +23,20 @@ function DB.CreateActorData(guid, name, class, flags)
         -- Totals
         damage = 0,
         healing = 0,
-        absorbs = 0,
+        absorbs = 0,            -- Absorbs done by this actor
+        absorbsReceived = 0,    -- Absorbs received by this actor
         overhealing = 0,
         damageTaken = 0,
         healingTaken = 0,
+        friendlyFire = 0,       -- Damage done to friendly targets
 
         -- Counts
         deaths = 0,
         kills = 0,
         interrupts = 0,
         dispels = 0,
+        ccBreaks = 0,           -- CC broken by this actor
+        resurrects = 0,         -- Resurrects cast by this actor
 
         -- Activity tracking (for Activity tab)
         interruptSpells = {}, -- spellId -> {name, count}
@@ -549,6 +553,8 @@ function DB:GetSortedActors(segment, mode)
             hasValue = (actor.healing or 0) > 0
         elseif mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
             hasValue = (actor.damageTaken or 0) > 0
+        elseif mode == C.DISPLAY_MODE.HEALING_TAKEN then
+            hasValue = (actor.healingTaken or 0) > 0
         elseif mode == C.DISPLAY_MODE.DEATHS then
             hasValue = (actor.deaths or 0) > 0
         elseif mode == C.DISPLAY_MODE.INTERRUPTS then
@@ -557,8 +563,16 @@ function DB:GetSortedActors(segment, mode)
             hasValue = (actor.dispels or 0) > 0
         elseif mode == C.DISPLAY_MODE.ABSORBS then
             hasValue = (actor.absorbs or 0) > 0
+        elseif mode == C.DISPLAY_MODE.ABSORBS_DONE then
+            hasValue = (actor.absorbsReceived or 0) > 0
         elseif mode == C.DISPLAY_MODE.OVERHEALING then
             hasValue = (actor.overhealing or 0) > 0
+        elseif mode == C.DISPLAY_MODE.FRIENDLY_FIRE then
+            hasValue = (actor.friendlyFire or 0) > 0
+        elseif mode == C.DISPLAY_MODE.CC_BREAKS then
+            hasValue = (actor.ccBreaks or 0) > 0
+        elseif mode == C.DISPLAY_MODE.RESURRECTS then
+            hasValue = (actor.resurrects or 0) > 0
         else
             hasValue = (actor.damage or 0) > 0 or (actor.healing or 0) > 0
         end
@@ -576,6 +590,8 @@ function DB:GetSortedActors(segment, mode)
         sortKey = "healing"
     elseif mode == C.DISPLAY_MODE.DAMAGE_TAKEN then
         sortKey = "damageTaken"
+    elseif mode == C.DISPLAY_MODE.HEALING_TAKEN then
+        sortKey = "healingTaken"
     elseif mode == C.DISPLAY_MODE.DEATHS then
         sortKey = "deaths"
     elseif mode == C.DISPLAY_MODE.INTERRUPTS then
@@ -584,8 +600,16 @@ function DB:GetSortedActors(segment, mode)
         sortKey = "dispels"
     elseif mode == C.DISPLAY_MODE.ABSORBS then
         sortKey = "absorbs"
+    elseif mode == C.DISPLAY_MODE.ABSORBS_DONE then
+        sortKey = "absorbsReceived"
     elseif mode == C.DISPLAY_MODE.OVERHEALING then
         sortKey = "overhealing"
+    elseif mode == C.DISPLAY_MODE.FRIENDLY_FIRE then
+        sortKey = "friendlyFire"
+    elseif mode == C.DISPLAY_MODE.CC_BREAKS then
+        sortKey = "ccBreaks"
+    elseif mode == C.DISPLAY_MODE.RESURRECTS then
+        sortKey = "resurrects"
     else
         sortKey = "damage"
     end

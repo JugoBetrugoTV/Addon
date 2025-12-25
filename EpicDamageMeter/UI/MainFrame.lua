@@ -518,6 +518,7 @@ function Instance:CreateCustomMenu()
     menu.damageDone = CreateMenuItem("Damage Done", C.DISPLAY_MODE.DAMAGE_DONE)
     menu.dps = CreateMenuItem("DPS", C.DISPLAY_MODE.DPS)
     menu.damageTaken = CreateMenuItem("Damage Taken", C.DISPLAY_MODE.DAMAGE_TAKEN)
+    menu.friendlyFire = CreateMenuItem("Friendly Fire", C.DISPLAY_MODE.FRIENDLY_FIRE)
 
     yOffset = yOffset - 6
     CreateHeader("Healing", "|cff66ff66")
@@ -525,13 +526,16 @@ function Instance:CreateCustomMenu()
     menu.hps = CreateMenuItem("HPS", C.DISPLAY_MODE.HPS)
     menu.healingTaken = CreateMenuItem("Healing Received", C.DISPLAY_MODE.HEALING_TAKEN)
     menu.overhealing = CreateMenuItem("Overhealing", C.DISPLAY_MODE.OVERHEALING)
-    menu.absorbs = CreateMenuItem("Absorbs", C.DISPLAY_MODE.ABSORBS)
+    menu.absorbs = CreateMenuItem("Absorbs Done", C.DISPLAY_MODE.ABSORBS)
+    menu.absorbsReceived = CreateMenuItem("Absorbs Received", C.DISPLAY_MODE.ABSORBS_DONE)
 
     yOffset = yOffset - 6
     CreateHeader("Utility", "|cff6699ff")
     menu.interrupts = CreateMenuItem("Interrupts", C.DISPLAY_MODE.INTERRUPTS)
     menu.dispels = CreateMenuItem("Dispels", C.DISPLAY_MODE.DISPELS)
     menu.deaths = CreateMenuItem("Deaths", C.DISPLAY_MODE.DEATHS)
+    menu.ccBreaks = CreateMenuItem("CC Breaks", C.DISPLAY_MODE.CC_BREAKS)
+    menu.resurrects = CreateMenuItem("Resurrects", C.DISPLAY_MODE.RESURRECTS)
 
     -- Adjust menu height
     menu:SetHeight(-yOffset + 8)
@@ -817,6 +821,21 @@ function Instance:CalculateTotals(actors, segment, duration)
             total = total + (actor.overhealing or 0)
             if (actor.overhealing or 0) > topValue then topValue = actor.overhealing end
         end
+    elseif self.mode == C.DISPLAY_MODE.FRIENDLY_FIRE then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.friendlyFire or 0)
+            if (actor.friendlyFire or 0) > topValue then topValue = actor.friendlyFire end
+        end
+    elseif self.mode == C.DISPLAY_MODE.ABSORBS_DONE then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.absorbsReceived or 0)
+            if (actor.absorbsReceived or 0) > topValue then topValue = actor.absorbsReceived end
+        end
+    elseif self.mode == C.DISPLAY_MODE.RESURRECTS then
+        for _, actor in ipairs(actors) do
+            total = total + (actor.resurrects or 0)
+            if (actor.resurrects or 0) > topValue then topValue = actor.resurrects end
+        end
     end
 
     if total == 0 then total = 1 end
@@ -871,8 +890,14 @@ function Instance:SetBarData(bar, actor, rank, topValue, duration, total)
         value = actor.dispels or 0
     elseif self.mode == C.DISPLAY_MODE.ABSORBS then
         value = actor.absorbs or 0
+    elseif self.mode == C.DISPLAY_MODE.ABSORBS_DONE then
+        value = actor.absorbsReceived or 0
     elseif self.mode == C.DISPLAY_MODE.OVERHEALING then
         value = actor.overhealing or 0
+    elseif self.mode == C.DISPLAY_MODE.FRIENDLY_FIRE then
+        value = actor.friendlyFire or 0
+    elseif self.mode == C.DISPLAY_MODE.RESURRECTS then
+        value = actor.resurrects or 0
     end
 
     -- Calculate percentage relative to top player (for bar width)
