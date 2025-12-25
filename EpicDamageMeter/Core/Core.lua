@@ -316,13 +316,21 @@ function Core:OnCombatStart()
         self.segmentTimeoutTimer = nil
     end
 
-    -- Check if current segment exists and has data - DON'T reset if recent combat
-    -- This behaves like Recount/Details - data persists across combat sessions
+    -- Check if we should reset on new combat (configurable)
+    local resetPerCombat = self.db and self.db.profile and self.db.profile.combat and self.db.profile.combat.resetOnCombat
     local segment = DB.Data.currentSegment
-    if not segment then
-        -- No segment exists, create one
-        DB:StartNewCurrentSegment()
-        segment = DB.Data.currentSegment
+
+    -- Reset current segment on new combat if setting is enabled
+    -- OR if there's no segment yet
+    -- Overall is never reset here - only by user action
+    if resetPerCombat or not segment then
+        -- Check if enough time has passed since last combat (avoid micro-resets)
+        local timeSinceLastCombat = segment and segment.lastCombatEnd and (GetTime() - segment.lastCombatEnd) or 999
+        if timeSinceLastCombat > 10 or not segment then
+            DB:StartNewCurrentSegment()
+            segment = DB.Data.currentSegment
+            Utils.Debug("Combat started - New current segment created")
+        end
     end
 
     if segment then
@@ -333,7 +341,7 @@ function Core:OnCombatStart()
         end
     end
 
-    Utils.Debug("Combat started - Data preserved")
+    Utils.Debug("Combat started")
 end
 
 -- Combat end
@@ -875,11 +883,17 @@ end
 
 -- Toggle graph
 function Core:ToggleGraph()
-    if EDM.UI and EDM.UI.graphFrame then
-        if EDM.UI.graphFrame:IsShown() then
-            EDM.UI.graphFrame:Hide()
-        else
-            EDM.UI.graphFrame:Show()
+    if EDM.Graph then
+        if not EDM.Graph.frame then
+            EDM.Graph:Initialize(UIParent)
+        end
+        if EDM.Graph.frame then
+            if EDM.Graph.frame:IsShown() then
+                EDM.Graph.frame:Hide()
+            else
+                EDM.Graph.frame:Show()
+                EDM.Graph:Update()
+            end
         end
     end
 end

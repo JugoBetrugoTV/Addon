@@ -737,9 +737,26 @@ function Instance:UpdateBars()
     -- Layout without resetting scroll
     self:LayoutBars()
 
+    -- Get display settings
+    local displayDb = EDM.db and EDM.db.profile.display or {}
+    local showDuration = displayDb.showDuration ~= false
+    local showCurrentDPS = displayDb.showCurrentDPS ~= false
+
     -- Update status bar
-    self.statusBar.time:SetText(Utils.FormatTime(duration))
-    self.statusBar.total:SetText("Total: " .. Utils.FormatNumber(total))
+    if showDuration then
+        self.statusBar.time:SetText(Utils.FormatTime(duration))
+        self.statusBar.time:Show()
+    else
+        self.statusBar.time:Hide()
+    end
+
+    -- Show total with DPS if enabled
+    local totalStr = "Total: " .. Utils.FormatNumber(total)
+    if showCurrentDPS and duration > 0 then
+        local totalPS = total / duration
+        totalStr = totalStr .. " (" .. Utils.FormatNumber(totalPS) .. "/s)"
+    end
+    self.statusBar.total:SetText(totalStr)
 
     self.isUpdating = false
 end
@@ -812,6 +829,18 @@ function Instance:SetBarData(bar, actor, rank, topValue, duration, total)
     bar.actorData = actor
     bar.rank = rank
 
+    -- Get settings
+    local db = EDM.db and EDM.db.profile or {}
+    local barsDb = db.bars or {}
+    local displayDb = db.display or {}
+    local showIcon = barsDb.showIcon ~= false
+    local showValue = barsDb.showValue ~= false
+    local showRank = barsDb.showRank ~= false
+    local showPercent = barsDb.showPercent ~= false
+    local useClassColors = barsDb.useClassColors ~= false
+    local numberFormat = displayDb.numberFormat or "SHORT"
+    local highlightSelf = displayDb.highlightSelf
+
     -- Get value based on mode
     local value = 0
     local perSecond = 0
@@ -853,29 +882,68 @@ function Instance:SetBarData(bar, actor, rank, topValue, duration, total)
     -- Calculate percentage of total (for display)
     local percentOfTotal = total > 0 and ((value / total) * 100) or 0
 
-    -- Set color
+    -- Set color based on class colors setting
     local r, g, b = Utils.GetClassColor(actor.class)
-    bar.statusBar:SetStatusBarColor(r, g, b, 0.9)
+    if useClassColors then
+        bar.statusBar:SetStatusBarColor(r, g, b, 0.9)
+    else
+        -- Use rank-based colors
+        if rank == 1 then
+            bar.statusBar:SetStatusBarColor(1, 0.84, 0, 0.9) -- Gold
+        elseif rank == 2 then
+            bar.statusBar:SetStatusBarColor(0.75, 0.75, 0.75, 0.9) -- Silver
+        elseif rank == 3 then
+            bar.statusBar:SetStatusBarColor(0.80, 0.50, 0.20, 0.9) -- Bronze
+        else
+            bar.statusBar:SetStatusBarColor(0.4, 0.4, 0.5, 0.9) -- Grey
+        end
+    end
 
-    -- Set texts
-    bar.rankText:SetText(rank)
+    -- Highlight self
+    if highlightSelf and actor.name == UnitName("player") then
+        bar.bg:SetColorTexture(0.15, 0.25, 0.35, 0.9)
+    else
+        bar.bg:SetColorTexture(0.02, 0.02, 0.02, 0.85)
+    end
+
+    -- Set rank text (respect showRank setting)
+    if showRank then
+        bar.rankText:SetText(rank)
+        bar.rankText:Show()
+    else
+        bar.rankText:SetText("")
+        bar.rankText:Hide()
+    end
 
     -- Name with class color
     local nameColor = string.format("|cff%02x%02x%02x", r*255, g*255, b*255)
     bar.nameText:SetText(nameColor .. (actor.name or "Unknown") .. "|r")
 
-    -- Value text with percentage
+    -- Value text (respect showValue and showPercent settings)
     local displayValue = (self.mode == C.DISPLAY_MODE.DPS or self.mode == C.DISPLAY_MODE.HPS) and perSecond or value
-    if self.mode == C.DISPLAY_MODE.DEATHS or self.mode == C.DISPLAY_MODE.INTERRUPTS or
-       self.mode == C.DISPLAY_MODE.DISPELS or self.mode == C.DISPLAY_MODE.CC_BREAKS then
-        bar.valueText:SetText(string.format("%d (%.1f%%)", value, percentOfTotal))
-    else
-        bar.valueText:SetText(string.format("%s (%.1f%%)", Utils.FormatNumber(displayValue), percentOfTotal))
+    local valueStr = ""
+    if showValue then
+        if self.mode == C.DISPLAY_MODE.DEATHS or self.mode == C.DISPLAY_MODE.INTERRUPTS or
+           self.mode == C.DISPLAY_MODE.DISPELS or self.mode == C.DISPLAY_MODE.CC_BREAKS then
+            valueStr = string.format("%d", value)
+        else
+            valueStr = Utils.FormatNumber(displayValue, numberFormat)
+        end
     end
+    if showPercent then
+        if valueStr ~= "" then
+            valueStr = valueStr .. string.format(" (%.1f%%)", percentOfTotal)
+        else
+            valueStr = string.format("%.1f%%", percentOfTotal)
+        end
+    end
+    bar.valueText:SetText(valueStr)
+    bar.valueText:SetShown(showValue or showPercent)
 
-    -- Icon - use class icon
+    -- Icon - use class icon (respect showIcon setting)
     local icon = actor.class and ("Interface\\Icons\\ClassIcon_" .. actor.class) or "Interface\\Icons\\INV_Misc_QuestionMark"
     bar.icon:SetTexture(icon)
+    bar.icon:SetShown(showIcon)
 end
 
 function Instance:LayoutBars()
@@ -1178,10 +1246,14 @@ function UI:ApplySettings()
         Skins:Initialize()
     end
 
-    -- Get skin and bar settings
+    -- Get profile settings
+    local profile = EDM.db and EDM.db.profile or {}
+    local windowDb = profile.window or {}
+    local barsDb = profile.bars or {}
+
+    -- Get skin settings
     local skin = Skins and Skins:Get() or nil
     local barSettings = skin and skin.bar or {}
-    local db = EDM.db and EDM.db.profile.bars or {}
 
     -- Get bar texture from skin
     local barTexture = "Interface\\TargetingFrame\\UI-StatusBar"
@@ -1193,42 +1265,79 @@ function UI:ApplySettings()
         end
     end
 
-    -- Update bar pool with skin settings
+    -- Get font settings
+    local fontName = barsDb.font or "Friz Quadrata TT"
+    local fontPaths = {
+        ["Friz Quadrata TT"] = "Fonts\\FRIZQT__.TTF",
+        ["Arial Narrow"] = "Fonts\\ARIALN.TTF",
+        ["Morpheus"] = "Fonts\\MORPHEUS.TTF",
+        ["Skurri"] = "Fonts\\SKURRI.TTF",
+        ["2002"] = "Fonts\\2002.TTF",
+        ["2002 Bold"] = "Fonts\\2002B.TTF",
+    }
+    local fontPath = fontPaths[fontName] or "Fonts\\FRIZQT__.TTF"
+    local fontSize = barsDb.fontSize or 11
+    local fontFlags = barsDb.fontFlags or "OUTLINE"
+    local barHeight = barsDb.height or 18
+
+    -- Update bar pool with settings
     for _, bar in ipairs(self.barPool) do
         bar.statusBar:SetStatusBarTexture(barTexture)
-        bar:SetHeight(barSettings.height or db.height or 18)
-        bar.icon:SetSize((barSettings.iconSize or db.height or 18) - 2, (barSettings.iconSize or db.height or 18) - 2)
+        bar:SetHeight(barHeight)
+        bar.icon:SetSize(barHeight - 2, barHeight - 2)
+        bar.icon:SetShown(barsDb.showIcon ~= false)
 
         -- Apply font settings
-        if barSettings.font then
-            bar.nameText:SetFont(barSettings.font, barSettings.fontSize or 11, barSettings.fontFlags or "OUTLINE")
-            bar.valueText:SetFont(barSettings.font, barSettings.fontSize or 10, barSettings.fontFlags or "OUTLINE")
-            bar.rankText:SetFont(barSettings.rankFont or barSettings.font, barSettings.rankFontSize or 9, barSettings.fontFlags or "OUTLINE")
-        end
-
-        -- Apply background color
-        if barSettings.backgroundColor then
-            bar.bg:SetColorTexture(
-                barSettings.backgroundColor.r,
-                barSettings.backgroundColor.g,
-                barSettings.backgroundColor.b,
-                barSettings.backgroundColor.a or 0.7
-            )
-        end
+        bar.nameText:SetFont(fontPath, fontSize, fontFlags)
+        bar.valueText:SetFont(fontPath, fontSize - 1, fontFlags)
+        bar.rankText:SetFont(fontPath, fontSize - 2, fontFlags)
+        bar.rankText:SetShown(barsDb.showRank ~= false)
     end
 
-    -- Apply skin to all instances
+    -- Apply settings to all instances
     for _, instance in pairs(self.instances) do
+        -- Apply window background color from profile
+        local bgColor = windowDb.backgroundColor or {r = 0.05, g = 0.05, b = 0.08, a = 0.92}
+        local borderColor = windowDb.borderColor or {r = 0.15, g = 0.15, b = 0.2, a = 1}
+        local showBackground = windowDb.showBackground ~= false
+
+        if showBackground then
+            instance.frame:SetBackdropColor(bgColor.r or 0.05, bgColor.g or 0.05, bgColor.b or 0.08, bgColor.a or 0.92)
+        else
+            instance.frame:SetBackdropColor(0, 0, 0, 0)
+        end
+        instance.frame:SetBackdropBorderColor(borderColor.r or 0.15, borderColor.g or 0.15, borderColor.b or 0.2, borderColor.a or 1)
+
+        -- Apply window size settings
+        if windowDb.width and windowDb.height then
+            instance.frame:SetSize(windowDb.width, windowDb.height)
+        end
+        if windowDb.scale then
+            instance.frame:SetScale(windowDb.scale)
+        end
+        if windowDb.opacity then
+            instance.frame:SetAlpha(windowDb.opacity)
+        end
+
+        -- Apply title bar visibility
+        if instance.titleBar then
+            instance.titleBar:SetShown(windowDb.showTitle ~= false)
+        end
+
+        -- Apply skin overrides if available
         if skin and skin.window then
             local w = skin.window
-            instance.frame:SetBackdropColor(w.backgroundColor.r, w.backgroundColor.g, w.backgroundColor.b, w.backgroundColor.a)
+            if showBackground then
+                instance.frame:SetBackdropColor(w.backgroundColor.r, w.backgroundColor.g, w.backgroundColor.b, w.backgroundColor.a)
+            end
             instance.frame:SetBackdropBorderColor(w.borderColor.r, w.borderColor.g, w.borderColor.b, w.borderColor.a)
         end
         if skin and skin.titleBar then
             local tb = skin.titleBar
             instance.titleBar.bg:SetColorTexture(tb.backgroundColor.r, tb.backgroundColor.g, tb.backgroundColor.b, tb.backgroundColor.a)
-            instance.titleText:SetFont(tb.font or "Fonts\\FRIZQT__.TTF", tb.fontSize or 11, tb.fontFlags or "OUTLINE")
+            instance.titleText:SetFont(tb.font or fontPath, tb.fontSize or 11, tb.fontFlags or fontFlags)
         end
+
         instance:UpdateLayout()
     end
 end

@@ -790,6 +790,9 @@ function Config:BuildGeneralTab()
         function(v) EDM.db.profile.combat.mergePlayerPets = v end)
 
     y = y + self:CreateSectionHeader(y, "Combat Settings")
+    y = y + self:CreateToggleRow(y, "Reset on New Combat", "Clear current segment when new combat starts",
+        function() return EDM.db.profile.combat.resetOnCombat end,
+        function(v) EDM.db.profile.combat.resetOnCombat = v end)
     y = y + self:CreateToggleRow(y, "Auto New Segment", "Create new segment after combat ends",
         function() return EDM.db.profile.combat.autoReset end,
         function(v) EDM.db.profile.combat.autoReset = v end)
@@ -932,7 +935,7 @@ end
 function Config:BuildBarsTab()
     local y = 0
 
-    -- Helper function to apply bar settings
+    -- Helper function to apply bar settings to ALL bar pools
     local function ApplyBarSettings()
         -- Get font path from selection
         local fontName = EDM.db.profile.bars.font or "Friz Quadrata TT"
@@ -948,31 +951,58 @@ function Config:BuildBarsTab()
         local fontSize = EDM.db.profile.bars.fontSize or 11
         local barHeight = EDM.db.profile.bars.height or 18
         local fontFlags = EDM.db.profile.bars.fontFlags or "OUTLINE"
+        local showIcon = EDM.db.profile.bars.showIcon ~= false
+        local showValue = EDM.db.profile.bars.showValue ~= false
+        local showRank = EDM.db.profile.bars.showRank ~= false
+        local showPercent = EDM.db.profile.bars.showPercent ~= false
 
-        -- Apply to Bars pool
+        -- Apply to UI bar pool (MainFrame)
+        if EDM.UI and EDM.UI.barPool then
+            for _, bar in ipairs(EDM.UI.barPool) do
+                bar:SetHeight(barHeight)
+                if bar.icon then
+                    bar.icon:SetSize(barHeight - 2, barHeight - 2)
+                    bar.icon:SetShown(showIcon)
+                end
+                if bar.nameText then
+                    bar.nameText:SetFont(fontPath, fontSize, fontFlags)
+                end
+                if bar.valueText then
+                    bar.valueText:SetFont(fontPath, fontSize - 1, fontFlags)
+                    bar.valueText:SetShown(showValue)
+                end
+                if bar.rankText then
+                    bar.rankText:SetFont(fontPath, fontSize - 2, fontFlags)
+                    bar.rankText:SetShown(showRank)
+                end
+            end
+        end
+
+        -- Apply to Bars module pool (legacy)
         if EDM.Bars and EDM.Bars.pool then
             for _, bar in pairs(EDM.Bars.pool) do
                 bar:SetHeight(barHeight)
                 if bar.icon then
                     bar.icon:SetSize(barHeight - 2, barHeight - 2)
-                    bar.icon:SetShown(EDM.db.profile.bars.showIcon ~= false)
+                    bar.icon:SetShown(showIcon)
                 end
                 if bar.name then
                     bar.name:SetFont(fontPath, fontSize, fontFlags)
                 end
                 if bar.value then
                     bar.value:SetFont(fontPath, fontSize - 1, fontFlags)
-                    bar.value:SetShown(EDM.db.profile.bars.showValue ~= false)
+                    bar.value:SetShown(showValue)
                 end
                 if bar.rank then
                     bar.rank:SetFont(fontPath, fontSize - 2, fontFlags)
-                    bar.rank:SetShown(EDM.db.profile.bars.showRank ~= false)
+                    bar.rank:SetShown(showRank)
                 end
                 if bar.percent then
-                    bar.percent:SetShown(EDM.db.profile.bars.showPercent ~= false)
+                    bar.percent:SetShown(showPercent)
                 end
             end
         end
+
         -- Refresh all instances
         if EDM.UI then EDM.UI:Refresh() end
     end
@@ -1078,7 +1108,7 @@ function Config:BuildDisplayTab()
 
     -- Toggle Graph button
     local graphBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
-    graphBtn:SetSize(100, 28)
+    graphBtn:SetSize(120, 28)
     graphBtn:SetPoint("LEFT", 10, 0)
     graphBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
     graphBtn:SetBackdropColor(0.2, 0.4, 0.6, 0.8)
@@ -1089,33 +1119,28 @@ function Config:BuildDisplayTab()
     graphBtn.text:SetText("Toggle Graph")
     graphBtn.text:SetTextColor(1, 1, 1, 1)
     graphBtn:SetScript("OnClick", function()
-        if EDM.Core then EDM.Core:ToggleGraph() end
+        -- Direct toggle using the Graph module
+        if EDM.Graph then
+            if not EDM.Graph.frame then
+                EDM.Graph:Initialize(UIParent)
+            end
+            if EDM.Graph.frame then
+                if EDM.Graph.frame:IsShown() then
+                    EDM.Graph.frame:Hide()
+                else
+                    EDM.Graph.frame:Show()
+                    EDM.Graph:Update()
+                end
+            end
+        end
     end)
     graphBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.3, 0.5, 0.7, 1) end)
     graphBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.2, 0.4, 0.6, 0.8) end)
 
-    -- Report button
-    local reportBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
-    reportBtn:SetSize(100, 28)
-    reportBtn:SetPoint("LEFT", graphBtn, "RIGHT", 10, 0)
-    reportBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
-    reportBtn:SetBackdropColor(0.5, 0.4, 0.2, 0.8)
-    reportBtn:SetBackdropBorderColor(0.7, 0.6, 0.3, 1)
-    reportBtn.text = reportBtn:CreateFontString(nil, "OVERLAY")
-    reportBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-    reportBtn.text:SetPoint("CENTER")
-    reportBtn.text:SetText("Report Menu")
-    reportBtn.text:SetTextColor(1, 1, 1, 1)
-    reportBtn:SetScript("OnClick", function()
-        if EDM.Core then EDM.Core:ShowReportMenu(reportBtn) end
-    end)
-    reportBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.6, 0.5, 0.3, 1) end)
-    reportBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.5, 0.4, 0.2, 0.8) end)
-
     -- New Window button
     local newWinBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
-    newWinBtn:SetSize(100, 28)
-    newWinBtn:SetPoint("LEFT", reportBtn, "RIGHT", 10, 0)
+    newWinBtn:SetSize(120, 28)
+    newWinBtn:SetPoint("LEFT", graphBtn, "RIGHT", 10, 0)
     newWinBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
     newWinBtn:SetBackdropColor(0.3, 0.5, 0.3, 0.8)
     newWinBtn:SetBackdropBorderColor(0.4, 0.7, 0.4, 1)
@@ -1125,23 +1150,45 @@ function Config:BuildDisplayTab()
     newWinBtn.text:SetText("New Window")
     newWinBtn.text:SetTextColor(1, 1, 1, 1)
     newWinBtn:SetScript("OnClick", function()
-        if EDM.Core then EDM.Core:CreateNewWindow() end
+        if EDM.UI then EDM.UI:CreateNewInstance() end
     end)
     newWinBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.4, 0.6, 0.4, 1) end)
     newWinBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.3, 0.5, 0.3, 0.8) end)
 
+    -- Reset Current button
+    local resetCurBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
+    resetCurBtn:SetSize(120, 28)
+    resetCurBtn:SetPoint("LEFT", newWinBtn, "RIGHT", 10, 0)
+    resetCurBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    resetCurBtn:SetBackdropColor(0.5, 0.3, 0.2, 0.8)
+    resetCurBtn:SetBackdropBorderColor(0.7, 0.4, 0.3, 1)
+    resetCurBtn.text = resetCurBtn:CreateFontString(nil, "OVERLAY")
+    resetCurBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    resetCurBtn.text:SetPoint("CENTER")
+    resetCurBtn.text:SetText("Reset Current")
+    resetCurBtn.text:SetTextColor(1, 1, 1, 1)
+    resetCurBtn:SetScript("OnClick", function()
+        if EDM.Database then
+            EDM.Database:StartNewCurrentSegment()
+            if EDM.UI then EDM.UI:Refresh() end
+            print("|cff00ff00EpicDamageMeter:|r Current segment reset!")
+        end
+    end)
+    resetCurBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.6, 0.4, 0.3, 1) end)
+    resetCurBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.5, 0.3, 0.2, 0.8) end)
+
     y = y + 45
 
     y = y + self:CreateSectionHeader(y, "Performance Overlay")
-    y = y + self:CreateToggleRow(y, "Show Current DPS", "Display live DPS in title bar",
+    y = y + self:CreateToggleRow(y, "Show Current DPS", "Display live DPS in status bar",
         function() return EDM.db.profile.display.showCurrentDPS ~= false end,
-        function(v) EDM.db.profile.display.showCurrentDPS = v end)
-    y = y + self:CreateToggleRow(y, "Show Fight Duration", "Display combat time in title bar",
+        function(v) EDM.db.profile.display.showCurrentDPS = v; if EDM.UI then EDM.UI:Refresh() end end)
+    y = y + self:CreateToggleRow(y, "Show Fight Duration", "Display combat time in status bar",
         function() return EDM.db.profile.display.showDuration ~= false end,
-        function(v) EDM.db.profile.display.showDuration = v end)
-    y = y + self:CreateToggleRow(y, "Highlight Self", "Highlight your own bar",
+        function(v) EDM.db.profile.display.showDuration = v; if EDM.UI then EDM.UI:Refresh() end end)
+    y = y + self:CreateToggleRow(y, "Highlight Self", "Highlight your own bar with different color",
         function() return EDM.db.profile.display.highlightSelf end,
-        function(v) EDM.db.profile.display.highlightSelf = v end)
+        function(v) EDM.db.profile.display.highlightSelf = v; if EDM.UI then EDM.UI:Refresh() end end)
 
     self.quickPanel.scrollChild:SetHeight(y + 30)
 end

@@ -12,7 +12,7 @@ local C = EDM.Constants
 -- Addon Info
 C.ADDON_NAME = "EpicDamageMeter"
 C.ADDON_SHORT = "EDM"
-C.VERSION = "1.0.6"
+C.VERSION = "1.0.7"
 C.INTERFACE_VERSION = 110207
 
 -- Display Modes (Extended like Details!)
@@ -264,6 +264,7 @@ C.DEFAULT_SETTINGS = {
         -- Combat
         combat = {
             autoReset = false,             -- Don't auto-reset on combat end (like Recount/Details)
+            resetOnCombat = true,          -- Reset current segment when new combat starts
             maxSegments = 10,
             mergePlayerPets = true,
             showOnlyBosses = false,
@@ -279,6 +280,9 @@ C.DEFAULT_SETTINGS = {
             numberFormat = "SHORT", -- SHORT, FULL, COMMA
             refreshRate = 0.5,
             maxBars = 20,
+            showCurrentDPS = true,         -- Show current DPS in status bar
+            showDuration = true,           -- Show fight duration
+            highlightSelf = true,          -- Highlight player's own bar
         },
 
         -- Sounds

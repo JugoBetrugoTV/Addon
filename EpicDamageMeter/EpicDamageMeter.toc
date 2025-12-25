@@ -3,7 +3,7 @@
 ## Notes: A beautiful, feature-rich damage meter with stunning visuals, real-time graphs, and custom UI
 ## Notes-deDE: Ein wunderschöner, funktionsreicher Damage Meter mit atemberaubenden Grafiken, Echtzeit-Graphen und benutzerdefinierter UI
 ## Author: EpicDamageMeter Team
-## Version: 1.0.0
+## Version: 1.0.7
 ## SavedVariables: EpicDamageMeterDB
 ## SavedVariablesPerCharacter: EpicDamageMeterCharDB
 ## IconTexture: Interface\AddOns\EpicDamageMeter\Textures\icon
