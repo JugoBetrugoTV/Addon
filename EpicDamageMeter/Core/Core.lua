@@ -310,6 +310,9 @@ function Core:OnCombatStart()
     self.inCombat = true
     self.combatStartTime = GetTime()
 
+    -- Handle visibility settings (Details!/Recount-style)
+    self:UpdateVisibility(true)
+
     -- Cancel any pending segment timeout
     if self.segmentTimeoutTimer then
         self:CancelTimer(self.segmentTimeoutTimer)
@@ -351,6 +354,9 @@ function Core:OnCombatEnd()
     self.inCombat = false
     local combatDuration = GetTime() - (self.combatStartTime or GetTime())
 
+    -- Handle visibility settings (Details!/Recount-style)
+    self:UpdateVisibility(false)
+
     local segment = DB.Data.currentSegment
     if segment then
         segment.inCombat = false
@@ -366,6 +372,79 @@ function Core:OnCombatEnd()
     end
 
     Utils.Debug("Combat ended, session duration:", combatDuration, "total:", segment and segment.duration or 0)
+end
+
+-- Update window visibility based on settings (Details!/Recount-style)
+function Core:UpdateVisibility(inCombat)
+    if not EDM.UI or not EDM.UI.mainFrame then return end
+
+    local vis = self.db and self.db.profile and self.db.profile.visibility
+    if not vis then return end
+
+    local frame = EDM.UI.mainFrame
+
+    -- Check visibility conditions
+    local shouldShow = true
+
+    -- Show only in group check
+    if vis.showOnlyInGroup and not IsInGroup() then
+        shouldShow = false
+    end
+
+    -- Show only in instance check
+    if vis.showOnlyInInstance then
+        local inInstance = IsInInstance()
+        if not inInstance then
+            shouldShow = false
+        end
+    end
+
+    -- Hide in PvP check
+    if vis.hideInPvP then
+        local instanceType = select(2, IsInInstance())
+        if instanceType == "pvp" or instanceType == "arena" then
+            shouldShow = false
+        end
+    end
+
+    -- Apply visibility
+    if not shouldShow then
+        frame:Hide()
+        return
+    end
+
+    -- Auto-show on combat
+    if inCombat and vis.autoShow then
+        frame:Show()
+        -- Restore full opacity
+        local opacity = self.db.profile.window.opacity or 1
+        frame:SetAlpha(opacity)
+    end
+
+    -- Auto-hide on leaving combat
+    if not inCombat and vis.autoHide then
+        -- Delay the hide slightly to let players see final results
+        C_Timer.After(3, function()
+            if not self.inCombat and frame:IsShown() then
+                frame:Hide()
+            end
+        end)
+    end
+
+    -- Fade out of combat
+    if not inCombat and vis.fadeOutOfCombat and frame:IsShown() then
+        local fadeOpacity = vis.fadeOpacity or 0.5
+        frame:SetAlpha(fadeOpacity)
+    elseif inCombat and frame:IsShown() then
+        -- Restore full opacity in combat
+        local opacity = self.db.profile.window.opacity or 1
+        frame:SetAlpha(opacity)
+    end
+end
+
+-- Check visibility conditions (for group/instance changes)
+function Core:CheckVisibilityConditions()
+    self:UpdateVisibility(self.inCombat)
 end
 
 -- Check if group/instance changed (should reset overall)
@@ -454,6 +533,7 @@ function Core:OnZoneChanged()
     -- Check if we should auto-reset for new instance
     C_Timer.After(1, function()
         self:CheckGroupChange()
+        self:CheckVisibilityConditions()
     end)
 end
 
@@ -488,6 +568,7 @@ function Core:OnGroupRosterUpdate()
     -- Check for group changes
     C_Timer.After(0.5, function()
         self:CheckGroupChange()
+        self:CheckVisibilityConditions()
     end)
 end
 

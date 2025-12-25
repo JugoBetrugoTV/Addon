@@ -12,7 +12,7 @@ local C = EDM.Constants
 -- Addon Info
 C.ADDON_NAME = "EpicDamageMeter"
 C.ADDON_SHORT = "EDM"
-C.VERSION = "1.0.7"
+C.VERSION = "1.0.8"
 C.INTERFACE_VERSION = 110207
 
 -- Display Modes (Extended like Details!)
@@ -246,6 +246,31 @@ C.DEFAULT_SETTINGS = {
             textColor = { r = 1, g = 1, b = 1, a = 1 },
             animation = true,
             animationSpeed = 0.3,
+            -- Details!/Recount-style options
+            showSpecIcon = true,           -- Show specialization icon instead of class
+            showRPS = false,               -- Show R-PS (resource per second)
+            showTotalAndPS = false,        -- Show both total and per-second value
+            clickToDetails = true,         -- Click bar to open details window
+            rightClickMenu = true,         -- Right-click for context menu
+            flashOnCrit = false,           -- Flash bar on critical hit
+            myBarFirst = false,            -- Always show player's bar at top
+        },
+
+        -- Death Log (Recount-style)
+        deathLog = {
+            enabled = true,
+            maxEntries = 20,               -- Max entries per death
+            trackTime = 10,                -- Seconds before death to track
+            showAbsorbs = true,            -- Show absorb amounts
+            showOverkill = true,           -- Show overkill damage
+        },
+
+        -- Aura Tracking (Details!-style)
+        auras = {
+            trackBuffs = true,             -- Track buff uptimes
+            trackDebuffs = true,           -- Track debuff applications
+            onlyMine = true,               -- Only track player's auras
+            showUptime = true,             -- Show uptime percentages
         },
 
         -- Graph
@@ -283,6 +308,19 @@ C.DEFAULT_SETTINGS = {
             showCurrentDPS = true,         -- Show current DPS in status bar
             showDuration = true,           -- Show fight duration
             highlightSelf = true,          -- Highlight player's own bar
+            colorBySchool = false,         -- Color bars by spell school instead of class
+            realTimeMode = true,           -- Real-time updates vs segment-only
+        },
+
+        -- Visibility (Details!/Recount-style)
+        visibility = {
+            autoHide = false,              -- Auto-hide when leaving combat
+            autoShow = false,              -- Auto-show when entering combat
+            showOnlyInGroup = false,       -- Only show when in party/raid
+            showOnlyInInstance = false,    -- Only show in dungeons/raids
+            hideInPvP = false,             -- Hide in battlegrounds/arenas
+            fadeOutOfCombat = false,       -- Fade window when out of combat
+            fadeOpacity = 0.5,             -- Opacity when faded
         },
 
         -- Sounds

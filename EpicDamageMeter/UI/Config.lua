@@ -213,18 +213,19 @@ function Config:CreateQuickPanel()
     panel.tabFrame.bg:SetAllPoints()
     panel.tabFrame.bg:SetColorTexture(0.04, 0.06, 0.1, 0.95)
 
-    local tabNames = {"General", "Window", "Bars", "Display", "Credits"}
+    local tabNames = {"General", "Window", "Bars", "Display", "Segments", "Credits"}
     local tabIcons = {
         "Interface\\Icons\\Spell_Holy_MagicalSentry",
         "Interface\\Icons\\INV_Misc_EngGizmos_30",
         "Interface\\Icons\\Ability_Warrior_BloodFrenzy",
         "Interface\\Icons\\INV_Misc_Spyglass_03",
+        "Interface\\Icons\\INV_Misc_Map_01",
         "Interface\\Icons\\INV_Misc_Note_01"
     }
     panel.tabs = {}
     panel.selectedTab = 1
 
-    local tabWidth = 95
+    local tabWidth = 78
     for i, name in ipairs(tabNames) do
         local tab = CreateFrame("Button", nil, panel.tabFrame, "BackdropTemplate")
         tab:SetSize(tabWidth, 32)
@@ -298,7 +299,7 @@ function Config:CreateQuickPanel()
     panel.bottomBar.version:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
     panel.bottomBar.version:SetPoint("LEFT", 10, 0)
     panel.bottomBar.version:SetTextColor(0.5, 0.5, 0.6, 1)
-    panel.bottomBar.version:SetText("EpicDamageMeter v1.0.7 | Interface 110207")
+    panel.bottomBar.version:SetText("EpicDamageMeter v1.0.8 | Interface 110207")
 
     -- Save & Reload button
     panel.bottomBar.saveBtn = CreateFrame("Button", nil, panel.bottomBar, "BackdropTemplate")
@@ -416,6 +417,8 @@ function Config:SelectTab(index)
     elseif index == 4 then
         self:BuildDisplayTab()
     elseif index == 5 then
+        self:BuildSegmentsTab()
+    elseif index == 6 then
         self:BuildCreditsTab()
     end
 
@@ -830,6 +833,43 @@ function Config:BuildGeneralTab()
         function() return EDM.db.profile.combat.combatTimeout or 3 end,
         function(v) EDM.db.profile.combat.combatTimeout = v end, 1, 10, 1, "s")
 
+    y = y + self:CreateSectionHeader(y, "Visibility (Details!/Recount-style)")
+
+    -- Ensure visibility settings exist
+    if not EDM.db.profile.visibility then
+        EDM.db.profile.visibility = {
+            autoHide = false,
+            autoShow = false,
+            showOnlyInGroup = false,
+            showOnlyInInstance = false,
+            hideInPvP = false,
+            fadeOutOfCombat = false,
+            fadeOpacity = 0.5,
+        }
+    end
+
+    y = y + self:CreateToggleRow(y, "Auto-Show in Combat", "Automatically show window when entering combat",
+        function() return EDM.db.profile.visibility.autoShow end,
+        function(v) EDM.db.profile.visibility.autoShow = v end)
+    y = y + self:CreateToggleRow(y, "Auto-Hide out of Combat", "Automatically hide window when leaving combat",
+        function() return EDM.db.profile.visibility.autoHide end,
+        function(v) EDM.db.profile.visibility.autoHide = v end)
+    y = y + self:CreateToggleRow(y, "Show Only in Group", "Only display when in a party or raid",
+        function() return EDM.db.profile.visibility.showOnlyInGroup end,
+        function(v) EDM.db.profile.visibility.showOnlyInGroup = v end)
+    y = y + self:CreateToggleRow(y, "Show Only in Instance", "Only display in dungeons and raids",
+        function() return EDM.db.profile.visibility.showOnlyInInstance end,
+        function(v) EDM.db.profile.visibility.showOnlyInInstance = v end)
+    y = y + self:CreateToggleRow(y, "Hide in PvP", "Hide in battlegrounds and arenas",
+        function() return EDM.db.profile.visibility.hideInPvP end,
+        function(v) EDM.db.profile.visibility.hideInPvP = v end)
+    y = y + self:CreateToggleRow(y, "Fade out of Combat", "Reduce opacity when not in combat",
+        function() return EDM.db.profile.visibility.fadeOutOfCombat end,
+        function(v) EDM.db.profile.visibility.fadeOutOfCombat = v end)
+    y = y + self:CreateSliderRow(y, "Fade Opacity", "Opacity when faded out of combat",
+        function() return EDM.db.profile.visibility.fadeOpacity or 0.5 end,
+        function(v) EDM.db.profile.visibility.fadeOpacity = v end, 0.1, 1.0, 0.1, "")
+
     y = y + self:CreateSectionHeader(y, "Theme / Skin")
     local skinOptions = {}
     if EDM.Skins then
@@ -1034,6 +1074,56 @@ function Config:BuildBarsTab()
         function() return EDM.db.profile.bars.spacing end,
         function(v) EDM.db.profile.bars.spacing = v; ApplyBarSettings() end, 0, 5, 1, "px")
 
+    y = y + self:CreateSectionHeader(y, "Bar Texture (Details!-style)")
+    -- Build texture options from LibSharedMedia
+    local textureOptions = {}
+    local LSM = LibStub("LibSharedMedia-3.0", true)
+    if LSM then
+        local textures = LSM:List("statusbar")
+        if textures then
+            for _, texName in ipairs(textures) do
+                textureOptions[texName] = texName
+            end
+        end
+    end
+    -- Fallback textures
+    if not next(textureOptions) then
+        textureOptions = {
+            Modern = "Modern",
+            Smooth = "Smooth",
+            Gradient = "Gradient",
+            Glossy = "Glossy",
+            Flat = "Flat",
+            Blizzard = "Blizzard",
+            Solid = "Solid",
+        }
+    end
+    y = y + self:CreateDropdownRow(y, "Bar Texture", "Choose the status bar texture",
+        function() return EDM.db.profile.bars.texture or "Modern" end,
+        function(v)
+            EDM.db.profile.bars.texture = v
+            -- Apply texture to all bars
+            local texturePath = nil
+            if LSM then
+                texturePath = LSM:Fetch("statusbar", v)
+            end
+            if EDM.UI and EDM.UI.barPool then
+                for _, bar in ipairs(EDM.UI.barPool) do
+                    if bar.SetStatusBarTexture and texturePath then
+                        bar:SetStatusBarTexture(texturePath)
+                    end
+                end
+            end
+            if EDM.Bars and EDM.Bars.pool then
+                for _, bar in pairs(EDM.Bars.pool) do
+                    if bar.SetStatusBarTexture and texturePath then
+                        bar:SetStatusBarTexture(texturePath)
+                    end
+                end
+            end
+            if EDM.UI then EDM.UI:Refresh() end
+        end, textureOptions)
+
     y = y + self:CreateSectionHeader(y, "Bar Display")
     y = y + self:CreateToggleRow(y, "Use Class Colors", "Color bars by player class",
         function() return EDM.db.profile.bars.useClassColors end,
@@ -1089,6 +1179,26 @@ function Config:BuildBarsTab()
     y = y + self:CreateSliderRow(y, "Animation Speed", "How fast bars animate",
         function() return EDM.db.profile.bars.animationSpeed end,
         function(v) EDM.db.profile.bars.animationSpeed = v end, 0.1, 1.0, 0.05, "")
+
+    y = y + self:CreateSectionHeader(y, "Advanced Bar Options (Details!/Recount)")
+    y = y + self:CreateToggleRow(y, "Click for Details", "Left-click bars to open detailed breakdown",
+        function() return EDM.db.profile.bars.clickToDetails ~= false end,
+        function(v) EDM.db.profile.bars.clickToDetails = v end)
+    y = y + self:CreateToggleRow(y, "Right-Click Menu", "Enable right-click context menu on bars",
+        function() return EDM.db.profile.bars.rightClickMenu ~= false end,
+        function(v) EDM.db.profile.bars.rightClickMenu = v end)
+    y = y + self:CreateToggleRow(y, "Show Spec Icon", "Show specialization icon instead of class icon",
+        function() return EDM.db.profile.bars.showSpecIcon end,
+        function(v) EDM.db.profile.bars.showSpecIcon = v; ApplyBarSettings() end)
+    y = y + self:CreateToggleRow(y, "Show Total + PS", "Display both total value and per-second value",
+        function() return EDM.db.profile.bars.showTotalAndPS end,
+        function(v) EDM.db.profile.bars.showTotalAndPS = v; if EDM.UI then EDM.UI:Refresh() end end)
+    y = y + self:CreateToggleRow(y, "My Bar Always First", "Always display player's bar at the top",
+        function() return EDM.db.profile.bars.myBarFirst end,
+        function(v) EDM.db.profile.bars.myBarFirst = v; if EDM.UI then EDM.UI:Refresh() end end)
+    y = y + self:CreateToggleRow(y, "Flash on Critical", "Flash bar briefly on critical hits",
+        function() return EDM.db.profile.bars.flashOnCrit end,
+        function(v) EDM.db.profile.bars.flashOnCrit = v end)
 
     self.quickPanel.scrollChild:SetHeight(y + 30)
 end
@@ -1222,7 +1332,326 @@ function Config:BuildDisplayTab()
         function() return EDM.db.profile.display.highlightSelf end,
         function(v) EDM.db.profile.display.highlightSelf = v; if EDM.UI then EDM.UI:Refresh() end end)
 
+    y = y + self:CreateSectionHeader(y, "Color Options (Details!-style)")
+    y = y + self:CreateToggleRow(y, "Color by Spell School", "Color abilities by damage type (Fire, Frost, etc.)",
+        function() return EDM.db.profile.display.colorBySchool end,
+        function(v) EDM.db.profile.display.colorBySchool = v; if EDM.UI then EDM.UI:Refresh() end end)
+    y = y + self:CreateToggleRow(y, "Real-Time Mode", "Update bars in real-time during combat",
+        function() return EDM.db.profile.display.realTimeMode ~= false end,
+        function(v) EDM.db.profile.display.realTimeMode = v end)
+
+    y = y + self:CreateSectionHeader(y, "Death Log (Recount-style)")
+
+    -- Ensure death log settings exist
+    if not EDM.db.profile.deathLog then
+        EDM.db.profile.deathLog = {
+            enabled = true,
+            maxEntries = 20,
+            trackTime = 10,
+            showAbsorbs = true,
+            showOverkill = true,
+        }
+    end
+
+    y = y + self:CreateToggleRow(y, "Enable Death Log", "Track detailed death information",
+        function() return EDM.db.profile.deathLog.enabled ~= false end,
+        function(v) EDM.db.profile.deathLog.enabled = v end)
+    y = y + self:CreateSliderRow(y, "Track Time (seconds)", "Seconds before death to track damage",
+        function() return EDM.db.profile.deathLog.trackTime or 10 end,
+        function(v) EDM.db.profile.deathLog.trackTime = v end, 5, 30, 1, "s")
+    y = y + self:CreateSliderRow(y, "Max Log Entries", "Maximum damage entries per death",
+        function() return EDM.db.profile.deathLog.maxEntries or 20 end,
+        function(v) EDM.db.profile.deathLog.maxEntries = v end, 5, 50, 5, "")
+    y = y + self:CreateToggleRow(y, "Show Absorbs", "Display absorbed damage in death log",
+        function() return EDM.db.profile.deathLog.showAbsorbs ~= false end,
+        function(v) EDM.db.profile.deathLog.showAbsorbs = v end)
+    y = y + self:CreateToggleRow(y, "Show Overkill", "Display overkill damage amount",
+        function() return EDM.db.profile.deathLog.showOverkill ~= false end,
+        function(v) EDM.db.profile.deathLog.showOverkill = v end)
+
+    y = y + self:CreateSectionHeader(y, "Aura Tracking (Details!-style)")
+
+    -- Ensure aura settings exist
+    if not EDM.db.profile.auras then
+        EDM.db.profile.auras = {
+            trackBuffs = true,
+            trackDebuffs = true,
+            onlyMine = true,
+            showUptime = true,
+        }
+    end
+
+    y = y + self:CreateToggleRow(y, "Track Buff Uptime", "Track how long buffs are active",
+        function() return EDM.db.profile.auras.trackBuffs ~= false end,
+        function(v) EDM.db.profile.auras.trackBuffs = v end)
+    y = y + self:CreateToggleRow(y, "Track Debuff Applications", "Count debuff applications on enemies",
+        function() return EDM.db.profile.auras.trackDebuffs ~= false end,
+        function(v) EDM.db.profile.auras.trackDebuffs = v end)
+    y = y + self:CreateToggleRow(y, "Only My Auras", "Only track auras cast by the player",
+        function() return EDM.db.profile.auras.onlyMine ~= false end,
+        function(v) EDM.db.profile.auras.onlyMine = v end)
+    y = y + self:CreateToggleRow(y, "Show Uptime %", "Display uptime as percentage in tooltips",
+        function() return EDM.db.profile.auras.showUptime ~= false end,
+        function(v) EDM.db.profile.auras.showUptime = v end)
+
     self.quickPanel.scrollChild:SetHeight(y + 30)
+end
+
+function Config:BuildSegmentsTab()
+    local panel = self.quickPanel
+    local y = 0
+
+    y = y + self:CreateSectionHeader(y, "Segment Browser (Recount/Details!-style)")
+
+    -- Info text
+    local infoRow = CreateFrame("Frame", nil, panel.scrollChild)
+    infoRow:SetHeight(50)
+    infoRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
+    infoRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
+
+    infoRow.bg = infoRow:CreateTexture(nil, "BACKGROUND")
+    infoRow.bg:SetAllPoints()
+    infoRow.bg:SetColorTexture(0.08, 0.1, 0.15, 0.8)
+
+    infoRow.icon = infoRow:CreateTexture(nil, "ARTWORK")
+    infoRow.icon:SetSize(32, 32)
+    infoRow.icon:SetPoint("LEFT", 10, 0)
+    infoRow.icon:SetTexture("Interface\\Icons\\Spell_Holy_BorrowedTime")
+    infoRow.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+    infoRow.text = infoRow:CreateFontString(nil, "OVERLAY")
+    infoRow.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
+    infoRow.text:SetPoint("LEFT", infoRow.icon, "RIGHT", 10, 0)
+    infoRow.text:SetPoint("RIGHT", infoRow, "RIGHT", -10, 0)
+    infoRow.text:SetTextColor(0.8, 0.85, 0.9, 1)
+    infoRow.text:SetJustifyH("LEFT")
+    infoRow.text:SetText("Browse past combat segments. Click a segment to view its data. Right-click for options.")
+
+    y = y + 55
+
+    -- Quick segment actions
+    local actionsRow = CreateFrame("Frame", nil, panel.scrollChild)
+    actionsRow:SetHeight(35)
+    actionsRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
+    actionsRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
+
+    actionsRow.bg = actionsRow:CreateTexture(nil, "BACKGROUND")
+    actionsRow.bg:SetAllPoints()
+    actionsRow.bg:SetColorTexture(0.05, 0.07, 0.1, 0.6)
+
+    -- Current segment button
+    local currentBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
+    currentBtn:SetSize(100, 26)
+    currentBtn:SetPoint("LEFT", 10, 0)
+    currentBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    currentBtn:SetBackdropColor(0.2, 0.5, 0.3, 0.8)
+    currentBtn:SetBackdropBorderColor(0.3, 0.7, 0.4, 1)
+    currentBtn.text = currentBtn:CreateFontString(nil, "OVERLAY")
+    currentBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    currentBtn.text:SetPoint("CENTER")
+    currentBtn.text:SetText("Current")
+    currentBtn.text:SetTextColor(0.9, 1, 0.9, 1)
+    currentBtn:SetScript("OnClick", function()
+        if EDM.Database then
+            EDM.db.profile.display.segment = 1 -- CURRENT
+            if EDM.UI then EDM.UI:Refresh() end
+            Config:BuildSegmentsTab() -- Refresh tab
+        end
+    end)
+    currentBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.3, 0.6, 0.4, 1) end)
+    currentBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.2, 0.5, 0.3, 0.8) end)
+
+    -- Overall segment button
+    local overallBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
+    overallBtn:SetSize(100, 26)
+    overallBtn:SetPoint("LEFT", currentBtn, "RIGHT", 8, 0)
+    overallBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    overallBtn:SetBackdropColor(0.3, 0.4, 0.6, 0.8)
+    overallBtn:SetBackdropBorderColor(0.4, 0.5, 0.8, 1)
+    overallBtn.text = overallBtn:CreateFontString(nil, "OVERLAY")
+    overallBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    overallBtn.text:SetPoint("CENTER")
+    overallBtn.text:SetText("Overall")
+    overallBtn.text:SetTextColor(0.9, 0.9, 1, 1)
+    overallBtn:SetScript("OnClick", function()
+        if EDM.Database then
+            EDM.db.profile.display.segment = 2 -- OVERALL
+            if EDM.UI then EDM.UI:Refresh() end
+            Config:BuildSegmentsTab()
+        end
+    end)
+    overallBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.4, 0.5, 0.7, 1) end)
+    overallBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.3, 0.4, 0.6, 0.8) end)
+
+    -- Delete All button
+    local deleteAllBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
+    deleteAllBtn:SetSize(100, 26)
+    deleteAllBtn:SetPoint("RIGHT", -10, 0)
+    deleteAllBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    deleteAllBtn:SetBackdropColor(0.5, 0.2, 0.2, 0.8)
+    deleteAllBtn:SetBackdropBorderColor(0.7, 0.3, 0.3, 1)
+    deleteAllBtn.text = deleteAllBtn:CreateFontString(nil, "OVERLAY")
+    deleteAllBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    deleteAllBtn.text:SetPoint("CENTER")
+    deleteAllBtn.text:SetText("Clear All")
+    deleteAllBtn.text:SetTextColor(1, 0.8, 0.8, 1)
+    deleteAllBtn:SetScript("OnClick", function()
+        StaticPopup_Show("EDM_CONFIRM_CLEAR_SEGMENTS")
+    end)
+    deleteAllBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.7, 0.3, 0.3, 1) end)
+    deleteAllBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.5, 0.2, 0.2, 0.8) end)
+
+    -- Static popup for clearing segments
+    if not StaticPopupDialogs["EDM_CONFIRM_CLEAR_SEGMENTS"] then
+        StaticPopupDialogs["EDM_CONFIRM_CLEAR_SEGMENTS"] = {
+            text = "Clear all combat segments? This cannot be undone.",
+            button1 = "Yes",
+            button2 = "No",
+            OnAccept = function()
+                if EDM.Database then
+                    EDM.Database:ClearAllSegments()
+                    if EDM.UI then EDM.UI:Refresh() end
+                    Config:BuildSegmentsTab()
+                end
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+        }
+    end
+
+    y = y + 40
+
+    y = y + self:CreateSectionHeader(y, "Saved Segments")
+
+    -- Get segments from database
+    local segments = {}
+    if EDM.Database and EDM.Database.segments then
+        segments = EDM.Database.segments
+    end
+
+    local currentSegmentType = EDM.db.profile.display.segment or 1
+
+    if #segments == 0 then
+        -- No segments message
+        local noDataRow = CreateFrame("Frame", nil, panel.scrollChild)
+        noDataRow:SetHeight(60)
+        noDataRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
+        noDataRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
+
+        noDataRow.bg = noDataRow:CreateTexture(nil, "BACKGROUND")
+        noDataRow.bg:SetAllPoints()
+        noDataRow.bg:SetColorTexture(0.05, 0.07, 0.1, 0.6)
+
+        noDataRow.text = noDataRow:CreateFontString(nil, "OVERLAY")
+        noDataRow.text:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+        noDataRow.text:SetPoint("CENTER")
+        noDataRow.text:SetTextColor(0.6, 0.6, 0.7, 1)
+        noDataRow.text:SetText("No combat segments recorded yet.\nEnter combat to start tracking!")
+
+        y = y + 65
+    else
+        -- Display each segment
+        for i, segment in ipairs(segments) do
+            local segRow = CreateFrame("Button", nil, panel.scrollChild, "BackdropTemplate")
+            segRow:SetHeight(45)
+            segRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
+            segRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
+            segRow:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+
+            -- Highlight if selected
+            local isSelected = (i == 1 and currentSegmentType == 1) or (segment.isOverall and currentSegmentType == 2)
+            if isSelected then
+                segRow:SetBackdropColor(0.15, 0.25, 0.4, 0.9)
+                segRow:SetBackdropBorderColor(0.3, 0.6, 1, 1)
+            else
+                segRow:SetBackdropColor(0.06, 0.08, 0.12, 0.8)
+                segRow:SetBackdropBorderColor(0.2, 0.25, 0.35, 0.8)
+            end
+
+            -- Segment icon
+            segRow.icon = segRow:CreateTexture(nil, "ARTWORK")
+            segRow.icon:SetSize(32, 32)
+            segRow.icon:SetPoint("LEFT", 8, 0)
+            if segment.isBoss then
+                segRow.icon:SetTexture("Interface\\Icons\\Achievement_Boss_Onyxia")
+            elseif segment.isOverall then
+                segRow.icon:SetTexture("Interface\\Icons\\Spell_Holy_SurgeOfLight")
+            else
+                segRow.icon:SetTexture("Interface\\Icons\\INV_Misc_SummerFest_BrazierRed")
+            end
+            segRow.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+            -- Segment name
+            segRow.name = segRow:CreateFontString(nil, "OVERLAY")
+            segRow.name:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+            segRow.name:SetPoint("TOPLEFT", segRow.icon, "TOPRIGHT", 10, -4)
+            local segmentName = segment.name or (segment.isOverall and "Overall" or "Combat #" .. i)
+            if i == 1 and not segment.isOverall then
+                segmentName = "|cff00ff00" .. segmentName .. " (Current)|r"
+            elseif segment.isBoss then
+                segmentName = "|cffff9900" .. segmentName .. "|r"
+            end
+            segRow.name:SetText(segmentName)
+
+            -- Segment details
+            segRow.details = segRow:CreateFontString(nil, "OVERLAY")
+            segRow.details:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+            segRow.details:SetPoint("TOPLEFT", segRow.name, "BOTTOMLEFT", 0, -4)
+            segRow.details:SetTextColor(0.7, 0.7, 0.8, 1)
+
+            local duration = segment.duration or 0
+            local totalDamage = segment.totalDamage or 0
+            local durationStr = string.format("%d:%02d", math.floor(duration / 60), duration % 60)
+            local damageStr = EDM.Database and EDM.Database.FormatNumber and EDM.Database:FormatNumber(totalDamage) or tostring(totalDamage)
+            segRow.details:SetText(string.format("Duration: %s | Total Damage: %s", durationStr, damageStr))
+
+            -- Click to select
+            segRow:SetScript("OnClick", function()
+                -- Set segment as current view
+                if segment.isOverall then
+                    EDM.db.profile.display.segment = 2 -- OVERALL
+                else
+                    EDM.db.profile.display.segment = 1 -- CURRENT
+                    -- If not the first segment, we need a way to select it
+                    if EDM.Database then
+                        EDM.Database.selectedSegmentIndex = i
+                    end
+                end
+                if EDM.UI then EDM.UI:Refresh() end
+                Config:BuildSegmentsTab()
+            end)
+
+            segRow:SetScript("OnEnter", function(btn)
+                if not isSelected then
+                    btn:SetBackdropColor(0.1, 0.15, 0.25, 0.9)
+                end
+            end)
+            segRow:SetScript("OnLeave", function(btn)
+                if not isSelected then
+                    btn:SetBackdropColor(0.06, 0.08, 0.12, 0.8)
+                end
+            end)
+
+            y = y + 48
+        end
+    end
+
+    y = y + self:CreateSectionHeader(y, "Segment Options")
+
+    y = y + self:CreateSliderRow(y, "Max Segments", "Maximum number of segments to keep",
+        function() return EDM.db.profile.combat.maxSegments or 10 end,
+        function(v) EDM.db.profile.combat.maxSegments = v end, 5, 50, 5, "")
+
+    y = y + self:CreateToggleRow(y, "Auto-Merge Trash", "Combine trash pulls into one segment",
+        function() return EDM.db.profile.combat.autoMergeTrash end,
+        function(v) EDM.db.profile.combat.autoMergeTrash = v end)
+
+    y = y + self:CreateToggleRow(y, "Separate Boss Segments", "Create separate segments for boss fights",
+        function() return EDM.db.profile.combat.separateBossSegments ~= false end,
+        function(v) EDM.db.profile.combat.separateBossSegments = v end)
+
+    panel.scrollChild:SetHeight(y + 30)
 end
 
 function Config:BuildCreditsTab()
@@ -1361,21 +1790,21 @@ function Config:BuildCreditsTab()
     changelogRow.text:SetTextColor(0.8, 0.8, 0.85, 1)
     changelogRow.text:SetJustifyH("LEFT")
     changelogRow.text:SetText(
-        "|cff00ff00v1.0.7 - Latest|r\n" ..
+        "|cff00ff00v1.0.8 - Latest|r\n" ..
+        "  - Added Details!/Recount-style features\n" ..
+        "  - New Segments browser tab\n" ..
+        "  - Bar texture selection from LibSharedMedia\n" ..
+        "  - Auto-hide/show combat visibility options\n" ..
+        "  - Death log tracking settings\n" ..
+        "  - Aura/buff uptime tracking\n" ..
+        "  - Color by spell school option\n\n" ..
+        "|cffccccccv1.0.7|r\n" ..
         "  - Fixed spell bar click registration\n" ..
-        "  - Improved UI responsiveness\n" ..
-        "  - Combat segment handling improvements\n" ..
-        "  - Enhanced settings panel\n" ..
-        "  - Removed Enable Addon toggle (always enabled)\n\n" ..
+        "  - Enhanced settings panel design\n" ..
+        "  - Added more display modes\n\n" ..
         "|cffccccccv1.0.6|r\n" ..
-        "  - Simplified tracking (group/raid only like Recount)\n" ..
-        "  - Fixed data persistence (no more quick resets)\n" ..
-        "  - Fixed all bar settings (class colors, percent, value)\n" ..
-        "  - Added font selection dropdown\n\n" ..
-        "|cffccccccv1.0.5|r\n" ..
-        "  - Fixed settings panel tabs\n" ..
-        "  - Fixed font size slider\n" ..
-        "  - Fixed window size/opacity settings"
+        "  - Simplified tracking (group/raid only)\n" ..
+        "  - Fixed data persistence issues"
     )
 
     y = y + 210
@@ -1396,7 +1825,7 @@ function Config:BuildCreditsTab()
     versionRow.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
     versionRow.text:SetPoint("LEFT", 10, 0)
     versionRow.text:SetTextColor(0.6, 0.6, 0.7, 1)
-    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.7 BETA\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
+    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.8 BETA\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
 
     y = y + 70
 
