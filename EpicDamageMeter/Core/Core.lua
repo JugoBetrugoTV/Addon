@@ -382,20 +382,21 @@ function Core:UpdateVisibility(inCombat)
     if not vis then return end
 
     local frame = EDM.UI.mainFrame
+    local wasShown = frame:IsShown()
 
-    -- Check visibility conditions
-    local shouldShow = true
+    -- Check if any visibility restriction applies
+    local isRestricted = false
 
     -- Show only in group check
     if vis.showOnlyInGroup and not IsInGroup() then
-        shouldShow = false
+        isRestricted = true
     end
 
     -- Show only in instance check
     if vis.showOnlyInInstance then
         local inInstance = IsInInstance()
         if not inInstance then
-            shouldShow = false
+            isRestricted = true
         end
     end
 
@@ -403,42 +404,42 @@ function Core:UpdateVisibility(inCombat)
     if vis.hideInPvP then
         local instanceType = select(2, IsInInstance())
         if instanceType == "pvp" or instanceType == "arena" then
-            shouldShow = false
+            isRestricted = true
         end
     end
 
-    -- Apply visibility
-    if not shouldShow then
+    -- Apply restriction if any
+    if isRestricted then
         frame:Hide()
         return
     end
 
-    -- Auto-show on combat
-    if inCombat and vis.autoShow then
-        frame:Show()
-        -- Restore full opacity
-        local opacity = self.db.profile.window.opacity or 1
-        frame:SetAlpha(opacity)
-    end
-
-    -- Auto-hide on leaving combat
-    if not inCombat and vis.autoHide then
-        -- Delay the hide slightly to let players see final results
-        C_Timer.After(3, function()
-            if not self.inCombat and frame:IsShown() then
-                frame:Hide()
-            end
-        end)
-    end
-
-    -- Fade out of combat
-    if not inCombat and vis.fadeOutOfCombat and frame:IsShown() then
-        local fadeOpacity = vis.fadeOpacity or 0.5
-        frame:SetAlpha(fadeOpacity)
-    elseif inCombat and frame:IsShown() then
+    -- Handle combat-based visibility
+    if inCombat then
+        -- Auto-show on combat start
+        if vis.autoShow and not wasShown then
+            frame:Show()
+        end
         -- Restore full opacity in combat
-        local opacity = self.db.profile.window.opacity or 1
-        frame:SetAlpha(opacity)
+        if frame:IsShown() then
+            local opacity = self.db.profile.window.opacity or 1
+            frame:SetAlpha(opacity)
+        end
+    else
+        -- Auto-hide after combat ends
+        if vis.autoHide and wasShown then
+            -- Delay to let players see final results
+            C_Timer.After(3, function()
+                if not self.inCombat and frame:IsShown() and vis.autoHide then
+                    frame:Hide()
+                end
+            end)
+        end
+        -- Fade out of combat (if not auto-hiding)
+        if vis.fadeOutOfCombat and frame:IsShown() and not vis.autoHide then
+            local fadeOpacity = vis.fadeOpacity or 0.5
+            frame:SetAlpha(fadeOpacity)
+        end
     end
 end
 

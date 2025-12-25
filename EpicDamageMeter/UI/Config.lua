@@ -996,46 +996,19 @@ function Config:BuildBarsTab()
 
     -- Helper function to apply bar settings to ALL bar pools
     local function ApplyBarSettings()
-        -- Get font path from selection
-        local fontName = EDM.db.profile.bars.font or "Friz Quadrata TT"
-        local fontPaths = {
-            ["Friz Quadrata TT"] = "Fonts\\FRIZQT__.TTF",
-            ["Arial Narrow"] = "Fonts\\ARIALN.TTF",
-            ["Morpheus"] = "Fonts\\MORPHEUS.TTF",
-            ["Skurri"] = "Fonts\\SKURRI.TTF",
-            ["2002"] = "Fonts\\2002.TTF",
-            ["2002 Bold"] = "Fonts\\2002B.TTF",
-        }
-        local fontPath = fontPaths[fontName] or "Fonts\\FRIZQT__.TTF"
-        local fontSize = EDM.db.profile.bars.fontSize or 11
-        local barHeight = EDM.db.profile.bars.height or 18
-        local fontFlags = EDM.db.profile.bars.fontFlags or "OUTLINE"
-        local showIcon = EDM.db.profile.bars.showIcon ~= false
-        local showValue = EDM.db.profile.bars.showValue ~= false
-        local showRank = EDM.db.profile.bars.showRank ~= false
-        local showPercent = EDM.db.profile.bars.showPercent ~= false
-
-        -- Apply to UI bar pool (MainFrame)
-        if EDM.UI and EDM.UI.barPool then
-            for _, bar in ipairs(EDM.UI.barPool) do
-                bar:SetHeight(barHeight)
-                if bar.icon then
-                    bar.icon:SetSize(barHeight - 2, barHeight - 2)
-                    bar.icon:SetShown(showIcon)
-                end
-                if bar.nameText then
-                    bar.nameText:SetFont(fontPath, fontSize, fontFlags)
-                end
-                if bar.valueText then
-                    bar.valueText:SetFont(fontPath, fontSize - 1, fontFlags)
-                    bar.valueText:SetShown(showValue)
-                end
-                if bar.rankText then
-                    bar.rankText:SetFont(fontPath, fontSize - 2, fontFlags)
-                    bar.rankText:SetShown(showRank)
-                end
-            end
+        -- Use UI:ApplySettings which handles all bar updates correctly
+        if EDM.UI and EDM.UI.ApplySettings then
+            EDM.UI:ApplySettings()
         end
+        if EDM.UI and EDM.UI.Refresh then
+            EDM.UI:Refresh()
+        end
+    end
+
+    -- Legacy support - keep old direct update as fallback
+    local function ApplyBarSettingsLegacy()
+        local barHeight = EDM.db.profile.bars.height or 18
+        local showIcon = EDM.db.profile.bars.showIcon ~= false
 
         -- Apply to Bars module pool (legacy)
         if EDM.Bars and EDM.Bars.pool then
@@ -1099,27 +1072,12 @@ function Config:BuildBarsTab()
         }
     end
     y = y + self:CreateDropdownRow(y, "Bar Texture", "Choose the status bar texture",
-        function() return EDM.db.profile.bars.texture or "Modern" end,
+        function() return EDM.db.profile.bars.texture or "Blizzard" end,
         function(v)
             EDM.db.profile.bars.texture = v
-            -- Apply texture to all bars
-            local texturePath = nil
-            if LSM then
-                texturePath = LSM:Fetch("statusbar", v)
-            end
-            if EDM.UI and EDM.UI.barPool then
-                for _, bar in ipairs(EDM.UI.barPool) do
-                    if bar.SetStatusBarTexture and texturePath then
-                        bar:SetStatusBarTexture(texturePath)
-                    end
-                end
-            end
-            if EDM.Bars and EDM.Bars.pool then
-                for _, bar in pairs(EDM.Bars.pool) do
-                    if bar.SetStatusBarTexture and texturePath then
-                        bar:SetStatusBarTexture(texturePath)
-                    end
-                end
+            -- Apply to all bars via ApplySettings
+            if EDM.UI and EDM.UI.ApplySettings then
+                EDM.UI:ApplySettings()
             end
             if EDM.UI then EDM.UI:Refresh() end
         end, textureOptions)
@@ -1501,8 +1459,8 @@ function Config:BuildSegmentsTab()
 
     -- Get segments from database
     local segments = {}
-    if EDM.Database and EDM.Database.segments then
-        segments = EDM.Database.segments
+    if EDM.Database and EDM.Database.Data and EDM.Database.Data.segments then
+        segments = EDM.Database.Data.segments
     end
 
     local currentSegmentType = EDM.db.profile.display.segment or 1

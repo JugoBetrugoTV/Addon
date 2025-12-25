@@ -1084,6 +1084,21 @@ end
 function UI:CreateBar()
     local db = EDM.db and EDM.db.profile.bars or C.DEFAULT_SETTINGS.profile.bars
 
+    -- Get texture and font from LibSharedMedia
+    local texturePath = "Interface\\TargetingFrame\\UI-StatusBar"
+    local fontPath = "Fonts\\FRIZQT__.TTF"
+
+    if LSM then
+        local textureName = db.texture or "Blizzard"
+        texturePath = LSM:Fetch("statusbar", textureName) or texturePath
+
+        local fontName = db.font or "Friz Quadrata TT"
+        fontPath = LSM:Fetch("font", fontName) or fontPath
+    end
+
+    local fontSize = db.fontSize or 11
+    local fontFlags = db.fontFlags or "OUTLINE"
+
     local bar = CreateFrame("Button", nil, UIParent, "BackdropTemplate")
     bar:SetHeight(db.height or 18)
     bar:EnableMouse(true)
@@ -1099,7 +1114,7 @@ function UI:CreateBar()
     bar.statusBar:SetAllPoints()
     bar.statusBar:SetMinMaxValues(0, 1)
     bar.statusBar:SetValue(0)
-    bar.statusBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bar.statusBar:SetStatusBarTexture(texturePath)
     bar.statusBar:SetAlpha(0.7) -- Reduced alpha so text is readable
     bar.statusBar:EnableMouse(false) -- Pass clicks through to parent button
 
@@ -1116,7 +1131,7 @@ function UI:CreateBar()
 
     -- Rank with shadow
     bar.rankText = bar:CreateFontString(nil, "OVERLAY")
-    bar.rankText:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
+    bar.rankText:SetFont(fontPath, fontSize - 2, fontFlags)
     bar.rankText:SetPoint("LEFT", bar.icon, "RIGHT", 2, 0)
     bar.rankText:SetWidth(14)
     bar.rankText:SetJustifyH("CENTER")
@@ -1126,7 +1141,7 @@ function UI:CreateBar()
 
     -- Name with strong shadow for readability
     bar.nameText = bar:CreateFontString(nil, "OVERLAY")
-    bar.nameText:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+    bar.nameText:SetFont(fontPath, fontSize, fontFlags)
     bar.nameText:SetPoint("LEFT", bar.rankText, "RIGHT", 2, 0)
     bar.nameText:SetPoint("RIGHT", bar, "RIGHT", -70, 0)
     bar.nameText:SetJustifyH("LEFT")
@@ -1136,7 +1151,7 @@ function UI:CreateBar()
 
     -- Value with shadow
     bar.valueText = bar:CreateFontString(nil, "OVERLAY")
-    bar.valueText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    bar.valueText:SetFont(fontPath, fontSize - 1, fontFlags)
     bar.valueText:SetPoint("RIGHT", -4, 0)
     bar.valueText:SetJustifyH("RIGHT")
     bar.valueText:SetShadowOffset(1, -1)
@@ -1280,14 +1295,12 @@ function UI:ApplySettings()
     local skin = Skins and Skins:Get() or nil
     local barSettings = skin and skin.bar or {}
 
-    -- Get bar texture from skin
+    -- Get bar texture from profile settings first, then skin
     local barTexture = "Interface\\TargetingFrame\\UI-StatusBar"
-    if barSettings.texture then
-        local LSM = LibStub("LibSharedMedia-3.0", true)
-        if LSM then
-            local tex = LSM:Fetch("statusbar", barSettings.texture)
-            if tex then barTexture = tex end
-        end
+    local textureName = barsDb.texture or barSettings.texture or "Blizzard"
+    if LSM then
+        local tex = LSM:Fetch("statusbar", textureName)
+        if tex then barTexture = tex end
     end
 
     -- Get font settings from LibSharedMedia

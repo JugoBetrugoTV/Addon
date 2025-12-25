@@ -675,3 +675,45 @@ function DB:GetSegment(index)
         return self.Data.segments[index]
     end
 end
+
+-- Clear all segments (but keep current and overall)
+function DB:ClearAllSegments()
+    -- Keep only the current segment
+    local current = self.Data.currentSegment
+    self.Data.segments = {}
+    if current then
+        table.insert(self.Data.segments, current)
+    end
+    -- Reset overall
+    self.Data.overallSegment = DB.CreateSegment(C.SEGMENT_TYPE.OVERALL, "Overall")
+end
+
+-- Get all segments for display
+function DB:GetSegments()
+    return self.Data.segments or {}
+end
+
+-- Format number for display
+function DB:FormatNumber(value)
+    if not value or value == 0 then return "0" end
+
+    local format = EDM.db and EDM.db.profile.display.numberFormat or "SHORT"
+
+    if format == "FULL" then
+        return tostring(math.floor(value))
+    elseif format == "COMMA" then
+        local str = tostring(math.floor(value))
+        local formatted = str:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+        return formatted:gsub("^,", "")
+    else -- SHORT
+        if value >= 1e9 then
+            return string.format("%.1fB", value / 1e9)
+        elseif value >= 1e6 then
+            return string.format("%.1fM", value / 1e6)
+        elseif value >= 1e3 then
+            return string.format("%.1fK", value / 1e3)
+        else
+            return tostring(math.floor(value))
+        end
+    end
+end
