@@ -434,33 +434,55 @@ end
 
 function Config:CreateSectionHeader(yOffset, text)
     local panel = self.quickPanel
-    local header = CreateFrame("Frame", nil, panel.scrollChild)
-    header:SetHeight(28)
+    local header = CreateFrame("Frame", nil, panel.scrollChild, "BackdropTemplate")
+    header:SetHeight(32)
     header:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 0, -yOffset)
     header:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", 0, -yOffset)
 
-    header.bg = header:CreateTexture(nil, "BACKGROUND")
-    header.bg:SetAllPoints()
-    header.bg:SetColorTexture(0.1, 0.15, 0.25, 0.8)
+    -- Beautiful styled header with gradient
+    header:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 }
+    })
+    header:SetBackdropColor(0.1, 0.18, 0.3, 0.95)
+    header:SetBackdropBorderColor(0.25, 0.45, 0.75, 0.7)
 
-    header.icon = header:CreateTexture(nil, "ARTWORK")
+    -- Gradient overlay for depth
+    header.gradient = header:CreateTexture(nil, "BACKGROUND", nil, 1)
+    header.gradient:SetAllPoints()
+    header.gradient:SetTexture("Interface\\Buttons\\WHITE8X8")
+    header.gradient:SetGradient("HORIZONTAL", CreateColor(0.1, 0.18, 0.32, 1), CreateColor(0.08, 0.14, 0.24, 0.7))
+
+    -- Glowing icon
+    header.iconGlow = header:CreateTexture(nil, "ARTWORK")
+    header.iconGlow:SetSize(24, 24)
+    header.iconGlow:SetPoint("LEFT", 8, 0)
+    header.iconGlow:SetTexture("Interface\\Buttons\\WHITE8X8")
+    header.iconGlow:SetVertexColor(0.3, 0.6, 1, 0.3)
+
+    header.icon = header:CreateTexture(nil, "OVERLAY")
     header.icon:SetSize(16, 16)
-    header.icon:SetPoint("LEFT", 8, 0)
+    header.icon:SetPoint("CENTER", header.iconGlow, "CENTER", 0, 0)
     header.icon:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
 
     header.text = header:CreateFontString(nil, "OVERLAY")
     header.text:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
-    header.text:SetPoint("LEFT", header.icon, "RIGHT", 6, 0)
+    header.text:SetPoint("LEFT", header.iconGlow, "RIGHT", 8, 0)
     header.text:SetText(text)
-    header.text:SetTextColor(0.4, 0.8, 1, 1)
+    header.text:SetTextColor(0.5, 0.85, 1, 1)
+    header.text:SetShadowOffset(1, -1)
+    header.text:SetShadowColor(0, 0, 0, 0.8)
 
-    header.line = header:CreateTexture(nil, "ARTWORK")
-    header.line:SetHeight(1)
+    -- Accent line at bottom with glow
+    header.line = header:CreateTexture(nil, "OVERLAY")
+    header.line:SetHeight(2)
     header.line:SetPoint("BOTTOMLEFT", 0, 0)
     header.line:SetPoint("BOTTOMRIGHT", 0, 0)
-    header.line:SetColorTexture(0.3, 0.5, 0.8, 0.5)
+    header.line:SetColorTexture(0.35, 0.6, 0.95, 0.8)
 
-    return 32
+    return 38
 end
 
 function Config:CreateToggleRow(yOffset, label, tooltip, getValue, setValue)
