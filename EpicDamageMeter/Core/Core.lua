@@ -310,7 +310,7 @@ function Core:OnCombatStart()
     self.inCombat = true
     self.combatStartTime = GetTime()
 
-    -- Handle visibility settings (Details!/Recount-style)
+    -- Handle visibility settings
     self:UpdateVisibility(true)
 
     -- Cancel any pending segment timeout
@@ -354,7 +354,7 @@ function Core:OnCombatEnd()
     self.inCombat = false
     local combatDuration = GetTime() - (self.combatStartTime or GetTime())
 
-    -- Handle visibility settings (Details!/Recount-style)
+    -- Handle visibility settings
     self:UpdateVisibility(false)
 
     local segment = DB.Data.currentSegment
@@ -366,7 +366,7 @@ function Core:OnCombatEnd()
         -- Don't set endTime - segment stays active for more combat
     end
 
-    -- Update UI (data stays visible after combat - like Recount/Details)
+    -- Update UI (data stays visible after combat)
     if EDM.UI then
         EDM.UI:Refresh()
     end
@@ -374,7 +374,7 @@ function Core:OnCombatEnd()
     Utils.Debug("Combat ended, session duration:", combatDuration, "total:", segment and segment.duration or 0)
 end
 
--- Update window visibility based on settings (Details!/Recount-style)
+-- Update window visibility based on settings
 function Core:UpdateVisibility(inCombat)
     if not EDM.UI or not EDM.UI.mainFrame then return end
 

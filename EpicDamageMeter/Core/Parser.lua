@@ -592,13 +592,11 @@ function Parser:ProcessAbsorb(segment, timestamp, subEvent, sourceGUID, sourceNa
     -- Get caster class
     local casterClass = self:GetClass(effCasterGUID)
 
-    -- Record absorb as healing
+    -- Record absorb as absorbs (NOT as healing - they are separate!)
     local actor = DB:GetActor(segment, effCasterGUID, effCasterName, casterClass, casterFlags)
     if actor then
         actor.absorbs = actor.absorbs + amount
-        actor.healing = actor.healing + amount
         segment.totalAbsorbs = segment.totalAbsorbs + amount
-        segment.totalHealing = segment.totalHealing + amount
     end
 
     -- Also update overall
@@ -606,10 +604,8 @@ function Parser:ProcessAbsorb(segment, timestamp, subEvent, sourceGUID, sourceNa
         local overallActor = DB:GetActor(DB.Data.overallSegment, effCasterGUID, effCasterName, casterClass, casterFlags)
         if overallActor then
             overallActor.absorbs = overallActor.absorbs + amount
-            overallActor.healing = overallActor.healing + amount
         end
         DB.Data.overallSegment.totalAbsorbs = DB.Data.overallSegment.totalAbsorbs + amount
-        DB.Data.overallSegment.totalHealing = DB.Data.overallSegment.totalHealing + amount
     end
 end
 

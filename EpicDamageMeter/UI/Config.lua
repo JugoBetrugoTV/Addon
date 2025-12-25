@@ -299,7 +299,7 @@ function Config:CreateQuickPanel()
     panel.bottomBar.version:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
     panel.bottomBar.version:SetPoint("LEFT", 10, 0)
     panel.bottomBar.version:SetTextColor(0.5, 0.5, 0.6, 1)
-    panel.bottomBar.version:SetText("EpicDamageMeter v1.0.8 | Interface 110207")
+    panel.bottomBar.version:SetText("EpicDamageMeter v1.0.9 | Interface 110207")
 
     -- Save & Reload button
     panel.bottomBar.saveBtn = CreateFrame("Button", nil, panel.bottomBar, "BackdropTemplate")
@@ -833,7 +833,7 @@ function Config:BuildGeneralTab()
         function() return EDM.db.profile.combat.combatTimeout or 3 end,
         function(v) EDM.db.profile.combat.combatTimeout = v end, 1, 10, 1, "s")
 
-    y = y + self:CreateSectionHeader(y, "Visibility (Details!/Recount-style)")
+    y = y + self:CreateSectionHeader(y, "Visibility Options")
 
     -- Ensure visibility settings exist
     if not EDM.db.profile.visibility then
@@ -1074,7 +1074,7 @@ function Config:BuildBarsTab()
         function() return EDM.db.profile.bars.spacing end,
         function(v) EDM.db.profile.bars.spacing = v; ApplyBarSettings() end, 0, 5, 1, "px")
 
-    y = y + self:CreateSectionHeader(y, "Bar Texture (Details!-style)")
+    y = y + self:CreateSectionHeader(y, "Bar Texture")
     -- Build texture options from LibSharedMedia
     local textureOptions = {}
     local LSM = LibStub("LibSharedMedia-3.0", true)
@@ -1180,7 +1180,7 @@ function Config:BuildBarsTab()
         function() return EDM.db.profile.bars.animationSpeed end,
         function(v) EDM.db.profile.bars.animationSpeed = v end, 0.1, 1.0, 0.05, "")
 
-    y = y + self:CreateSectionHeader(y, "Advanced Bar Options (Details!/Recount)")
+    y = y + self:CreateSectionHeader(y, "Advanced Bar Options")
     y = y + self:CreateToggleRow(y, "Click for Details", "Left-click bars to open detailed breakdown",
         function() return EDM.db.profile.bars.clickToDetails ~= false end,
         function(v) EDM.db.profile.bars.clickToDetails = v end)
@@ -1332,7 +1332,7 @@ function Config:BuildDisplayTab()
         function() return EDM.db.profile.display.highlightSelf end,
         function(v) EDM.db.profile.display.highlightSelf = v; if EDM.UI then EDM.UI:Refresh() end end)
 
-    y = y + self:CreateSectionHeader(y, "Color Options (Details!-style)")
+    y = y + self:CreateSectionHeader(y, "Color Options")
     y = y + self:CreateToggleRow(y, "Color by Spell School", "Color abilities by damage type (Fire, Frost, etc.)",
         function() return EDM.db.profile.display.colorBySchool end,
         function(v) EDM.db.profile.display.colorBySchool = v; if EDM.UI then EDM.UI:Refresh() end end)
@@ -1340,7 +1340,7 @@ function Config:BuildDisplayTab()
         function() return EDM.db.profile.display.realTimeMode ~= false end,
         function(v) EDM.db.profile.display.realTimeMode = v end)
 
-    y = y + self:CreateSectionHeader(y, "Death Log (Recount-style)")
+    y = y + self:CreateSectionHeader(y, "Death Log")
 
     -- Ensure death log settings exist
     if not EDM.db.profile.deathLog then
@@ -1369,31 +1369,6 @@ function Config:BuildDisplayTab()
         function() return EDM.db.profile.deathLog.showOverkill ~= false end,
         function(v) EDM.db.profile.deathLog.showOverkill = v end)
 
-    y = y + self:CreateSectionHeader(y, "Aura Tracking (Details!-style)")
-
-    -- Ensure aura settings exist
-    if not EDM.db.profile.auras then
-        EDM.db.profile.auras = {
-            trackBuffs = true,
-            trackDebuffs = true,
-            onlyMine = true,
-            showUptime = true,
-        }
-    end
-
-    y = y + self:CreateToggleRow(y, "Track Buff Uptime", "Track how long buffs are active",
-        function() return EDM.db.profile.auras.trackBuffs ~= false end,
-        function(v) EDM.db.profile.auras.trackBuffs = v end)
-    y = y + self:CreateToggleRow(y, "Track Debuff Applications", "Count debuff applications on enemies",
-        function() return EDM.db.profile.auras.trackDebuffs ~= false end,
-        function(v) EDM.db.profile.auras.trackDebuffs = v end)
-    y = y + self:CreateToggleRow(y, "Only My Auras", "Only track auras cast by the player",
-        function() return EDM.db.profile.auras.onlyMine ~= false end,
-        function(v) EDM.db.profile.auras.onlyMine = v end)
-    y = y + self:CreateToggleRow(y, "Show Uptime %", "Display uptime as percentage in tooltips",
-        function() return EDM.db.profile.auras.showUptime ~= false end,
-        function(v) EDM.db.profile.auras.showUptime = v end)
-
     self.quickPanel.scrollChild:SetHeight(y + 30)
 end
 
@@ -1401,7 +1376,7 @@ function Config:BuildSegmentsTab()
     local panel = self.quickPanel
     local y = 0
 
-    y = y + self:CreateSectionHeader(y, "Segment Browser (Recount/Details!-style)")
+    y = y + self:CreateSectionHeader(y, "Segment Browser")
 
     -- Info text
     local infoRow = CreateFrame("Frame", nil, panel.scrollChild)
@@ -1790,21 +1765,19 @@ function Config:BuildCreditsTab()
     changelogRow.text:SetTextColor(0.8, 0.8, 0.85, 1)
     changelogRow.text:SetJustifyH("LEFT")
     changelogRow.text:SetText(
-        "|cff00ff00v1.0.8 - Latest|r\n" ..
-        "  - Added Details!/Recount-style features\n" ..
+        "|cff00ff00v1.0.9 - Latest|r\n" ..
+        "  - Fixed absorbs being double-counted as healing\n" ..
+        "  - Improved data accuracy\n" ..
+        "  - Fixed visibility settings\n" ..
+        "  - Cleaned up UI text\n\n" ..
+        "|cffccccccv1.0.8|r\n" ..
         "  - New Segments browser tab\n" ..
-        "  - Bar texture selection from LibSharedMedia\n" ..
-        "  - Auto-hide/show combat visibility options\n" ..
-        "  - Death log tracking settings\n" ..
-        "  - Aura/buff uptime tracking\n" ..
-        "  - Color by spell school option\n\n" ..
+        "  - Bar texture selection\n" ..
+        "  - Auto-hide/show visibility options\n" ..
+        "  - Death log tracking\n\n" ..
         "|cffccccccv1.0.7|r\n" ..
         "  - Fixed spell bar click registration\n" ..
-        "  - Enhanced settings panel design\n" ..
-        "  - Added more display modes\n\n" ..
-        "|cffccccccv1.0.6|r\n" ..
-        "  - Simplified tracking (group/raid only)\n" ..
-        "  - Fixed data persistence issues"
+        "  - Enhanced settings panel design"
     )
 
     y = y + 210
@@ -1825,7 +1798,7 @@ function Config:BuildCreditsTab()
     versionRow.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
     versionRow.text:SetPoint("LEFT", 10, 0)
     versionRow.text:SetTextColor(0.6, 0.6, 0.7, 1)
-    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.8 BETA\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
+    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.9\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
 
     y = y + 70
 

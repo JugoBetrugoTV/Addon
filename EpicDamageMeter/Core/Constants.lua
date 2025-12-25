@@ -12,10 +12,10 @@ local C = EDM.Constants
 -- Addon Info
 C.ADDON_NAME = "EpicDamageMeter"
 C.ADDON_SHORT = "EDM"
-C.VERSION = "1.0.8"
+C.VERSION = "1.0.9"
 C.INTERFACE_VERSION = 110207
 
--- Display Modes (Extended like Details!)
+-- Display Modes
 C.DISPLAY_MODE = {
     -- Damage
     DAMAGE_DONE = 1,
@@ -246,7 +246,7 @@ C.DEFAULT_SETTINGS = {
             textColor = { r = 1, g = 1, b = 1, a = 1 },
             animation = true,
             animationSpeed = 0.3,
-            -- Details!/Recount-style options
+            -- Advanced options
             showSpecIcon = true,           -- Show specialization icon instead of class
             showRPS = false,               -- Show R-PS (resource per second)
             showTotalAndPS = false,        -- Show both total and per-second value
@@ -256,7 +256,7 @@ C.DEFAULT_SETTINGS = {
             myBarFirst = false,            -- Always show player's bar at top
         },
 
-        -- Death Log (Recount-style)
+        -- Death Log
         deathLog = {
             enabled = true,
             maxEntries = 20,               -- Max entries per death
@@ -265,7 +265,7 @@ C.DEFAULT_SETTINGS = {
             showOverkill = true,           -- Show overkill damage
         },
 
-        -- Aura Tracking (Details!-style)
+        -- Aura Tracking (not yet implemented)
         auras = {
             trackBuffs = true,             -- Track buff uptimes
             trackDebuffs = true,           -- Track debuff applications
@@ -288,14 +288,14 @@ C.DEFAULT_SETTINGS = {
 
         -- Combat
         combat = {
-            autoReset = false,             -- Don't auto-reset on combat end (like Recount/Details)
+            autoReset = false,             -- Don't auto-reset on combat end
             resetOnCombat = true,          -- Reset current segment when new combat starts
             maxSegments = 10,
             mergePlayerPets = true,
             showOnlyBosses = false,
             minCombatTime = 3,
             combatTimeout = 3,             -- Seconds of no combat before segment ends
-            keepDataMinutes = 30,          -- Keep data for 30 minutes (like Recount/Details)
+            keepDataMinutes = 30,          -- Keep data for 30 minutes
         },
 
         -- Display
@@ -312,7 +312,7 @@ C.DEFAULT_SETTINGS = {
             realTimeMode = true,           -- Real-time updates vs segment-only
         },
 
-        -- Visibility (Details!/Recount-style)
+        -- Visibility
         visibility = {
             autoHide = false,              -- Auto-hide when leaving combat
             autoShow = false,              -- Auto-show when entering combat
