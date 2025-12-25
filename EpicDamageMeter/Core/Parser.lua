@@ -386,12 +386,14 @@ end
 -- Process damage event
 function Parser:ProcessDamage(segment, timestamp, subEvent, sourceGUID, sourceName, sourceFlags,
                               destGUID, destName, destFlags)
-    -- Check if source is in our group
-    if not self:IsInGroup(sourceGUID) then return end
+    -- Check if either source or dest is in our group
+    local sourceInGroup = self:IsInGroup(sourceGUID)
+    local destInGroup = self:IsInGroup(destGUID)
 
-    -- Get effective source (handles pet merging)
-    local effSourceGUID, effSourceName, effSourceFlags = self:GetEffectiveSource(sourceGUID, sourceName, sourceFlags)
+    -- Skip if neither source nor dest is in our group
+    if not sourceInGroup and not destInGroup then return end
 
+    -- Parse combat log data
     local _, _, _, _, _, _, _, _, _, _, _, spellId, spellName, spellSchool
     local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
 
@@ -419,26 +421,36 @@ function Parser:ProcessDamage(segment, timestamp, subEvent, sourceGUID, sourceNa
     local spellInfo = Utils.GetSpellInfo(spellId)
     local spellIcon = spellInfo and spellInfo.icon
 
-    -- Get source class
-    local sourceClass = self:GetClass(effSourceGUID)
+    -- Record damage DONE if source is in our group
+    if sourceInGroup then
+        local effSourceGUID, effSourceName, effSourceFlags = self:GetEffectiveSource(sourceGUID, sourceName, sourceFlags)
+        local sourceClass = self:GetClass(effSourceGUID)
 
-    -- Record damage
-    DB:RecordDamage(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags,
-                    destGUID, destName, destFlags,
-                    spellId, spellName, spellIcon, amount, overkill, spellSchool, critical)
+        DB:RecordDamage(segment, effSourceGUID, effSourceName, sourceClass, effSourceFlags,
+                        destGUID, destName, destFlags,
+                        spellId, spellName, spellIcon, amount, overkill, spellSchool, critical)
+    end
 
-    -- Also record damage taken for dest if in group
-    if self:IsInGroup(destGUID) then
+    -- Record damage TAKEN if dest is in our group (from any source, including enemies!)
+    if destInGroup then
         local destClass = self:GetClass(destGUID)
         local destActor = DB:GetActor(segment, destGUID, destName, destClass, destFlags)
         if destActor then
             destActor.damageTaken = destActor.damageTaken + amount
 
-            -- Record in sources
+            -- Record in sources (who hit us)
             if not destActor.sources[sourceGUID] then
                 destActor.sources[sourceGUID] = DB.CreateTargetData(sourceGUID, sourceName)
             end
             destActor.sources[sourceGUID].damage = destActor.sources[sourceGUID].damage + amount
+        end
+
+        -- Also update overall segment
+        if DB.Data.overallSegment then
+            local overallActor = DB:GetActor(DB.Data.overallSegment, destGUID, destName, destClass, destFlags)
+            if overallActor then
+                overallActor.damageTaken = overallActor.damageTaken + amount
+            end
         end
     end
 end
