@@ -171,12 +171,12 @@ function DetailWindow:Initialize()
     self.tabFrame.bg:SetColorTexture(0.04, 0.05, 0.07, 0.98)
 
     self.tabs = {}
-    local tabNames = { "Damage", "Healing", "Targets", "Activity" }
+    local tabNames = { "Damage", "Healing", "Targets", "All Spells" }
     local tabIcons = {
         "Interface\\Icons\\Ability_Warrior_BloodFrenzy",
         "Interface\\Icons\\Spell_Holy_FlashHeal",
         "Interface\\Icons\\Ability_Creature_Cursed_02",
-        "Interface\\Icons\\Spell_Holy_MagicalSentry"
+        "Interface\\Icons\\Spell_Arcane_TeleportStormWind"
     }
     local tabWidth = 85
 
@@ -433,7 +433,7 @@ function DetailWindow:SelectTab(index)
     elseif index == 3 then
         self:ShowTargets()
     elseif index == 4 then
-        self:ShowActivity()
+        self:ShowAllSpells()
     end
 end
 
@@ -772,8 +772,8 @@ function DetailWindow:ShowTargets()
     self.scrollChild:SetHeight(math.max(yOffset, 1))
 end
 
--- Show activity tab (interrupts, dispels, CC, absorbs)
-function DetailWindow:ShowActivity()
+-- Show all spells tab (combined damage + healing + utility abilities)
+function DetailWindow:ShowAllSpells()
     local actor = self.currentActor
     if not actor then return end
 
@@ -781,136 +781,201 @@ function DetailWindow:ShowActivity()
     local yOffset = 0
     local barIndex = 1
 
-    -- Section: Interrupts
-    local interrupts = actor.interrupts or 0
-    local interruptSpells = actor.interruptSpells or {}
+    -- Collect all abilities with their total impact
+    local allAbilities = {}
+    for spellId, ability in pairs(actor.abilities or {}) do
+        local totalImpact = (ability.damage or 0) + (ability.healing or 0) + (ability.absorbs or 0)
+        if totalImpact > 0 or (ability.damageHits or 0) + (ability.healingHits or 0) + (ability.absorbCount or 0) > 0 then
+            table.insert(allAbilities, {
+                spellId = spellId,
+                name = ability.name,
+                icon = ability.icon,
+                damage = ability.damage or 0,
+                healing = ability.healing or 0,
+                absorbs = ability.absorbs or 0,
+                total = totalImpact,
+                hits = (ability.damageHits or 0) + (ability.healingHits or 0),
+                crits = (ability.damageCrits or 0) + (ability.healingCrits or 0),
+                damageMax = ability.damageMax or 0,
+                damageMin = ability.damageMin or 0,
+            })
+        end
+    end
 
-    if interrupts > 0 or next(interruptSpells) then
+    -- Sort by total impact
+    table.sort(allAbilities, function(a, b)
+        return a.total > b.total
+    end)
+
+    -- Display abilities
+    local maxImpact = allAbilities[1] and allAbilities[1].total or 1
+
+    for i, ability in ipairs(allAbilities) do
+        if barIndex > 50 then break end
+
+        local bar = self:GetAbilityBar(barIndex)
+        bar:ClearAllPoints()
+        bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 0, -yOffset)
+        bar:SetWidth(contentWidth - 8)
+
+        -- Icon
+        local spellInfo = Utils.GetSpellInfo(ability.spellId)
+        bar.icon:SetTexture(ability.icon or (spellInfo and spellInfo.icon) or "Interface\\Icons\\INV_Misc_QuestionMark")
+        bar.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+        -- Name
+        bar.name:SetText(ability.name or "Unknown")
+
+        -- Determine type and color
+        local typeStr = ""
+        local barColor = {0.4, 0.4, 0.5}
+        if ability.damage > 0 and ability.healing > 0 then
+            typeStr = "|cffff6666DMG|r + |cff66ff66HEAL|r"
+            barColor = {0.6, 0.4, 0.6}
+        elseif ability.damage > 0 then
+            typeStr = "|cffff6666Damage|r"
+            barColor = {0.8, 0.3, 0.2}
+        elseif ability.healing > 0 then
+            typeStr = "|cff66ff66Healing|r"
+            barColor = {0.2, 0.7, 0.3}
+        elseif ability.absorbs > 0 then
+            typeStr = "|cffffff66Absorb|r"
+            barColor = {0.8, 0.7, 0.2}
+        end
+
+        bar.subText:SetText(string.format("%s | Hits: %d | Crits: %d", typeStr, ability.hits, ability.crits))
+
+        -- Value
+        bar.value:SetText(Utils.FormatNumber(ability.total))
+        bar.value:SetTextColor(1, 0.9, 0.6, 1)
+
+        -- Bar value
+        local percent = ability.total / maxImpact
+        bar.statusBar:SetValue(percent)
+        bar.statusBar:SetStatusBarColor(barColor[1], barColor[2], barColor[3], 0.8)
+
+        -- Percent text
+        local totalActorDamageHealing = (actor.damage or 0) + (actor.healing or 0)
+        local percentOfTotal = totalActorDamageHealing > 0 and ((ability.total / totalActorDamageHealing) * 100) or 0
+        bar.percent:SetText(string.format("%.1f%%", percentOfTotal))
+        bar.percent:SetTextColor(0.8, 0.8, 0.8, 1)
+
+        -- Accent color
+        if bar.accent then
+            bar.accent:SetColorTexture(barColor[1], barColor[2], barColor[3], 0.6)
+        end
+
+        -- Tooltip with more details
+        bar:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+            GameTooltip:SetText(ability.name or "Unknown", 1, 1, 1)
+            if ability.damage > 0 then
+                GameTooltip:AddLine(string.format("Damage: %s", Utils.FormatNumber(ability.damage)), 1, 0.4, 0.4)
+                if ability.damageMin > 0 then
+                    GameTooltip:AddLine(string.format("Min/Max: %s / %s", Utils.FormatNumber(ability.damageMin), Utils.FormatNumber(ability.damageMax)), 0.7, 0.7, 0.7)
+                end
+            end
+            if ability.healing > 0 then
+                GameTooltip:AddLine(string.format("Healing: %s", Utils.FormatNumber(ability.healing)), 0.4, 1, 0.4)
+            end
+            if ability.absorbs > 0 then
+                GameTooltip:AddLine(string.format("Absorbs: %s", Utils.FormatNumber(ability.absorbs)), 1, 1, 0.4)
+            end
+            GameTooltip:AddLine(string.format("Hits: %d | Crits: %d (%.1f%%)", ability.hits, ability.crits, ability.hits > 0 and (ability.crits / ability.hits * 100) or 0), 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        bar:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+        bar:SetScript("OnClick", nil)
+
+        yOffset = yOffset + 34
+        barIndex = barIndex + 1
+    end
+
+    -- Add utility section (interrupts, dispels)
+    local interrupts = actor.interrupts or 0
+    local dispels = actor.dispels or 0
+    local deaths = actor.deaths or 0
+
+    if interrupts > 0 or dispels > 0 or deaths > 0 then
+        yOffset = yOffset + 10 -- Spacer
+
+        -- Utility header
         local headerBar = self:GetAbilityBar(barIndex)
         headerBar:ClearAllPoints()
         headerBar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 0, -yOffset)
         headerBar:SetWidth(contentWidth - 8)
-        headerBar.icon:SetTexture("Interface\\Icons\\Ability_Kick")
-        headerBar.name:SetText("|cff00ccffInterrupts|r")
-        headerBar.subText:SetText(string.format("Total: %d successful interrupts", interrupts))
+        headerBar.icon:SetTexture("Interface\\Icons\\Trade_Engineering")
+        headerBar.name:SetText("|cff88aaccUtility Summary|r")
+        headerBar.subText:SetText("")
         headerBar.value:SetText("")
         headerBar.percent:SetText("")
         headerBar.statusBar:SetValue(0)
-        if headerBar.accent then headerBar.accent:SetColorTexture(0, 0.8, 1, 0.7) end
+        if headerBar.accent then headerBar.accent:SetColorTexture(0.4, 0.6, 0.8, 0.7) end
         headerBar:SetScript("OnEnter", nil)
         headerBar:SetScript("OnLeave", nil)
         headerBar:SetScript("OnClick", nil)
         yOffset = yOffset + 36
         barIndex = barIndex + 1
 
-        -- Show interrupt spells
-        for spellId, data in pairs(interruptSpells) do
-            if barIndex > 50 then break end
+        -- Show utility stats
+        if interrupts > 0 then
             local bar = self:GetAbilityBar(barIndex)
             bar:ClearAllPoints()
             bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 12, -yOffset)
             bar:SetWidth(contentWidth - 20)
-            local spellInfo = Utils.GetSpellInfo(spellId)
-            bar.icon:SetTexture(spellInfo and spellInfo.icon or "Interface\\Icons\\Ability_Kick")
-            bar.name:SetText(data.name or "Unknown")
-            bar.subText:SetText(string.format("%d times", data.count or 0))
-            bar.value:SetText("")
+            bar.icon:SetTexture("Interface\\Icons\\Ability_Kick")
+            bar.name:SetText("|cff00ccffInterrupts|r")
+            bar.subText:SetText("")
+            bar.value:SetText(tostring(interrupts))
+            bar.value:SetTextColor(0, 0.8, 1, 1)
             bar.percent:SetText("")
             bar.statusBar:SetValue(0)
             if bar.accent then bar.accent:SetColorTexture(0, 0.6, 0.8, 0.5) end
             bar:SetScript("OnEnter", nil)
             bar:SetScript("OnLeave", nil)
-            bar:SetScript("OnClick", nil)
             yOffset = yOffset + 34
             barIndex = barIndex + 1
         end
-    end
 
-    -- Section: Dispels
-    local dispels = actor.dispels or 0
-    local dispelSpells = actor.dispelSpells or {}
-
-    if dispels > 0 or next(dispelSpells) then
-        local headerBar = self:GetAbilityBar(barIndex)
-        headerBar:ClearAllPoints()
-        headerBar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 0, -yOffset)
-        headerBar:SetWidth(contentWidth - 8)
-        headerBar.icon:SetTexture("Interface\\Icons\\Spell_Holy_DispelMagic")
-        headerBar.name:SetText("|cff00ff00Dispels|r")
-        headerBar.subText:SetText(string.format("Total: %d successful dispels", dispels))
-        headerBar.value:SetText("")
-        headerBar.percent:SetText("")
-        headerBar.statusBar:SetValue(0)
-        if headerBar.accent then headerBar.accent:SetColorTexture(0.2, 1, 0.3, 0.7) end
-        headerBar:SetScript("OnEnter", nil)
-        headerBar:SetScript("OnLeave", nil)
-        headerBar:SetScript("OnClick", nil)
-        yOffset = yOffset + 36
-        barIndex = barIndex + 1
-
-        for spellId, data in pairs(dispelSpells) do
-            if barIndex > 50 then break end
+        if dispels > 0 then
             local bar = self:GetAbilityBar(barIndex)
             bar:ClearAllPoints()
             bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 12, -yOffset)
             bar:SetWidth(contentWidth - 20)
-            local spellInfo = Utils.GetSpellInfo(spellId)
-            bar.icon:SetTexture(spellInfo and spellInfo.icon or "Interface\\Icons\\Spell_Holy_DispelMagic")
-            bar.name:SetText(data.name or "Unknown")
-            bar.subText:SetText(string.format("%d times | Removed: %s", data.count or 0, data.removedSpell or "Unknown"))
-            bar.value:SetText("")
+            bar.icon:SetTexture("Interface\\Icons\\Spell_Holy_DispelMagic")
+            bar.name:SetText("|cff00ff00Dispels|r")
+            bar.subText:SetText("")
+            bar.value:SetText(tostring(dispels))
+            bar.value:SetTextColor(0.3, 1, 0.4, 1)
             bar.percent:SetText("")
             bar.statusBar:SetValue(0)
             if bar.accent then bar.accent:SetColorTexture(0.2, 0.8, 0.3, 0.5) end
             bar:SetScript("OnEnter", nil)
             bar:SetScript("OnLeave", nil)
-            bar:SetScript("OnClick", nil)
             yOffset = yOffset + 34
             barIndex = barIndex + 1
         end
-    end
 
-    -- Section: Absorbs
-    local absorbs = actor.absorbs or 0
-    if absorbs > 0 then
-        local headerBar = self:GetAbilityBar(barIndex)
-        headerBar:ClearAllPoints()
-        headerBar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 0, -yOffset)
-        headerBar:SetWidth(contentWidth - 8)
-        headerBar.icon:SetTexture("Interface\\Icons\\Spell_Holy_PowerWordShield")
-        headerBar.name:SetText("|cffffff00Absorbs|r")
-        headerBar.subText:SetText(string.format("Total absorbed: %s", Utils.FormatNumber(absorbs)))
-        headerBar.value:SetText(Utils.FormatNumber(absorbs))
-        headerBar.percent:SetText("")
-        headerBar.statusBar:SetValue(0)
-        if headerBar.accent then headerBar.accent:SetColorTexture(1, 0.9, 0.2, 0.7) end
-        headerBar:SetScript("OnEnter", nil)
-        headerBar:SetScript("OnLeave", nil)
-        headerBar:SetScript("OnClick", nil)
-        yOffset = yOffset + 36
-        barIndex = barIndex + 1
-    end
-
-    -- Section: Deaths summary
-    local deaths = actor.deaths or 0
-    if deaths > 0 then
-        local headerBar = self:GetAbilityBar(barIndex)
-        headerBar:ClearAllPoints()
-        headerBar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 0, -yOffset)
-        headerBar:SetWidth(contentWidth - 8)
-        headerBar.icon:SetTexture("Interface\\Icons\\Ability_Rogue_FeignDeath")
-        headerBar.name:SetText("|cffff0000Deaths|r")
-        headerBar.subText:SetText(string.format("Died %d time(s)", deaths))
-        headerBar.value:SetText("")
-        headerBar.percent:SetText("")
-        headerBar.statusBar:SetValue(0)
-        headerBar.statusBar:SetStatusBarColor(0.8, 0.1, 0.1, 0.5)
-        if headerBar.accent then headerBar.accent:SetColorTexture(1, 0.2, 0.2, 0.8) end
-        headerBar:SetScript("OnEnter", nil)
-        headerBar:SetScript("OnLeave", nil)
-        headerBar:SetScript("OnClick", nil)
-        yOffset = yOffset + 36
-        barIndex = barIndex + 1
+        if deaths > 0 then
+            local bar = self:GetAbilityBar(barIndex)
+            bar:ClearAllPoints()
+            bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 12, -yOffset)
+            bar:SetWidth(contentWidth - 20)
+            bar.icon:SetTexture("Interface\\Icons\\Ability_Rogue_FeignDeath")
+            bar.name:SetText("|cffff4444Deaths|r")
+            bar.subText:SetText("")
+            bar.value:SetText(tostring(deaths))
+            bar.value:SetTextColor(1, 0.3, 0.3, 1)
+            bar.percent:SetText("")
+            bar.statusBar:SetValue(0)
+            if bar.accent then bar.accent:SetColorTexture(1, 0.2, 0.2, 0.5) end
+            bar:SetScript("OnEnter", nil)
+            bar:SetScript("OnLeave", nil)
+            yOffset = yOffset + 34
+            barIndex = barIndex + 1
+        end
     end
 
     -- If nothing to show
@@ -919,7 +984,7 @@ function DetailWindow:ShowActivity()
         noData:SetPoint("CENTER", 0, 0)
         noData:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
         noData:SetTextColor(0.6, 0.6, 0.6, 1)
-        noData:SetText("No activity recorded yet")
+        noData:SetText("No spells recorded yet")
         self.scrollChild:SetHeight(50)
         return
     end
