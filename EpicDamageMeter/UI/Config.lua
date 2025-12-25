@@ -1528,7 +1528,6 @@ function Config:BuildCreditsTab()
     changelogRow.text:SetJustifyH("LEFT")
     changelogRow.text:SetText(
         "|cff00ff00v1.1.0 - Latest|r\n" ..
-        "  - Added Damage Taken and Death Recap modules\n" ..
         "  - Smooth graph animation with Catmull-Rom curves\n" ..
         "  - DPS shown next to damage values\n" ..
         "  - Fixed double-hit registration\n" ..
