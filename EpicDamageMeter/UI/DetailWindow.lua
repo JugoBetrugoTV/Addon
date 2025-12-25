@@ -481,6 +481,7 @@ function DetailWindow:CreateAbilityBar(index)
     })
     bar.iconBorder:SetBackdropColor(0, 0, 0, 0.8)
     bar.iconBorder:SetBackdropBorderColor(0.25, 0.3, 0.4, 0.8)
+    bar.iconBorder:EnableMouse(false) -- Pass clicks through to parent button
 
     bar.icon = bar.iconBorder:CreateTexture(nil, "ARTWORK")
     bar.icon:SetSize(24, 24)

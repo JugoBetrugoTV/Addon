@@ -1265,17 +1265,16 @@ function UI:ApplySettings()
         end
     end
 
-    -- Get font settings
+    -- Get font settings from LibSharedMedia
     local fontName = barsDb.font or "Friz Quadrata TT"
-    local fontPaths = {
-        ["Friz Quadrata TT"] = "Fonts\\FRIZQT__.TTF",
-        ["Arial Narrow"] = "Fonts\\ARIALN.TTF",
-        ["Morpheus"] = "Fonts\\MORPHEUS.TTF",
-        ["Skurri"] = "Fonts\\SKURRI.TTF",
-        ["2002"] = "Fonts\\2002.TTF",
-        ["2002 Bold"] = "Fonts\\2002B.TTF",
-    }
-    local fontPath = fontPaths[fontName] or "Fonts\\FRIZQT__.TTF"
+    local fontPath = "Fonts\\FRIZQT__.TTF"
+    local LSMFont = LibStub("LibSharedMedia-3.0", true)
+    if LSMFont then
+        local fetchedFont = LSMFont:Fetch("font", fontName)
+        if fetchedFont then
+            fontPath = fetchedFont
+        end
+    end
     local fontSize = barsDb.fontSize or 11
     local fontFlags = barsDb.fontFlags or "OUTLINE"
     local barHeight = barsDb.height or 18

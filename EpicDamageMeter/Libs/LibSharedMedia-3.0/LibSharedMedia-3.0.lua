@@ -117,11 +117,18 @@ LibSharedMedia:Register("statusbar", "Glossy", "Interface\\AddOns\\EpicDamageMet
 LibSharedMedia:Register("statusbar", "Modern", "Interface\\AddOns\\EpicDamageMeter\\Textures\\statusbar_modern")
 LibSharedMedia:Register("statusbar", "Flat", "Interface\\AddOns\\EpicDamageMeter\\Textures\\statusbar_flat")
 
--- Fonts
+-- Fonts (All standard WoW fonts)
 LibSharedMedia:Register("font", "Friz Quadrata TT", "Fonts\\FRIZQT__.TTF")
 LibSharedMedia:Register("font", "Arial Narrow", "Fonts\\ARIALN.TTF")
 LibSharedMedia:Register("font", "Morpheus", "Fonts\\MORPHEUS.TTF")
 LibSharedMedia:Register("font", "Skurri", "Fonts\\SKURRI.TTF")
+LibSharedMedia:Register("font", "2002", "Fonts\\2002.TTF")
+LibSharedMedia:Register("font", "2002 Bold", "Fonts\\2002B.TTF")
+LibSharedMedia:Register("font", "Expressway", "Fonts\\EXPRESSA.TTF")
+LibSharedMedia:Register("font", "Nimrod MT", "Fonts\\NIM_____.TTF")
+LibSharedMedia:Register("font", "Adventure", "Fonts\\ADVENTURE.TTF")
+LibSharedMedia:Register("font", "Porky's", "Fonts\\PORKYS_.TTF")
+LibSharedMedia:Register("font", "Friends", "Fonts\\FRIENDS.TTF")
 
 -- Sounds
 LibSharedMedia:Register("sound", "None", "")

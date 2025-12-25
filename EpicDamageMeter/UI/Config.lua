@@ -298,7 +298,7 @@ function Config:CreateQuickPanel()
     panel.bottomBar.version:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
     panel.bottomBar.version:SetPoint("LEFT", 10, 0)
     panel.bottomBar.version:SetTextColor(0.5, 0.5, 0.6, 1)
-    panel.bottomBar.version:SetText("EpicDamageMeter v1.0.6 | Interface 110207")
+    panel.bottomBar.version:SetText("EpicDamageMeter v1.0.7 | Interface 110207")
 
     -- Save & Reload button
     panel.bottomBar.saveBtn = CreateFrame("Button", nil, panel.bottomBar, "BackdropTemplate")
@@ -776,9 +776,6 @@ function Config:BuildGeneralTab()
     end
 
     y = y + self:CreateSectionHeader(y, "General Options")
-    y = y + self:CreateToggleRow(y, "Enable Addon", "Enable or disable the damage meter",
-        function() return EDM.db and EDM.db.profile and EDM.db.profile.enabled or false end,
-        function(v) EDM.db.profile.enabled = v; if v then EDM.Core:OnEnable() else EDM.Core:OnDisable() end end)
     y = y + self:CreateToggleRow(y, "Lock Window", "Prevent the window from being moved",
         function() return EDM.db.profile.locked end,
         function(v) EDM.db.profile.locked = v; if EDM.UI then EDM.UI:SetLocked(v) end end)
@@ -1033,19 +1030,32 @@ function Config:BuildBarsTab()
         function(v) EDM.db.profile.bars.showIcon = v; ApplyBarSettings() end)
 
     y = y + self:CreateSectionHeader(y, "Font Settings")
+    -- Build font options dynamically from LibSharedMedia
+    local fontOptions = {}
+    local LSM = LibStub("LibSharedMedia-3.0", true)
+    if LSM then
+        local fonts = LSM:List("font")
+        if fonts then
+            for _, fontName in ipairs(fonts) do
+                fontOptions[fontName] = fontName
+            end
+        end
+    end
+    -- Fallback if no fonts found
+    if not next(fontOptions) then
+        fontOptions = {
+            ["Friz Quadrata TT"] = "Friz Quadrata TT",
+            ["Arial Narrow"] = "Arial Narrow",
+            ["Morpheus"] = "Morpheus",
+            ["Skurri"] = "Skurri",
+        }
+    end
     y = y + self:CreateDropdownRow(y, "Font", "Choose bar text font",
         function() return EDM.db.profile.bars.font or "Friz Quadrata TT" end,
         function(v)
             EDM.db.profile.bars.font = v
             ApplyBarSettings()
-        end, {
-            ["Friz Quadrata TT"] = "Friz Quadrata",
-            ["Arial Narrow"] = "Arial Narrow",
-            ["Morpheus"] = "Morpheus",
-            ["Skurri"] = "Skurri",
-            ["2002"] = "2002",
-            ["2002 Bold"] = "2002 Bold",
-        })
+        end, fontOptions)
     y = y + self:CreateSliderRow(y, "Font Size", "Size of bar text",
         function() return EDM.db.profile.bars.fontSize end,
         function(v) EDM.db.profile.bars.fontSize = v; ApplyBarSettings() end, 8, 18, 1, "pt")
@@ -1329,22 +1339,21 @@ function Config:BuildCreditsTab()
     changelogRow.text:SetTextColor(0.8, 0.8, 0.85, 1)
     changelogRow.text:SetJustifyH("LEFT")
     changelogRow.text:SetText(
-        "|cff00ff00v1.0.6 - Latest|r\n" ..
+        "|cff00ff00v1.0.7 - Latest|r\n" ..
+        "  - Fixed spell bar click registration\n" ..
+        "  - Improved UI responsiveness\n" ..
+        "  - Combat segment handling improvements\n" ..
+        "  - Enhanced settings panel\n" ..
+        "  - Removed Enable Addon toggle (always enabled)\n\n" ..
+        "|cffccccccv1.0.6|r\n" ..
         "  - Simplified tracking (group/raid only like Recount)\n" ..
         "  - Fixed data persistence (no more quick resets)\n" ..
         "  - Fixed all bar settings (class colors, percent, value)\n" ..
-        "  - Added font selection dropdown\n" ..
-        "  - Fixed number format options\n" ..
-        "  - Added Quick Actions in Display tab\n" ..
-        "  - Removed sound settings\n\n" ..
+        "  - Added font selection dropdown\n\n" ..
         "|cffccccccv1.0.5|r\n" ..
         "  - Fixed settings panel tabs\n" ..
         "  - Fixed font size slider\n" ..
-        "  - Fixed window size/opacity settings\n" ..
-        "  - New minimap icon\n\n" ..
-        "|cffccccccv1.0.4|r\n" ..
-        "  - Major settings rewrite with tabs\n" ..
-        "  - Added 11 custom skins"
+        "  - Fixed window size/opacity settings"
     )
 
     y = y + 210
@@ -1365,7 +1374,7 @@ function Config:BuildCreditsTab()
     versionRow.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
     versionRow.text:SetPoint("LEFT", 10, 0)
     versionRow.text:SetTextColor(0.6, 0.6, 0.7, 1)
-    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.6 BETA\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
+    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.7 BETA\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
 
     y = y + 70
 
