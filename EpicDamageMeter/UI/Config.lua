@@ -299,7 +299,7 @@ function Config:CreateQuickPanel()
     panel.bottomBar.version:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
     panel.bottomBar.version:SetPoint("LEFT", 10, 0)
     panel.bottomBar.version:SetTextColor(0.5, 0.5, 0.6, 1)
-    panel.bottomBar.version:SetText("EpicDamageMeter v1.0.9 | Interface 110207")
+    panel.bottomBar.version:SetText("EpicDamageMeter v1.1.0 | Interface 110207")
 
     -- Save & Reload button
     panel.bottomBar.saveBtn = CreateFrame("Button", nil, panel.bottomBar, "BackdropTemplate")
@@ -961,30 +961,11 @@ function Config:BuildWindowTab()
         function(v)
             EDM.db.profile.window.showBackground = v
             ApplyToAllWindows(function(inst)
-                local bgColor = EDM.db.profile.window.backgroundColor
                 if v then
-                    inst.frame:SetBackdropColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a or 0.9)
+                    inst.frame:SetBackdropColor(0.05, 0.05, 0.08, 0.92)
                 else
                     inst.frame:SetBackdropColor(0, 0, 0, 0)
                 end
-            end)
-        end)
-    y = y + self:CreateColorRow(y, "Background Color", "Window background color",
-        function() return EDM.db.profile.window.backgroundColor end,
-        function(v)
-            EDM.db.profile.window.backgroundColor = v
-            ApplyToAllWindows(function(inst)
-                if EDM.db.profile.window.showBackground then
-                    inst.frame:SetBackdropColor(v.r, v.g, v.b, v.a or 0.9)
-                end
-            end)
-        end)
-    y = y + self:CreateColorRow(y, "Border Color", "Window border color",
-        function() return EDM.db.profile.window.borderColor end,
-        function(v)
-            EDM.db.profile.window.borderColor = v
-            ApplyToAllWindows(function(inst)
-                inst.frame:SetBackdropBorderColor(v.r, v.g, v.b, v.a or 1)
             end)
         end)
 
@@ -1334,255 +1315,78 @@ function Config:BuildSegmentsTab()
     local panel = self.quickPanel
     local y = 0
 
-    y = y + self:CreateSectionHeader(y, "Segment Browser")
+    y = y + self:CreateSectionHeader(y, "Segment View")
 
-    -- Info text
-    local infoRow = CreateFrame("Frame", nil, panel.scrollChild)
-    infoRow:SetHeight(50)
-    infoRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
-    infoRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
-
-    infoRow.bg = infoRow:CreateTexture(nil, "BACKGROUND")
-    infoRow.bg:SetAllPoints()
-    infoRow.bg:SetColorTexture(0.08, 0.1, 0.15, 0.8)
-
-    infoRow.icon = infoRow:CreateTexture(nil, "ARTWORK")
-    infoRow.icon:SetSize(32, 32)
-    infoRow.icon:SetPoint("LEFT", 10, 0)
-    infoRow.icon:SetTexture("Interface\\Icons\\Spell_Holy_BorrowedTime")
-    infoRow.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-
-    infoRow.text = infoRow:CreateFontString(nil, "OVERLAY")
-    infoRow.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
-    infoRow.text:SetPoint("LEFT", infoRow.icon, "RIGHT", 10, 0)
-    infoRow.text:SetPoint("RIGHT", infoRow, "RIGHT", -10, 0)
-    infoRow.text:SetTextColor(0.8, 0.85, 0.9, 1)
-    infoRow.text:SetJustifyH("LEFT")
-    infoRow.text:SetText("Browse past combat segments. Click a segment to view its data. Right-click for options.")
-
-    y = y + 55
-
-    -- Quick segment actions
-    local actionsRow = CreateFrame("Frame", nil, panel.scrollChild)
-    actionsRow:SetHeight(35)
-    actionsRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
-    actionsRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
-
-    actionsRow.bg = actionsRow:CreateTexture(nil, "BACKGROUND")
-    actionsRow.bg:SetAllPoints()
-    actionsRow.bg:SetColorTexture(0.05, 0.07, 0.1, 0.6)
-
-    -- Current segment button
-    local currentBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
-    currentBtn:SetSize(100, 26)
-    currentBtn:SetPoint("LEFT", 10, 0)
-    currentBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
-    currentBtn:SetBackdropColor(0.2, 0.5, 0.3, 0.8)
-    currentBtn:SetBackdropBorderColor(0.3, 0.7, 0.4, 1)
-    currentBtn.text = currentBtn:CreateFontString(nil, "OVERLAY")
-    currentBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-    currentBtn.text:SetPoint("CENTER")
-    currentBtn.text:SetText("Current")
-    currentBtn.text:SetTextColor(0.9, 1, 0.9, 1)
-    currentBtn:SetScript("OnClick", function()
-        if EDM.Database then
-            EDM.db.profile.display.segment = 1 -- CURRENT
-            if EDM.UI then EDM.UI:Refresh() end
-            Config:BuildSegmentsTab() -- Refresh tab
-        end
-    end)
-    currentBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.3, 0.6, 0.4, 1) end)
-    currentBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.2, 0.5, 0.3, 0.8) end)
-
-    -- Overall segment button
-    local overallBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
-    overallBtn:SetSize(100, 26)
-    overallBtn:SetPoint("LEFT", currentBtn, "RIGHT", 8, 0)
-    overallBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
-    overallBtn:SetBackdropColor(0.3, 0.4, 0.6, 0.8)
-    overallBtn:SetBackdropBorderColor(0.4, 0.5, 0.8, 1)
-    overallBtn.text = overallBtn:CreateFontString(nil, "OVERLAY")
-    overallBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-    overallBtn.text:SetPoint("CENTER")
-    overallBtn.text:SetText("Overall")
-    overallBtn.text:SetTextColor(0.9, 0.9, 1, 1)
-    overallBtn:SetScript("OnClick", function()
-        if EDM.Database then
-            EDM.db.profile.display.segment = 2 -- OVERALL
-            if EDM.UI then EDM.UI:Refresh() end
-            Config:BuildSegmentsTab()
-        end
-    end)
-    overallBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.4, 0.5, 0.7, 1) end)
-    overallBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.3, 0.4, 0.6, 0.8) end)
-
-    -- Delete All button
-    local deleteAllBtn = CreateFrame("Button", nil, actionsRow, "BackdropTemplate")
-    deleteAllBtn:SetSize(100, 26)
-    deleteAllBtn:SetPoint("RIGHT", -10, 0)
-    deleteAllBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
-    deleteAllBtn:SetBackdropColor(0.5, 0.2, 0.2, 0.8)
-    deleteAllBtn:SetBackdropBorderColor(0.7, 0.3, 0.3, 1)
-    deleteAllBtn.text = deleteAllBtn:CreateFontString(nil, "OVERLAY")
-    deleteAllBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-    deleteAllBtn.text:SetPoint("CENTER")
-    deleteAllBtn.text:SetText("Clear All")
-    deleteAllBtn.text:SetTextColor(1, 0.8, 0.8, 1)
-    deleteAllBtn:SetScript("OnClick", function()
-        StaticPopup_Show("EDM_CONFIRM_CLEAR_SEGMENTS")
-    end)
-    deleteAllBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.7, 0.3, 0.3, 1) end)
-    deleteAllBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.5, 0.2, 0.2, 0.8) end)
-
-    -- Static popup for clearing segments
-    if not StaticPopupDialogs["EDM_CONFIRM_CLEAR_SEGMENTS"] then
-        StaticPopupDialogs["EDM_CONFIRM_CLEAR_SEGMENTS"] = {
-            text = "Clear all combat segments? This cannot be undone.",
-            button1 = "Yes",
-            button2 = "No",
-            OnAccept = function()
-                if EDM.Database then
-                    EDM.Database:ClearAllSegments()
-                    if EDM.UI then EDM.UI:Refresh() end
-                    Config:BuildSegmentsTab()
-                end
-            end,
-            timeout = 0,
-            whileDead = true,
-            hideOnEscape = true,
-        }
-    end
-
-    y = y + 40
-
-    y = y + self:CreateSectionHeader(y, "Saved Segments")
-
-    -- Get segments from database
-    local segments = {}
-    if EDM.Database and EDM.Database.Data and EDM.Database.Data.segments then
-        segments = EDM.Database.Data.segments
-    end
-
+    -- Current segment type display
     local currentSegmentType = EDM.db.profile.display.segment or 1
+    local currentLabel = currentSegmentType == 1 and "|cff00ff00Current Segment|r" or "|cff6699ffOverall Data|r"
 
-    if #segments == 0 then
-        -- No segments message
-        local noDataRow = CreateFrame("Frame", nil, panel.scrollChild)
-        noDataRow:SetHeight(60)
-        noDataRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
-        noDataRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
+    y = y + self:CreateToggleRow(y, "View Overall Data", "Switch between current segment and overall session data",
+        function() return EDM.db.profile.display.segment == 2 end,
+        function(v)
+            EDM.db.profile.display.segment = v and 2 or 1
+            if EDM.UI then EDM.UI:Refresh() end
+        end)
 
-        noDataRow.bg = noDataRow:CreateTexture(nil, "BACKGROUND")
-        noDataRow.bg:SetAllPoints()
-        noDataRow.bg:SetColorTexture(0.05, 0.07, 0.1, 0.6)
+    y = y + self:CreateSectionHeader(y, "Data Management")
 
-        noDataRow.text = noDataRow:CreateFontString(nil, "OVERLAY")
-        noDataRow.text:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
-        noDataRow.text:SetPoint("CENTER")
-        noDataRow.text:SetTextColor(0.6, 0.6, 0.7, 1)
-        noDataRow.text:SetText("No combat segments recorded yet.\nEnter combat to start tracking!")
+    -- Reset current segment button
+    local resetRow = CreateFrame("Frame", nil, panel.scrollChild)
+    resetRow:SetHeight(36)
+    resetRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
+    resetRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
 
-        y = y + 65
-    else
-        -- Display each segment
-        for i, segment in ipairs(segments) do
-            local segRow = CreateFrame("Button", nil, panel.scrollChild, "BackdropTemplate")
-            segRow:SetHeight(45)
-            segRow:SetPoint("TOPLEFT", panel.scrollChild, "TOPLEFT", 8, -y)
-            segRow:SetPoint("TOPRIGHT", panel.scrollChild, "TOPRIGHT", -8, -y)
-            segRow:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    resetRow.bg = resetRow:CreateTexture(nil, "BACKGROUND")
+    resetRow.bg:SetAllPoints()
+    resetRow.bg:SetColorTexture(0.05, 0.07, 0.1, 0.6)
 
-            -- Highlight if selected
-            local isSelected = (i == 1 and currentSegmentType == 1) or (segment.isOverall and currentSegmentType == 2)
-            if isSelected then
-                segRow:SetBackdropColor(0.15, 0.25, 0.4, 0.9)
-                segRow:SetBackdropBorderColor(0.3, 0.6, 1, 1)
-            else
-                segRow:SetBackdropColor(0.06, 0.08, 0.12, 0.8)
-                segRow:SetBackdropBorderColor(0.2, 0.25, 0.35, 0.8)
-            end
-
-            -- Segment icon
-            segRow.icon = segRow:CreateTexture(nil, "ARTWORK")
-            segRow.icon:SetSize(32, 32)
-            segRow.icon:SetPoint("LEFT", 8, 0)
-            if segment.isBoss then
-                segRow.icon:SetTexture("Interface\\Icons\\Achievement_Boss_Onyxia")
-            elseif segment.isOverall then
-                segRow.icon:SetTexture("Interface\\Icons\\Spell_Holy_SurgeOfLight")
-            else
-                segRow.icon:SetTexture("Interface\\Icons\\INV_Misc_SummerFest_BrazierRed")
-            end
-            segRow.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-
-            -- Segment name
-            segRow.name = segRow:CreateFontString(nil, "OVERLAY")
-            segRow.name:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
-            segRow.name:SetPoint("TOPLEFT", segRow.icon, "TOPRIGHT", 10, -4)
-            local segmentName = segment.name or (segment.isOverall and "Overall" or "Combat #" .. i)
-            if i == 1 and not segment.isOverall then
-                segmentName = "|cff00ff00" .. segmentName .. " (Current)|r"
-            elseif segment.isBoss then
-                segmentName = "|cffff9900" .. segmentName .. "|r"
-            end
-            segRow.name:SetText(segmentName)
-
-            -- Segment details
-            segRow.details = segRow:CreateFontString(nil, "OVERLAY")
-            segRow.details:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
-            segRow.details:SetPoint("TOPLEFT", segRow.name, "BOTTOMLEFT", 0, -4)
-            segRow.details:SetTextColor(0.7, 0.7, 0.8, 1)
-
-            local duration = segment.duration or 0
-            local totalDamage = segment.totalDamage or 0
-            local durationStr = string.format("%d:%02d", math.floor(duration / 60), duration % 60)
-            local damageStr = EDM.Database and EDM.Database.FormatNumber and EDM.Database:FormatNumber(totalDamage) or tostring(totalDamage)
-            segRow.details:SetText(string.format("Duration: %s | Total Damage: %s", durationStr, damageStr))
-
-            -- Click to select
-            segRow:SetScript("OnClick", function()
-                -- Set segment as current view
-                if segment.isOverall then
-                    EDM.db.profile.display.segment = 2 -- OVERALL
-                else
-                    EDM.db.profile.display.segment = 1 -- CURRENT
-                    -- If not the first segment, we need a way to select it
-                    if EDM.Database then
-                        EDM.Database.selectedSegmentIndex = i
-                    end
-                end
-                if EDM.UI then EDM.UI:Refresh() end
-                Config:BuildSegmentsTab()
-            end)
-
-            segRow:SetScript("OnEnter", function(btn)
-                if not isSelected then
-                    btn:SetBackdropColor(0.1, 0.15, 0.25, 0.9)
-                end
-            end)
-            segRow:SetScript("OnLeave", function(btn)
-                if not isSelected then
-                    btn:SetBackdropColor(0.06, 0.08, 0.12, 0.8)
-                end
-            end)
-
-            y = y + 48
+    local resetBtn = CreateFrame("Button", nil, resetRow, "BackdropTemplate")
+    resetBtn:SetSize(150, 28)
+    resetBtn:SetPoint("LEFT", 10, 0)
+    resetBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    resetBtn:SetBackdropColor(0.5, 0.3, 0.2, 0.8)
+    resetBtn:SetBackdropBorderColor(0.7, 0.4, 0.3, 1)
+    resetBtn.text = resetBtn:CreateFontString(nil, "OVERLAY")
+    resetBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    resetBtn.text:SetPoint("CENTER")
+    resetBtn.text:SetText("Reset Current")
+    resetBtn.text:SetTextColor(1, 0.9, 0.8, 1)
+    resetBtn:SetScript("OnClick", function()
+        if EDM.Database then
+            EDM.Database:StartNewCurrentSegment()
+            if EDM.UI then EDM.UI:Refresh() end
         end
-    end
+    end)
+    resetBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.7, 0.4, 0.3, 1) end)
+    resetBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.5, 0.3, 0.2, 0.8) end)
+
+    local clearBtn = CreateFrame("Button", nil, resetRow, "BackdropTemplate")
+    clearBtn:SetSize(150, 28)
+    clearBtn:SetPoint("LEFT", resetBtn, "RIGHT", 10, 0)
+    clearBtn:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    clearBtn:SetBackdropColor(0.5, 0.2, 0.2, 0.8)
+    clearBtn:SetBackdropBorderColor(0.7, 0.3, 0.3, 1)
+    clearBtn.text = clearBtn:CreateFontString(nil, "OVERLAY")
+    clearBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    clearBtn.text:SetPoint("CENTER")
+    clearBtn.text:SetText("Clear All Data")
+    clearBtn.text:SetTextColor(1, 0.8, 0.8, 1)
+    clearBtn:SetScript("OnClick", function()
+        if EDM.Database then
+            EDM.Database:ClearAllSegments()
+            if EDM.UI then EDM.UI:Refresh() end
+        end
+    end)
+    clearBtn:SetScript("OnEnter", function(btn) btn:SetBackdropColor(0.7, 0.3, 0.3, 1) end)
+    clearBtn:SetScript("OnLeave", function(btn) btn:SetBackdropColor(0.5, 0.2, 0.2, 0.8) end)
+
+    y = y + 42
 
     y = y + self:CreateSectionHeader(y, "Segment Options")
 
     y = y + self:CreateSliderRow(y, "Max Segments", "Maximum number of segments to keep",
         function() return EDM.db.profile.combat.maxSegments or 10 end,
         function(v) EDM.db.profile.combat.maxSegments = v end, 5, 50, 5, "")
-
-    y = y + self:CreateToggleRow(y, "Auto-Merge Trash", "Combine trash pulls into one segment",
-        function() return EDM.db.profile.combat.autoMergeTrash end,
-        function(v) EDM.db.profile.combat.autoMergeTrash = v end)
-
-    y = y + self:CreateToggleRow(y, "Separate Boss Segments", "Create separate segments for boss fights",
-        function() return EDM.db.profile.combat.separateBossSegments ~= false end,
-        function(v) EDM.db.profile.combat.separateBossSegments = v end)
 
     panel.scrollChild:SetHeight(y + 30)
 end
@@ -1723,11 +1527,12 @@ function Config:BuildCreditsTab()
     changelogRow.text:SetTextColor(0.8, 0.8, 0.85, 1)
     changelogRow.text:SetJustifyH("LEFT")
     changelogRow.text:SetText(
-        "|cff00ff00v1.0.9 - Latest|r\n" ..
-        "  - Fixed absorbs being double-counted as healing\n" ..
-        "  - Improved data accuracy\n" ..
-        "  - Fixed visibility settings\n" ..
-        "  - Cleaned up UI text\n\n" ..
+        "|cff00ff00v1.1.0 - Latest|r\n" ..
+        "  - Added Damage Taken and Death Recap modules\n" ..
+        "  - Smooth graph animation with Catmull-Rom curves\n" ..
+        "  - DPS shown next to damage values\n" ..
+        "  - Fixed double-hit registration\n" ..
+        "  - Improved click-to-details reliability\n\n" ..
         "|cffccccccv1.0.8|r\n" ..
         "  - New Segments browser tab\n" ..
         "  - Bar texture selection\n" ..
@@ -1756,7 +1561,7 @@ function Config:BuildCreditsTab()
     versionRow.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
     versionRow.text:SetPoint("LEFT", 10, 0)
     versionRow.text:SetTextColor(0.6, 0.6, 0.7, 1)
-    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.9\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
+    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.1.0\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
 
     y = y + 70
 

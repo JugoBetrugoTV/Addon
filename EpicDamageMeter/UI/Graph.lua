@@ -17,12 +17,14 @@ Graph.frame = nil
 Graph.canvas = nil
 Graph.dataPoints = {}
 Graph.maxPoints = 600     -- More data points for smoother graph
-Graph.updateInterval = 0.5 -- Faster updates for more detail
+Graph.updateInterval = 0.2 -- Faster updates for smoother animation (was 0.5)
 Graph.lastUpdate = 0
 Graph.peakDPS = 0
 Graph.peakHPS = 0
 Graph.animationProgress = 0
 Graph.isAnimating = false
+Graph.smoothingEnabled = true -- Enable curve smoothing
+Graph.interpolationPoints = 3 -- Points to add between each data point for smoothness
 
 -- Line data
 Graph.lines = {
@@ -589,14 +591,75 @@ function Graph:Draw()
     self:DrawLine(self.dataPoints, startTime, duration, width, height, maxValue, "hps", self.colors.healing.primary, lineWidth, false)
 end
 
--- Draw a single data line
-function Graph:DrawLine(dataPoints, startTime, duration, width, height, maxValue, key, color, lineWidth, isGlow)
-    local lastX, lastY
+-- Catmull-Rom spline interpolation for smooth curves
+function Graph:CatmullRom(p0, p1, p2, p3, t)
+    local t2 = t * t
+    local t3 = t2 * t
 
-    for i, point in ipairs(dataPoints) do
+    return 0.5 * (
+        (2 * p1) +
+        (-p0 + p2) * t +
+        (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+        (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+    )
+end
+
+-- Generate interpolated points for smoother curves
+function Graph:InterpolatePoints(points, key, startTime, duration, width, height, maxValue)
+    if #points < 2 then return {} end
+
+    local interpolated = {}
+    local numPoints = self.interpolationPoints
+
+    for i = 1, #points do
+        local point = points[i]
         local value = point[key] or 0
         local x = ((point.time - startTime) / duration) * width
         local y = math.max(1, (value / maxValue) * height)
+
+        -- Add the original point
+        table.insert(interpolated, {x = x, y = y})
+
+        -- Add interpolated points between this and next point (for smooth curves)
+        if self.smoothingEnabled and i < #points then
+            -- Get control points for Catmull-Rom spline
+            local p0 = points[math.max(1, i - 1)]
+            local p1 = points[i]
+            local p2 = points[i + 1]
+            local p3 = points[math.min(#points, i + 2)]
+
+            local v0 = (p0[key] or 0) / maxValue * height
+            local v1 = (p1[key] or 0) / maxValue * height
+            local v2 = (p2[key] or 0) / maxValue * height
+            local v3 = (p3[key] or 0) / maxValue * height
+
+            local x1 = ((p1.time - startTime) / duration) * width
+            local x2 = ((p2.time - startTime) / duration) * width
+
+            -- Generate intermediate points
+            for j = 1, numPoints do
+                local t = j / (numPoints + 1)
+                local interpY = math.max(1, self:CatmullRom(v0, v1, v2, v3, t))
+                local interpX = x1 + (x2 - x1) * t
+
+                table.insert(interpolated, {x = interpX, y = interpY})
+            end
+        end
+    end
+
+    return interpolated
+end
+
+-- Draw a single data line with smooth curves
+function Graph:DrawLine(dataPoints, startTime, duration, width, height, maxValue, key, color, lineWidth, isGlow)
+    -- Get interpolated points for smooth curves
+    local points = self:InterpolatePoints(dataPoints, key, startTime, duration, width, height, maxValue)
+
+    local lastX, lastY
+
+    for i, point in ipairs(points) do
+        local x = point.x
+        local y = point.y
 
         if lastX and lastY then
             local line
@@ -616,34 +679,40 @@ function Graph:DrawLine(dataPoints, startTime, duration, width, height, maxValue
     end
 end
 
--- Draw fill area under a curve
+-- Draw fill area under a curve with smooth gradient
 function Graph:DrawFillArea(dataPoints, startTime, duration, width, height, maxValue, key, color)
-    -- Create triangular fill segments
-    for i = 2, #dataPoints do
-        local prevPoint = dataPoints[i - 1]
-        local currPoint = dataPoints[i]
+    -- Use interpolated points for smoother fill
+    local points = self:InterpolatePoints(dataPoints, key, startTime, duration, width, height, maxValue)
 
-        local prevValue = prevPoint[key] or 0
-        local currValue = currPoint[key] or 0
+    -- Create smooth fill segments using the interpolated points
+    for i = 2, #points do
+        local prevPoint = points[i - 1]
+        local currPoint = points[i]
 
-        local x1 = ((prevPoint.time - startTime) / duration) * width
-        local y1 = (prevValue / maxValue) * height
-        local x2 = ((currPoint.time - startTime) / duration) * width
-        local y2 = (currValue / maxValue) * height
+        local x1 = prevPoint.x
+        local y1 = prevPoint.y
+        local x2 = currPoint.x
+        local y2 = currPoint.y
 
         -- Skip if segment is too small
-        if math.abs(x2 - x1) < 0.5 then
+        if math.abs(x2 - x1) < 0.3 then
             -- Skip very small segments
         else
-            -- Create a gradient fill texture for this segment
+            -- Create a smooth fill texture for this segment
             local fill = self:GetFillTexture()
             fill:SetTexture("Interface\\Buttons\\WHITE8X8")
-            fill:SetVertexColor(color[1], color[2], color[3], color[4])
 
-            -- Position it as a rectangle approximation
+            -- Apply gradient alpha based on height for better visual effect
+            local avgHeight = (y1 + y2) / 2
+            local heightRatio = math.min(1, avgHeight / height)
+            local alpha = color[4] * (0.5 + 0.5 * heightRatio) -- More visible at peaks
+
+            fill:SetVertexColor(color[1], color[2], color[3], alpha)
+
+            -- Position with smooth height interpolation
             fill:ClearAllPoints()
             fill:SetPoint("BOTTOMLEFT", self.canvas, "BOTTOMLEFT", x1, 0)
-            fill:SetSize(math.max(1, x2 - x1), math.max(1, (y1 + y2) / 2))
+            fill:SetSize(math.max(1, x2 - x1 + 0.5), math.max(1, avgHeight))
         end
     end
 end

@@ -945,19 +945,30 @@ function Instance:SetBarData(bar, actor, rank, topValue, duration, total)
     bar.nameText:SetText(nameColor .. (actor.name or "Unknown") .. "|r")
 
     -- Value text (respect showValue and showPercent settings)
+    -- Show DPS/HPS next to damage/healing values for better info
     local displayValue = (self.mode == C.DISPLAY_MODE.DPS or self.mode == C.DISPLAY_MODE.HPS) and perSecond or value
     local valueStr = ""
     if showValue then
         if self.mode == C.DISPLAY_MODE.DEATHS or self.mode == C.DISPLAY_MODE.INTERRUPTS or
-           self.mode == C.DISPLAY_MODE.DISPELS or self.mode == C.DISPLAY_MODE.CC_BREAKS then
+           self.mode == C.DISPLAY_MODE.DISPELS or self.mode == C.DISPLAY_MODE.CC_BREAKS or
+           self.mode == C.DISPLAY_MODE.RESURRECTS then
             valueStr = string.format("%d", value)
+        elseif self.mode == C.DISPLAY_MODE.DAMAGE_DONE then
+            -- Show damage + DPS
+            valueStr = Utils.FormatNumber(value, numberFormat) .. " (" .. Utils.FormatNumber(perSecond, numberFormat) .. "/s)"
+        elseif self.mode == C.DISPLAY_MODE.HEALING_DONE then
+            -- Show healing + HPS
+            valueStr = Utils.FormatNumber(value, numberFormat) .. " (" .. Utils.FormatNumber(perSecond, numberFormat) .. "/s)"
+        elseif self.mode == C.DISPLAY_MODE.DPS or self.mode == C.DISPLAY_MODE.HPS then
+            -- Already per-second mode, just show the value with /s suffix
+            valueStr = Utils.FormatNumber(perSecond, numberFormat) .. "/s"
         else
             valueStr = Utils.FormatNumber(displayValue, numberFormat)
         end
     end
     if showPercent then
         if valueStr ~= "" then
-            valueStr = valueStr .. string.format(" (%.1f%%)", percentOfTotal)
+            valueStr = valueStr .. string.format(" %.0f%%", percentOfTotal)
         else
             valueStr = string.format("%.1f%%", percentOfTotal)
         end
@@ -1162,11 +1173,23 @@ function UI:CreateBar()
     bar.highlight:SetAllPoints()
     bar.highlight:SetColorTexture(1, 1, 1, 0.1)
 
-    -- Click handlers
+    -- Click handlers - ensure detail window opens reliably
     bar:SetScript("OnClick", function(self, button)
         if button == "LeftButton" then
-            if self.actorData and EDM.DetailWindow then
+            -- Ensure DetailWindow is initialized and show with actor data
+            if self.actorData then
+                if not EDM.DetailWindow then
+                    Utils.Debug("DetailWindow module not loaded")
+                    return
+                end
+                -- Initialize if needed
+                if not EDM.DetailWindow.frame then
+                    EDM.DetailWindow:Initialize()
+                end
+                -- Show the detail window
                 EDM.DetailWindow:Show(self.actorData, self.instance)
+            else
+                Utils.Debug("No actor data for clicked bar")
             end
         elseif button == "RightButton" then
             if self.instance then

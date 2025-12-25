@@ -171,14 +171,16 @@ function DetailWindow:Initialize()
     self.tabFrame.bg:SetColorTexture(0.04, 0.05, 0.07, 0.98)
 
     self.tabs = {}
-    local tabNames = { "Damage", "Healing", "Targets", "All Spells" }
+    local tabNames = { "Damage", "Healing", "Taken", "Targets", "All", "Deaths" }
     local tabIcons = {
         "Interface\\Icons\\Ability_Warrior_BloodFrenzy",
         "Interface\\Icons\\Spell_Holy_FlashHeal",
+        "Interface\\Icons\\Ability_Creature_Disease_02",
         "Interface\\Icons\\Ability_Creature_Cursed_02",
-        "Interface\\Icons\\Spell_Arcane_TeleportStormWind"
+        "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
+        "Interface\\Icons\\Ability_Rogue_FeignDeath"
     }
-    local tabWidth = 85
+    local tabWidth = 68
 
     for i, name in ipairs(tabNames) do
         local tab = CreateFrame("Button", nil, self.tabFrame, "BackdropTemplate")
@@ -431,9 +433,13 @@ function DetailWindow:SelectTab(index)
     elseif index == 2 then
         self:ShowHealingAbilities()
     elseif index == 3 then
-        self:ShowTargets()
+        self:ShowDamageTaken()
     elseif index == 4 then
+        self:ShowTargets()
+    elseif index == 5 then
         self:ShowAllSpells()
+    elseif index == 6 then
+        self:ShowDeathRecap()
     end
 end
 
@@ -990,6 +996,249 @@ function DetailWindow:ShowAllSpells()
     end
 
     self.scrollChild:SetHeight(math.max(yOffset, 1))
+end
+
+-- Show damage taken tab
+function DetailWindow:ShowDamageTaken()
+    local actor = self.currentActor
+    if not actor then return end
+
+    local contentWidth = self.content:GetWidth() or 380
+    local yOffset = 0
+    local barIndex = 1
+
+    -- Collect all sources of damage taken
+    local damageSources = {}
+
+    -- Check if we have damageTaken data
+    if actor.damageTaken and next(actor.damageTaken) then
+        for sourceId, source in pairs(actor.damageTaken) do
+            for spellId, ability in pairs(source.abilities or {}) do
+                local key = sourceId .. "_" .. spellId
+                damageSources[key] = {
+                    sourceName = source.name or "Unknown",
+                    spellId = spellId,
+                    spellName = ability.name or "Unknown",
+                    icon = ability.icon,
+                    damage = ability.damage or 0,
+                    hits = ability.hits or 0,
+                    crits = ability.crits or 0,
+                    blocked = ability.blocked or 0,
+                    absorbed = ability.absorbed or 0,
+                }
+            end
+        end
+    end
+
+    -- Also check actor.damageTakenTotal for simple tracking
+    if actor.damageTakenTotal and actor.damageTakenTotal > 0 then
+        -- Create synthetic entry if no detailed breakdown exists
+        if not next(damageSources) then
+            damageSources["total"] = {
+                sourceName = "Various Sources",
+                spellId = 0,
+                spellName = "Total Damage Taken",
+                icon = "Interface\\Icons\\Ability_Creature_Disease_02",
+                damage = actor.damageTakenTotal,
+                hits = 1,
+                crits = 0,
+                blocked = 0,
+                absorbed = 0,
+            }
+        end
+    end
+
+    -- Convert to array and sort
+    local sortedSources = {}
+    for key, data in pairs(damageSources) do
+        table.insert(sortedSources, data)
+    end
+
+    table.sort(sortedSources, function(a, b)
+        return a.damage > b.damage
+    end)
+
+    -- Display
+    local maxDamage = sortedSources[1] and sortedSources[1].damage or 1
+
+    for i, source in ipairs(sortedSources) do
+        if barIndex > 30 then break end
+
+        local bar = self:GetAbilityBar(barIndex)
+        bar:ClearAllPoints()
+        bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 0, -yOffset)
+        bar:SetWidth(contentWidth - 8)
+
+        -- Icon
+        local spellInfo = Utils.GetSpellInfo(source.spellId)
+        bar.icon:SetTexture(source.icon or (spellInfo and spellInfo.icon) or "Interface\\Icons\\INV_Misc_QuestionMark")
+        bar.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+        -- Name: "Spell by Source"
+        bar.name:SetText(string.format("%s |cff888888from|r %s", source.spellName, source.sourceName))
+
+        -- Value
+        local valueStr = Utils.FormatNumber(source.damage)
+        if source.hits > 0 then
+            local critPercent = (source.crits / source.hits) * 100
+            valueStr = valueStr .. string.format(" |cff888888(%d hits, %.0f%% crit)|r", source.hits, critPercent)
+        end
+        bar.value:SetText(valueStr)
+
+        -- Bar fill
+        local fillPercent = math.min(1, source.damage / maxDamage)
+        bar.bar:SetWidth(math.max(1, (contentWidth - 40) * fillPercent))
+
+        -- Red/orange color for damage taken
+        bar.bar:SetColorTexture(0.8, 0.25, 0.2, 0.85)
+        if bar.accent then
+            bar.accent:SetColorTexture(1, 0.4, 0.3, 0.7)
+        end
+
+        barIndex = barIndex + 1
+        yOffset = yOffset + 34
+    end
+
+    -- No data message
+    if barIndex == 1 then
+        local noData = self.scrollChild:CreateFontString(nil, "OVERLAY")
+        noData:SetPoint("CENTER", 0, 0)
+        noData:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+        noData:SetTextColor(0.6, 0.6, 0.6, 1)
+        noData:SetText("No damage taken recorded")
+        self.scrollChild:SetHeight(50)
+        return
+    end
+
+    self.scrollChild:SetHeight(math.max(yOffset, 1))
+end
+
+-- Show death recap tab
+function DetailWindow:ShowDeathRecap()
+    local actor = self.currentActor
+    if not actor then return end
+
+    local contentWidth = self.content:GetWidth() or 380
+    local yOffset = 0
+
+    -- Check for deaths data
+    local deaths = actor.deaths or {}
+    local numDeaths = actor.deathCount or 0
+
+    -- Header section
+    local headerHeight = 40
+    local header = CreateFrame("Frame", nil, self.scrollChild, "BackdropTemplate")
+    header:SetSize(contentWidth - 8, headerHeight)
+    header:SetPoint("TOPLEFT", 0, -yOffset)
+    header:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+    header:SetBackdropColor(0.5, 0.15, 0.15, 0.4)
+    header:SetBackdropBorderColor(0.7, 0.3, 0.3, 0.6)
+
+    local deathIcon = header:CreateTexture(nil, "ARTWORK")
+    deathIcon:SetSize(28, 28)
+    deathIcon:SetPoint("LEFT", 8, 0)
+    deathIcon:SetTexture("Interface\\Icons\\Ability_Rogue_FeignDeath")
+    deathIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+    local deathText = header:CreateFontString(nil, "OVERLAY")
+    deathText:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+    deathText:SetPoint("LEFT", deathIcon, "RIGHT", 10, 0)
+    deathText:SetText(string.format("|cffff4444Deaths:|r |cffffffff%d|r", numDeaths))
+
+    yOffset = yOffset + headerHeight + 10
+
+    -- If no deaths, show message
+    if numDeaths == 0 then
+        local noData = self.scrollChild:CreateFontString(nil, "OVERLAY")
+        noData:SetPoint("TOPLEFT", 10, -yOffset)
+        noData:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
+        noData:SetTextColor(0.5, 0.8, 0.5, 1)
+        noData:SetText(actor.name .. " did not die during this encounter!")
+        self.scrollChild:SetHeight(yOffset + 30)
+        return
+    end
+
+    -- Display each death event
+    local barIndex = 1
+    for i, death in ipairs(deaths) do
+        if barIndex > 15 then break end
+
+        -- Death divider
+        local divider = CreateFrame("Frame", nil, self.scrollChild, "BackdropTemplate")
+        divider:SetSize(contentWidth - 8, 24)
+        divider:SetPoint("TOPLEFT", 0, -yOffset)
+        divider:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8"})
+        divider:SetBackdropColor(0.15, 0.08, 0.08, 0.7)
+
+        local divText = divider:CreateFontString(nil, "OVERLAY")
+        divText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+        divText:SetPoint("LEFT", 8, 0)
+        local timeStr = death.time and string.format("%.1fs into combat", death.time) or ""
+        divText:SetText(string.format("|cffff5555Death #%d|r  |cff888888%s|r", i, timeStr))
+
+        yOffset = yOffset + 28
+
+        -- Display last few hits before death
+        local recapEntries = death.recap or {}
+        for j, entry in ipairs(recapEntries) do
+            if j > 6 then break end -- Max 6 entries per death
+
+            local bar = self:GetAbilityBar(barIndex)
+            bar:ClearAllPoints()
+            bar:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 0, -yOffset)
+            bar:SetWidth(contentWidth - 8)
+
+            -- Icon
+            local spellInfo = entry.spellId and Utils.GetSpellInfo(entry.spellId)
+            bar.icon:SetTexture(entry.icon or (spellInfo and spellInfo.icon) or "Interface\\Icons\\Spell_Shadow_LifeDrain")
+            bar.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+            -- Name: "Spell from Source"
+            local spellName = entry.spellName or "Unknown"
+            local sourceName = entry.sourceName or "Unknown"
+            bar.name:SetText(string.format("%s |cff666666from|r %s", spellName, sourceName))
+
+            -- Damage value and time before death
+            local damageStr = Utils.FormatNumber(entry.damage or 0)
+            local timeBeforeDeath = entry.timeBeforeDeath or 0
+            bar.value:SetText(string.format("|cffff4444-%s|r |cff888888(%.1fs ago)|r", damageStr, timeBeforeDeath))
+
+            -- Bar fill (relative to max damage in recap)
+            local maxDmg = math.max(1, death.maxDamage or entry.damage or 1)
+            local fillPercent = math.min(1, (entry.damage or 0) / maxDmg)
+            bar.bar:SetWidth(math.max(1, (contentWidth - 40) * fillPercent))
+
+            -- Killing blow color
+            if entry.killingBlow then
+                bar.bar:SetColorTexture(0.9, 0.1, 0.1, 0.95)
+                if bar.accent then
+                    bar.accent:SetColorTexture(1.0, 0.2, 0.2, 0.9)
+                end
+            else
+                bar.bar:SetColorTexture(0.6, 0.2, 0.2, 0.8)
+                if bar.accent then
+                    bar.accent:SetColorTexture(0.8, 0.3, 0.3, 0.6)
+                end
+            end
+
+            barIndex = barIndex + 1
+            yOffset = yOffset + 34
+        end
+
+        -- If no recap data, show placeholder
+        if #recapEntries == 0 then
+            local noRecap = self.scrollChild:CreateFontString(nil, "OVERLAY")
+            noRecap:SetPoint("TOPLEFT", 10, -yOffset)
+            noRecap:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
+            noRecap:SetTextColor(0.5, 0.5, 0.5, 1)
+            noRecap:SetText("Detailed death recap not available")
+            yOffset = yOffset + 20
+        end
+
+        yOffset = yOffset + 10
+    end
+
+    self.scrollChild:SetHeight(math.max(yOffset + 20, 1))
 end
 
 -- Hide

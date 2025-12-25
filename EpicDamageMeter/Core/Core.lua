@@ -217,39 +217,42 @@ function Core:RegisterEvents()
         self:RegisterEvent("UNIT_PET", "OnUnitPet")
     end)
 
-    -- Fallback: Create direct frame-based event registration
-    -- This ensures combat log is captured even if AceEvent fails
-    if not self.eventFrame then
-        self.eventFrame = CreateFrame("Frame")
-        self.eventFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-        self.eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
-        self.eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-        self.eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-        self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-        self.eventFrame:RegisterEvent("UNIT_PET")
+    -- Only use fallback if AceEvent failed
+    if not aceEventSuccess then
+        Utils.Debug("AceEvent failed, using fallback event frame")
 
-        self.eventFrame:SetScript("OnEvent", function(frame, event, ...)
-            if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-                if Core.initialized and EDM.Parser then
-                    EDM.Parser:OnCombatLogEvent()
+        if not self.eventFrame then
+            self.eventFrame = CreateFrame("Frame")
+            self.eventFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+            self.eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+            self.eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+            self.eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+            self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+            self.eventFrame:RegisterEvent("UNIT_PET")
+
+            self.eventFrame:SetScript("OnEvent", function(frame, event, ...)
+                if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+                    if Core.initialized and EDM.Parser then
+                        EDM.Parser:OnCombatLogEvent()
+                    end
+                elseif event == "PLAYER_REGEN_DISABLED" then
+                    Core:OnCombatStart()
+                elseif event == "PLAYER_REGEN_ENABLED" then
+                    Core:OnCombatEnd()
+                elseif event == "GROUP_ROSTER_UPDATE" then
+                    Core:OnGroupRosterUpdate()
+                elseif event == "PLAYER_ENTERING_WORLD" then
+                    Core:OnPlayerEnteringWorld(event, ...)
+                elseif event == "UNIT_PET" then
+                    Core:OnUnitPet(event, ...)
                 end
-            elseif event == "PLAYER_REGEN_DISABLED" then
-                Core:OnCombatStart()
-            elseif event == "PLAYER_REGEN_ENABLED" then
-                Core:OnCombatEnd()
-            elseif event == "GROUP_ROSTER_UPDATE" then
-                Core:OnGroupRosterUpdate()
-            elseif event == "PLAYER_ENTERING_WORLD" then
-                Core:OnPlayerEnteringWorld(event, ...)
-            elseif event == "UNIT_PET" then
-                Core:OnUnitPet(event, ...)
-            end
-        end)
+            end)
 
-        Utils.Debug("Fallback event frame created")
+            Utils.Debug("Fallback event frame created")
+        end
     end
 
-    Utils.Debug("Events registered")
+    Utils.Debug("Events registered", aceEventSuccess and "(AceEvent)" or "(Fallback)")
 end
 
 -- Start update timer
