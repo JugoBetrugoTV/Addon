@@ -1,9 +1,11 @@
-## Interface: 110207
+## Interface: 110002
+## Interface-Classic: 11503
+## Interface-Cata: 40400
 ## Title: |cff00ff00Epic|r|cffff6600Damage|r|cffff0000Meter|r
 ## Notes: A beautiful, feature-rich damage meter with stunning visuals, real-time graphs, and custom UI
 ## Notes-deDE: Ein wunderschöner, funktionsreicher Damage Meter mit atemberaubenden Grafiken, Echtzeit-Graphen und benutzerdefinierter UI
 ## Author: EpicDamageMeter Team
-## Version: 1.0.7
+## Version: 1.1.0
 ## SavedVariables: EpicDamageMeterDB
 ## SavedVariablesPerCharacter: EpicDamageMeterCharDB
 ## IconTexture: Interface\AddOns\EpicDamageMeter\Textures\icon
@@ -11,7 +13,7 @@
 ## X-Website: https://github.com/EpicDamageMeter
 ## X-Category: Combat
 ## X-License: MIT
-## X-Curse-Project-ID: 999999
+## X-Curse-Project-ID: 1408861
 ## X-WoWI-ID: 999999
 ## OptionalDeps: Ace3, LibSharedMedia-3.0, LibDBIcon-1.0
 
