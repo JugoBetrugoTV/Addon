@@ -1,6 +1,4 @@
-## Interface: 110207
-## Interface-Classic: 11508
-## Interface-MoP: 50503
+## Interface: 110207, 11508, 50503
 ## Title: |cff00ff00Epic|r|cffff6600Damage|r|cffff0000Meter|r
 ## Notes: A beautiful, feature-rich damage meter with stunning visuals, real-time graphs, and custom UI
 ## Notes-deDE: Ein wunderschöner, funktionsreicher Damage Meter mit atemberaubenden Grafiken, Echtzeit-Graphen und benutzerdefinierter UI
