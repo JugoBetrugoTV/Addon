@@ -11,6 +11,21 @@ local C = EDM.Constants
 local Utils = EDM.Utils
 local DB = EDM.Database
 
+-- Localize frequently used globals for performance
+local pairs = pairs
+local ipairs = ipairs
+local type = type
+local select = select
+local strsplit = strsplit
+local wipe = wipe
+local GetTime = GetTime
+local UnitGUID = UnitGUID
+local UnitName = UnitName
+local UnitClass = UnitClass
+local IsInRaid = IsInRaid
+local IsInGroup = IsInGroup
+local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
+
 -- Player GUID cache
 local playerGUID = nil
 local playerName = nil
@@ -20,6 +35,9 @@ local ownerPets = {}
 
 -- GUID type cache for fast lookups
 local guidTypeCache = {}
+
+-- Reusable table to avoid garbage collection
+local eventArgs = {}
 
 -- Initialize parser
 function Parser:Initialize()
@@ -575,25 +593,17 @@ end
 -- Process absorb event
 function Parser:ProcessAbsorb(segment, timestamp, subEvent, sourceGUID, sourceName, sourceFlags,
                               destGUID, destName, destFlags)
-    -- SPELL_ABSORBED has complex parameters
-    local args = {select(12, CombatLogGetCurrentEventInfo())}
+    -- SPELL_ABSORBED has complex parameters - use select directly to avoid table creation
+    local arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8 = select(12, CombatLogGetCurrentEventInfo())
 
     local casterGUID, casterName, casterFlags, casterRaidFlags
     local absorbSpellId, absorbSpellName, absorbSpellSchool
     local amount
 
-    -- Parse based on event structure
-    if type(args[4]) == "string" then
-        -- Source spell was named (caster info at start)
-        casterGUID, casterName, casterFlags, casterRaidFlags = args[1], args[2], args[3], args[4]
-        absorbSpellId, absorbSpellName, absorbSpellSchool = args[5], args[6], args[7]
-        amount = args[8]
-    else
-        -- No source spell
-        casterGUID, casterName, casterFlags, casterRaidFlags = args[1], args[2], args[3], args[4]
-        absorbSpellId, absorbSpellName, absorbSpellSchool = args[5], args[6], args[7]
-        amount = args[8]
-    end
+    -- Parse absorb event args directly
+    casterGUID, casterName, casterFlags, casterRaidFlags = arg1, arg2, arg3, arg4
+    absorbSpellId, absorbSpellName, absorbSpellSchool = arg5, arg6, arg7
+    amount = arg8
 
     if not casterGUID or not self:IsInGroup(casterGUID) then return end
     if not amount or amount == 0 then return end

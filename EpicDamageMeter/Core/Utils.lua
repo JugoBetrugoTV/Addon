@@ -9,44 +9,77 @@ EDM.Utils = {}
 local Utils = EDM.Utils
 local C = EDM.Constants
 
--- Number formatting
+-- Localize frequently used globals for performance
+local pairs = pairs
+local ipairs = ipairs
+local type = type
+local select = select
+local tonumber = tonumber
+local tostring = tostring
+local next = next
+local math_abs = math.abs
+local math_floor = math.floor
+local math_modf = math.modf
+local math_sin = math.sin
+local math_pi = math.pi
+local string_format = string.format
+local string_gsub = string.gsub
+local string_sub = string.sub
+local string_match = string.match
+local string_gmatch = string.gmatch
+local table_insert = table.insert
+local table_sort = table.sort
+local bit_band = bit.band
+local bit_bor = bit.bor
+local strsplit = strsplit
+local GetPlayerInfoByGUID = GetPlayerInfoByGUID
+local GetSpellInfo = GetSpellInfo
+local GetInstanceInfo = GetInstanceInfo
+
+-- Cache for class colors (avoid repeated table lookups)
+local classColorCache = {}
+
+-- Number formatting (optimized)
 function Utils.FormatNumber(number, format)
     if not number or number == 0 then return "0" end
 
     format = format or "SHORT"
 
     if format == "FULL" then
-        return string.format("%.0f", number)
+        return string_format("%.0f", number)
     elseif format == "COMMA" then
-        local formatted = string.format("%.0f", number)
+        local formatted = string_format("%.0f", number)
         local k
         while true do
-            formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
+            formatted, k = string_gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
             if k == 0 then break end
         end
         return formatted
     else -- SHORT
-        for _, abbr in ipairs(C.NUMBER_ABBREVIATIONS) do
-            if math.abs(number) >= abbr.threshold then
-                return string.format("%.1f%s", number / abbr.threshold, abbr.suffix)
-            end
+        local absNum = math_abs(number)
+        if absNum >= 1e9 then
+            return string_format("%.1fB", number / 1e9)
+        elseif absNum >= 1e6 then
+            return string_format("%.1fM", number / 1e6)
+        elseif absNum >= 1e3 then
+            return string_format("%.1fK", number / 1e3)
         end
-        return string.format("%.0f", number)
+        return string_format("%.0f", number)
     end
 end
 
--- Time formatting
+-- Time formatting (optimized)
 function Utils.FormatTime(seconds)
     if not seconds or seconds <= 0 then return "0:00" end
 
-    local hours = math.floor(seconds / 3600)
-    local mins = math.floor((seconds % 3600) / 60)
-    local secs = math.floor(seconds % 60)
+    local hours = math_floor(seconds / 3600)
+    local mins = math_floor((seconds % 3600) / 60)
+    local secs = math_floor(seconds % 60)
 
     if hours > 0 then
-        return string.format("%d:%02d:%02d", hours, mins, secs)
+        return string_format("%d:%02d:%02d", hours, mins, secs)
     else
-        return string.format("%d:%02d", mins, secs)
+        return string_format("%d:%02d", mins, secs)
     end
 end
 
@@ -61,9 +94,14 @@ function Utils.FormatPercent(value, total)
     end
 end
 
--- Get class color
+-- Get class color (cached)
 function Utils.GetClassColor(class)
+    if classColorCache[class] then
+        local c = classColorCache[class]
+        return c.r, c.g, c.b
+    end
     local color = C.CLASS_COLORS[class] or C.CLASS_COLORS.UNKNOWN
+    classColorCache[class] = color
     return color.r, color.g, color.b
 end
 
@@ -95,47 +133,58 @@ function Utils.GetSchoolColor(school)
     return color or C.SCHOOL_COLORS[1]
 end
 
--- Check if unit is player controlled
+-- Check if unit is player controlled (optimized)
 function Utils.IsPlayerControlled(flags)
     if not flags then return false end
-    return bit.band(flags, C.UNIT_FLAGS.CONTROL_PLAYER) > 0
+    return bit_band(flags, C.UNIT_FLAGS.CONTROL_PLAYER) > 0
 end
 
--- Check if unit is friendly
+-- Check if unit is friendly (optimized)
 function Utils.IsFriendly(flags)
     if not flags then return false end
-    return bit.band(flags, C.UNIT_FLAGS.REACTION_FRIENDLY) > 0
+    return bit_band(flags, C.UNIT_FLAGS.REACTION_FRIENDLY) > 0
 end
 
--- Check if unit is in our group (party/raid)
+-- Pre-computed group affiliation mask
+local GROUP_MASK = nil
+
+-- Check if unit is in our group (party/raid) (optimized)
 function Utils.IsInGroup(flags)
     if not flags then return false end
-    local mask = bit.bor(
-        C.UNIT_FLAGS.AFFILIATION_MINE,
-        C.UNIT_FLAGS.AFFILIATION_PARTY,
-        C.UNIT_FLAGS.AFFILIATION_RAID
-    )
-    return bit.band(flags, mask) > 0
+    -- Lazy init the mask
+    if not GROUP_MASK then
+        GROUP_MASK = bit_bor(
+            C.UNIT_FLAGS.AFFILIATION_MINE,
+            C.UNIT_FLAGS.AFFILIATION_PARTY,
+            C.UNIT_FLAGS.AFFILIATION_RAID
+        )
+    end
+    return bit_band(flags, GROUP_MASK) > 0
 end
 
--- Check if unit is a pet/guardian
+-- Pre-computed pet mask
+local PET_MASK = nil
+
+-- Check if unit is a pet/guardian (optimized)
 function Utils.IsPet(flags)
     if not flags then return false end
-    local mask = bit.bor(C.UNIT_FLAGS.TYPE_PET, C.UNIT_FLAGS.TYPE_GUARDIAN)
-    return bit.band(flags, mask) > 0
+    if not PET_MASK then
+        PET_MASK = bit_bor(C.UNIT_FLAGS.TYPE_PET, C.UNIT_FLAGS.TYPE_GUARDIAN)
+    end
+    return bit_band(flags, PET_MASK) > 0
 end
 
--- Check if unit is an NPC
+-- Check if unit is an NPC (optimized)
 function Utils.IsNPC(flags)
     if not flags then return false end
-    return bit.band(flags, C.UNIT_FLAGS.TYPE_NPC) > 0
+    return bit_band(flags, C.UNIT_FLAGS.TYPE_NPC) > 0
 end
 
--- Get unit type string
+-- Get unit type string (optimized)
 function Utils.GetUnitType(flags)
     if Utils.IsPet(flags) then
         return "PET"
-    elseif bit.band(flags, C.UNIT_FLAGS.TYPE_PLAYER) > 0 then
+    elseif bit_band(flags, C.UNIT_FLAGS.TYPE_PLAYER) > 0 then
         return "PLAYER"
     elseif Utils.IsNPC(flags) then
         return "NPC"

@@ -5,6 +5,29 @@
 
 local ADDON_NAME, EDM = ...
 
+-- Localize frequently used globals for performance
+local pairs = pairs
+local ipairs = ipairs
+local type = type
+local pcall = pcall
+local select = select
+local tonumber = tonumber
+local tostring = tostring
+local math_min = math.min
+local math_max = math.max
+local string_format = string.format
+local table_insert = table.insert
+local table_concat = table.concat
+local table_sort = table.sort
+local GetTime = GetTime
+local UnitGUID = UnitGUID
+local UnitName = UnitName
+local IsInGroup = IsInGroup
+local IsInRaid = IsInRaid
+local IsInInstance = IsInInstance
+local CreateFrame = CreateFrame
+local C_Timer = C_Timer
+
 -- Ace3 Libraries
 local AceAddon = LibStub("AceAddon-3.0")
 local AceEvent = LibStub("AceEvent-3.0")

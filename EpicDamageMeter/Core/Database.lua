@@ -10,6 +10,24 @@ local DB = EDM.Database
 local C = EDM.Constants
 local Utils = EDM.Utils
 
+-- Localize frequently used globals for performance
+local pairs = pairs
+local ipairs = ipairs
+local type = type
+local tostring = tostring
+local tonumber = tonumber
+local math_floor = math.floor
+local string_format = string.format
+local table_insert = table.insert
+local table_remove = table.remove
+local table_sort = table.sort
+local wipe = wipe
+local GetTime = GetTime
+
+-- Reusable tables to reduce garbage collection
+local sortedActorsCache = {}
+local tempSortTable = {}
+
 -- Data Templates
 
 -- Player/Actor data structure
@@ -538,11 +556,14 @@ function DB:AddTimelinePoint(segment, timestamp, damage, healing)
     end
 end
 
--- Get sorted actors for display
+-- Get sorted actors for display (optimized with table reuse)
 function DB:GetSortedActors(segment, mode)
-    if not segment then return {} end
+    if not segment then return tempSortTable end
 
-    local actors = {}
+    -- Reuse temp table to avoid GC
+    wipe(tempSortTable)
+    local actors = tempSortTable
+
     for guid, actor in pairs(segment.actors) do
         -- Include all tracked actors (already filtered by Parser)
         -- Only skip if actor has zero relevant value for the mode

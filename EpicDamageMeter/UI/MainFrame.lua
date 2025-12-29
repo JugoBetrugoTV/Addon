@@ -13,6 +13,22 @@ local C = EDM.Constants
 local DB = EDM.Database
 local LSM = LibStub("LibSharedMedia-3.0")
 
+-- Localize frequently used globals for performance
+local pairs = pairs
+local ipairs = ipairs
+local math_floor = math.floor
+local math_max = math.max
+local math_min = math.min
+local string_format = string.format
+local table_insert = table.insert
+local table_sort = table.sort
+local wipe = wipe
+local GetTime = GetTime
+local UnitName = UnitName
+local GetRealmName = GetRealmName
+local UnitClass = UnitClass
+local CreateFrame = CreateFrame
+
 -- Instance management (multi-window support)
 UI.instances = {}
 UI.instanceCounter = 0
@@ -20,6 +36,10 @@ UI.initialized = false
 
 -- Bar pool for efficient reuse
 UI.barPool = {}
+
+-- Update throttling
+local UPDATE_INTERVAL = 0.1  -- 100ms between updates
+local lastUpdateTime = 0
 
 --============================================================================
 -- INSTANCE CLASS (Each window is an instance)
@@ -1288,8 +1308,14 @@ function UI:ShowBarTooltip(bar, actor, instance)
     GameTooltip:Show()
 end
 
--- Update all instances
+-- Update all instances (throttled)
 function UI:UpdateAll()
+    local now = GetTime()
+    if now - lastUpdateTime < UPDATE_INTERVAL then
+        return -- Throttle updates
+    end
+    lastUpdateTime = now
+
     for _, instance in pairs(self.instances) do
         if instance.frame and instance.frame:IsShown() then
             instance:UpdateBars()
