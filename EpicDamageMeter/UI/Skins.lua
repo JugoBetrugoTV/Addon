@@ -984,6 +984,184 @@ Skins.list["Skada"] = {
 }
 
 --============================================================================
+-- AURORA SKIN - Beautiful rainbow gradient accents
+--============================================================================
+Skins.list["Aurora"] = {
+    name = "Aurora",
+    description = "Beautiful aurora borealis inspired theme",
+
+    window = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.03, g = 0.03, b = 0.06, a = 0.94 },
+        border = TEXTURE_PATH .. "border_modern",
+        borderColor = { r = 0.4, g = 0.2, b = 0.6, a = 0.9 },
+        borderSize = 2,
+        inset = 3,
+    },
+
+    titleBar = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.05, g = 0.04, b = 0.08, a = 0.98 },
+        height = 24,
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 12,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 0.8, g = 0.6, b = 1, a = 1 },
+        gradientStart = { r = 0.3, g = 0.1, b = 0.4, a = 0.5 },
+        gradientEnd = { r = 0.1, g = 0.2, b = 0.3, a = 0.3 },
+    },
+
+    bar = {
+        texture = "Interface\\TargetingFrame\\UI-StatusBar",
+        fallbackTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+        height = 20,
+        spacing = 2,
+        backgroundColor = { r = 0.04, g = 0.03, b = 0.06, a = 0.7 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "OUTLINE",
+        fontColor = { r = 1, g = 1, b = 1, a = 1 },
+        rankFont = "Fonts\\FRIZQT__.TTF",
+        rankFontSize = 10,
+        iconSize = 18,
+        padding = 3,
+        showShadow = true,
+        shadowColor = { r = 0.2, g = 0.1, b = 0.3, a = 0.6 },
+        shadowOffset = 2,
+        glowOnHover = true,
+        glowColor = { r = 0.6, g = 0.4, b = 1, a = 0.5 },
+        useGradient = true,
+        gradientColors = {
+            top = { r = 0.3, g = 0.5, b = 0.9 },
+            bottom = { r = 0.5, g = 0.2, b = 0.7 },
+        },
+    },
+
+    tooltip = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.03, g = 0.03, b = 0.06, a = 0.98 },
+        borderColor = { r = 0.5, g = 0.3, b = 0.7, a = 0.9 },
+        headerFont = "Fonts\\FRIZQT__.TTF",
+        headerFontSize = 13,
+        headerFontFlags = "OUTLINE",
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 11,
+        fontFlags = "",
+        padding = 12,
+    },
+
+    scrollbar = {
+        width = 10,
+        backgroundColor = { r = 0.04, g = 0.03, b = 0.06, a = 0.9 },
+        thumbColor = { r = 0.4, g = 0.2, b = 0.6, a = 0.9 },
+        thumbHoverColor = { r = 0.6, g = 0.4, b = 0.8, a = 1 },
+    },
+
+    button = {
+        backgroundColor = { r = 0.15, g = 0.1, b = 0.25, a = 1 },
+        hoverColor = { r = 0.25, g = 0.15, b = 0.4, a = 1 },
+        pressedColor = { r = 0.1, g = 0.08, b = 0.18, a = 1 },
+        font = "Fonts\\FRIZQT__.TTF",
+        fontSize = 10,
+        fontFlags = "OUTLINE",
+    },
+
+    graph = {
+        backgroundColor = { r = 0.02, g = 0.02, b = 0.04, a = 0.98 },
+        gridColor = { r = 0.15, g = 0.1, b = 0.25, a = 0.4 },
+        lineWidth = 3,
+        damageColor = { r = 1, g = 0.4, b = 0.6, a = 1 },
+        healingColor = { r = 0.4, g = 1, b = 0.8, a = 1 },
+        legendFont = "Fonts\\FRIZQT__.TTF",
+        legendFontSize = 10,
+    },
+}
+
+--============================================================================
+-- MINIMAL SKIN - Ultra clean, distraction-free
+--============================================================================
+Skins.list["Minimal"] = {
+    name = "Minimal",
+    description = "Ultra minimal, distraction-free design",
+
+    window = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.88 },
+        border = "Interface\\Buttons\\WHITE8X8",
+        borderColor = { r = 0.2, g = 0.2, b = 0.2, a = 0.6 },
+        borderSize = 1,
+        inset = 1,
+    },
+
+    titleBar = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.12, g = 0.12, b = 0.12, a = 0.95 },
+        height = 18,
+        font = "Fonts\\ARIALN.TTF",
+        fontSize = 10,
+        fontFlags = "",
+        fontColor = { r = 0.9, g = 0.9, b = 0.9, a = 1 },
+    },
+
+    bar = {
+        texture = "Interface\\Buttons\\WHITE8X8",
+        fallbackTexture = "Interface\\Buttons\\WHITE8X8",
+        height = 14,
+        spacing = 1,
+        backgroundColor = { r = 0.06, g = 0.06, b = 0.06, a = 0.5 },
+        font = "Fonts\\ARIALN.TTF",
+        fontSize = 9,
+        fontFlags = "",
+        fontColor = { r = 0.95, g = 0.95, b = 0.95, a = 1 },
+        rankFont = "Fonts\\ARIALN.TTF",
+        rankFontSize = 8,
+        iconSize = 12,
+        padding = 1,
+        showShadow = false,
+        glowOnHover = false,
+    },
+
+    tooltip = {
+        background = "Interface\\Buttons\\WHITE8X8",
+        backgroundColor = { r = 0.1, g = 0.1, b = 0.1, a = 0.95 },
+        borderColor = { r = 0.25, g = 0.25, b = 0.25, a = 1 },
+        headerFont = "Fonts\\ARIALN.TTF",
+        headerFontSize = 11,
+        headerFontFlags = "",
+        font = "Fonts\\ARIALN.TTF",
+        fontSize = 9,
+        fontFlags = "",
+        padding = 6,
+    },
+
+    scrollbar = {
+        width = 4,
+        backgroundColor = { r = 0.1, g = 0.1, b = 0.1, a = 0.6 },
+        thumbColor = { r = 0.3, g = 0.3, b = 0.3, a = 0.8 },
+        thumbHoverColor = { r = 0.4, g = 0.4, b = 0.4, a = 1 },
+    },
+
+    button = {
+        backgroundColor = { r = 0.15, g = 0.15, b = 0.15, a = 1 },
+        hoverColor = { r = 0.2, g = 0.2, b = 0.2, a = 1 },
+        pressedColor = { r = 0.1, b = 0.1, b = 0.1, a = 1 },
+        font = "Fonts\\ARIALN.TTF",
+        fontSize = 9,
+        fontFlags = "",
+    },
+
+    graph = {
+        backgroundColor = { r = 0.06, g = 0.06, b = 0.06, a = 0.9 },
+        gridColor = { r = 0.15, g = 0.15, b = 0.15, a = 0.4 },
+        lineWidth = 1,
+        damageColor = { r = 0.9, g = 0.35, b = 0.35, a = 1 },
+        healingColor = { r = 0.35, g = 0.9, b = 0.35, a = 1 },
+        legendFont = "Fonts\\ARIALN.TTF",
+        legendFontSize = 8,
+    },
+}
+
+--============================================================================
 -- SKIN FUNCTIONS
 --============================================================================
 

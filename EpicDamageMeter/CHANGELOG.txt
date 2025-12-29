@@ -1,6 +1,25 @@
 EpicDamageMeter - Changelog
 ============================
 
+Version 1.3.0
+-------------
+NEW SKINS:
+- Aurora: Beautiful aurora borealis inspired theme with gradient effects
+- Minimal: Ultra clean, distraction-free design with thin bars
+
+UI ENHANCEMENTS:
+- Enhanced tooltips with spell school color indicators
+- Session statistics tooltip (total combat time, fights, DPS averages)
+- Death recap tooltip showing damage sequence before death
+- Spark effects for top 3 performers on bars
+- Gradient color support for bar styling
+- Improved bar animations with configurable speed
+
+TOOLTIP IMPROVEMENTS:
+- Spell school breakdown with colored indicators
+- Show damage distribution by school (Physical, Fire, Frost, etc.)
+- Death recap shows last 8 damage events with spell school colors
+
 Version 1.2.0
 -------------
 NEW FEATURES:

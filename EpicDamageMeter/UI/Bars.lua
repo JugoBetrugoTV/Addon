@@ -265,9 +265,23 @@ function Bars:SetBarData(bar, actor, rank, total, duration, mode)
     local r, g, b = Utils.GetClassColor(actor.class)
     local useClassColors = EDM.db and EDM.db.profile.bars.useClassColors ~= false
 
+    -- Check if skin has gradient colors
+    local skin = Skins:Get()
+    local barSettings = skin and skin.bar or {}
+    local useGradient = barSettings.useGradient and barSettings.gradientColors
+
     if useClassColors then
-        -- Use class colors
-        bar.statusBar:SetStatusBarColor(r, g, b, 1)
+        -- Use class colors with optional gradient
+        if useGradient then
+            -- Create gradient effect by modulating class color
+            local gc = barSettings.gradientColors
+            local tr = r * 0.7 + gc.top.r * 0.3
+            local tg = g * 0.7 + gc.top.g * 0.3
+            local tb = b * 0.7 + gc.top.b * 0.3
+            bar.statusBar:SetStatusBarColor(tr, tg, tb, 1)
+        else
+            bar.statusBar:SetStatusBarColor(r, g, b, 1)
+        end
     else
         -- Use rank-based colors (gold/silver/bronze for top 3, grey for rest)
         if rank == 1 then
@@ -279,6 +293,14 @@ function Bars:SetBarData(bar, actor, rank, total, duration, mode)
         else
             bar.statusBar:SetStatusBarColor(0.4, 0.4, 0.5, 1) -- Grey
         end
+    end
+
+    -- Add spark effect for top performers
+    if rank <= 3 and bar.spark then
+        bar.spark:Show()
+        bar.spark:SetVertexColor(r, g, b, 0.7)
+    elseif bar.spark then
+        bar.spark:Hide()
     end
 
     -- Highlight player's own bar

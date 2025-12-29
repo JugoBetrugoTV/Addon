@@ -88,6 +88,44 @@ function Tooltip:AddLine(text, r, g, b, isHeader)
     return line
 end
 
+-- Spell school names
+local SCHOOL_NAMES = {
+    [1] = "Physical",
+    [2] = "Holy",
+    [4] = "Fire",
+    [8] = "Nature",
+    [16] = "Frost",
+    [32] = "Shadow",
+    [64] = "Arcane",
+}
+
+-- Get spell school color from constants
+function Tooltip:GetSchoolColor(school)
+    local color = C.SCHOOL_COLORS[school]
+    if color then
+        return color.r, color.g, color.b
+    end
+    return 0.8, 0.8, 0.8
+end
+
+-- Get spell school name
+function Tooltip:GetSchoolName(school)
+    return SCHOOL_NAMES[school] or "Unknown"
+end
+
+-- Add spell school breakdown line with colored bar
+function Tooltip:AddSchoolLine(school, damage, percent)
+    local r, g, b = self:GetSchoolColor(school)
+    local name = self:GetSchoolName(school)
+    local text = string.format("  |cff%02x%02x%02x■|r %s: %s (%.1f%%)",
+        r * 255, g * 255, b * 255,
+        name,
+        Utils.FormatNumber(damage),
+        percent
+    )
+    return self:AddLine(text, 0.9, 0.9, 0.9)
+end
+
 -- Clear tooltip
 function Tooltip:Clear()
     for _, line in ipairs(self.lines) do
@@ -178,6 +216,18 @@ function Tooltip:ShowActorTooltip(anchor, actor)
             topAbility.name,
             Utils.FormatNumber(topAbility.damage)
         ), 0.7, 0.7, 1)
+    end
+
+    -- Spell school breakdown
+    local schoolBreakdown = DB:GetSpellSchoolBreakdown(actor)
+    if schoolBreakdown and #schoolBreakdown > 0 then
+        self:AddLine(" ")
+        self:AddLine("Damage by School:", 0.9, 0.8, 0.6)
+        for i, data in ipairs(schoolBreakdown) do
+            if i <= 4 then -- Limit to top 4 schools
+                self:AddSchoolLine(data.school, data.damage, data.percent)
+            end
+        end
     end
 
     -- Instructions
@@ -321,6 +371,126 @@ function Tooltip:ShowAbilityTooltip(anchor, ability, actor)
                 self:AddLine(string.format("  %s: %d", missType, count), 0.7, 0.7, 0.7)
             end
         end
+    end
+
+    self:Layout()
+    self:SetPosition(anchor)
+    self.frame:Show()
+end
+
+-- Show session stats tooltip
+function Tooltip:ShowSessionTooltip(anchor)
+    if not self.frame then
+        self:Initialize()
+    end
+
+    self:Clear()
+
+    local DB = EDM.Database
+    local stats = DB:GetSessionStats()
+
+    -- Header
+    local headerLine = self:AddLine("Session Statistics", 1, 0.82, 0)
+    headerLine:SetFont(self.headerFont, self.headerFontSize, "OUTLINE")
+
+    self:AddLine(" ")
+
+    -- Session duration
+    self:AddLine(string.format("Session Duration: %s", Utils.FormatTime(stats.sessionDuration)), 0.9, 0.9, 0.9)
+    self:AddLine(string.format("Combat Time: %s (%.1f%%)",
+        Utils.FormatTime(stats.totalCombatTime),
+        stats.combatTimePercent
+    ), 0.8, 0.8, 0.8)
+
+    self:AddLine(" ")
+
+    -- Combat stats
+    self:AddLine(string.format("Total Fights: %d", stats.totalFights), 0.7, 0.9, 0.7)
+    self:AddLine(string.format("Total Deaths: %d (%.1f/fight)",
+        stats.totalDeaths,
+        stats.deathsPerFight
+    ), 1, 0.5, 0.5)
+
+    self:AddLine(" ")
+
+    -- DPS/HPS averages
+    self:AddLine(string.format("Total Damage: %s", Utils.FormatNumber(stats.totalDamage)), 1, 0.6, 0.6)
+    self:AddLine(string.format("Average DPS: %s", Utils.FormatNumber(stats.avgDPS)), 1, 0.7, 0.7)
+    self:AddLine(string.format("Total Healing: %s", Utils.FormatNumber(stats.totalHealing)), 0.6, 1, 0.6)
+    self:AddLine(string.format("Average HPS: %s", Utils.FormatNumber(stats.avgHPS)), 0.7, 1, 0.7)
+
+    -- Boss stats
+    if stats.bossKills > 0 or stats.bossWipes > 0 then
+        self:AddLine(" ")
+        self:AddLine(string.format("Boss Kills: %d | Wipes: %d",
+            stats.bossKills, stats.bossWipes
+        ), 1, 0.82, 0)
+        self:AddLine(string.format("Success Rate: %.1f%%", stats.bossSuccessRate), 0.8, 0.8, 0.8)
+    end
+
+    self:Layout()
+    self:SetPosition(anchor)
+    self.frame:Show()
+end
+
+-- Show death recap tooltip
+function Tooltip:ShowDeathRecapTooltip(anchor, actor)
+    if not actor then return end
+
+    if not self.frame then
+        self:Initialize()
+    end
+
+    self:Clear()
+
+    local DB = EDM.Database
+    local recap = DB:GetDeathRecap(actor)
+
+    if not recap then
+        self:AddLine("No death data available", 0.7, 0.7, 0.7)
+        self:Layout()
+        self:SetPosition(anchor)
+        self.frame:Show()
+        return
+    end
+
+    -- Header
+    local headerLine = self:AddLine(string.format("Death Recap: %s", actor.name), 1, 0.3, 0.3)
+    headerLine:SetFont(self.headerFont, self.headerFontSize, "OUTLINE")
+
+    self:AddLine(" ")
+
+    -- Killing blow
+    self:AddLine("Killing Blow:", 1, 0.5, 0.5)
+    self:AddLine(string.format("  %s - %s",
+        recap.killerName or "Unknown",
+        recap.killingBlow.spellName or "Unknown"
+    ), 0.9, 0.9, 0.9)
+    self:AddLine(string.format("  Damage: %s (Overkill: %s)",
+        Utils.FormatNumber(recap.killingBlow.damage),
+        Utils.FormatNumber(recap.killingBlow.overkill)
+    ), 0.8, 0.8, 0.8)
+
+    -- Damage sequence
+    if recap.damageSequence and #recap.damageSequence > 0 then
+        self:AddLine(" ")
+        self:AddLine("Recent Damage:", 0.9, 0.7, 0.5)
+
+        local totalDamage = 0
+        for i, event in ipairs(recap.damageSequence) do
+            if i <= 8 then -- Limit to last 8 events
+                local r, g, b = self:GetSchoolColor(event.spellSchool)
+                self:AddLine(string.format("  |cff%02x%02x%02x■|r %s: %s",
+                    r * 255, g * 255, b * 255,
+                    event.spellName,
+                    Utils.FormatNumber(event.amount)
+                ), 0.8, 0.8, 0.8)
+                totalDamage = totalDamage + event.amount
+            end
+        end
+
+        self:AddLine(" ")
+        self:AddLine(string.format("Total: %s in last 10s", Utils.FormatNumber(totalDamage)), 0.9, 0.6, 0.6)
     end
 
     self:Layout()
