@@ -12,6 +12,23 @@ local Utils = EDM.Utils
 local C = EDM.Constants
 local Widgets = EDM.Widgets
 
+-- Localize frequently used globals for performance
+local pairs = pairs
+local ipairs = ipairs
+local math_max = math.max
+local math_min = math.min
+local math_floor = math.floor
+local math_ceil = math.ceil
+local math_abs = math.abs
+local math_log10 = math.log10
+local string_format = string.format
+local table_insert = table.insert
+local table_remove = table.remove
+local wipe = wipe
+local GetTime = GetTime
+local CreateFrame = CreateFrame
+local CreateColor = CreateColor
+
 -- Graph state
 Graph.frame = nil
 Graph.canvas = nil

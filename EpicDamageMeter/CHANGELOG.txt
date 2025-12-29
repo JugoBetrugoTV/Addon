@@ -1,0 +1,27 @@
+EpicDamageMeter - Changelog
+============================
+
+Version 1.1.0
+-------------
+- Added multi-client support (Retail, Classic Era, MoP Remix)
+- Interface versions: 110207 (Retail), 11508 (Classic), 50503 (MoP)
+- Fixed Damage Taken mode to correctly show damage received
+- Fixed DPS display calculations
+- Improved click handler for damage bars
+- Enhanced graph smoothing with Catmull-Rom spline interpolation
+- Performance optimizations:
+  - Localized globals across all modules for faster lookups
+  - Added UI update throttling (100ms) to reduce CPU usage
+  - Implemented table reuse to reduce garbage collection
+  - Pre-computed bit masks for flag checks
+  - Added class color caching
+
+Version 1.0.0
+-------------
+- Initial release
+- Real-time damage and healing tracking
+- Beautiful graph visualization with animations
+- Skin system support
+- Detail window with spell breakdown
+- Minimap button integration
+- Combat segment tracking

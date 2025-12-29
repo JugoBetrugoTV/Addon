@@ -9,6 +9,18 @@ EDM.Widgets = {}
 local Widgets = EDM.Widgets
 local Skins = EDM.Skins
 
+-- Localize frequently used globals for performance
+local pairs = pairs
+local CreateFrame = CreateFrame
+local CreateColor = CreateColor
+local UIDropDownMenu_SetWidth = UIDropDownMenu_SetWidth
+local UIDropDownMenu_CreateInfo = UIDropDownMenu_CreateInfo
+local UIDropDownMenu_SetSelectedValue = UIDropDownMenu_SetSelectedValue
+local UIDropDownMenu_SetText = UIDropDownMenu_SetText
+local UIDropDownMenu_AddButton = UIDropDownMenu_AddButton
+local UIDropDownMenu_Initialize = UIDropDownMenu_Initialize
+local GameTooltip = GameTooltip
+
 -- Create a skinned frame with backdrop
 function Widgets:CreateFrame(name, parent, template)
     local frame = CreateFrame("Frame", name, parent or UIParent, template or "BackdropTemplate")

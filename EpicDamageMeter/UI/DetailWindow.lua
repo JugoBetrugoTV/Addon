@@ -12,6 +12,24 @@ local Widgets = EDM.Widgets
 local Utils = EDM.Utils
 local C = EDM.Constants
 
+-- Localize frequently used globals for performance
+local pairs = pairs
+local ipairs = ipairs
+local type = type
+local tonumber = tonumber
+local tostring = tostring
+local math_floor = math.floor
+local math_max = math.max
+local math_min = math.min
+local string_format = string.format
+local table_insert = table.insert
+local table_sort = table.sort
+local wipe = wipe
+local CreateFrame = CreateFrame
+local CreateColor = CreateColor
+local GetSpellInfo = C_Spell and C_Spell.GetSpellInfo or GetSpellInfo
+local GameTooltip = GameTooltip
+
 -- State
 DetailWindow.frame = nil
 DetailWindow.currentActor = nil
