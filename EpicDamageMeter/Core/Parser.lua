@@ -39,6 +39,39 @@ local guidTypeCache = {}
 -- Reusable table to avoid garbage collection
 local eventArgs = {}
 
+-- Fast event type lookup (combined set for quick early exit)
+local TRACKED_EVENTS = {
+    -- Damage events
+    SWING_DAMAGE = true,
+    RANGE_DAMAGE = true,
+    SPELL_DAMAGE = true,
+    SPELL_PERIODIC_DAMAGE = true,
+    DAMAGE_SHIELD = true,
+    DAMAGE_SPLIT = true,
+    ENVIRONMENTAL_DAMAGE = true,
+    -- Miss events
+    SWING_MISSED = true,
+    RANGE_MISSED = true,
+    SPELL_MISSED = true,
+    SPELL_PERIODIC_MISSED = true,
+    -- Healing events
+    SPELL_HEAL = true,
+    SPELL_PERIODIC_HEAL = true,
+    -- Death events
+    UNIT_DIED = true,
+    PARTY_KILL = true,
+    UNIT_DESTROYED = true,
+    -- Interrupt/dispel events
+    SPELL_INTERRUPT = true,
+    SPELL_DISPEL = true,
+    SPELL_STOLEN = true,
+    SPELL_DISPEL_FAILED = true,
+    -- Absorb events
+    SPELL_ABSORBED = true,
+    -- Summon events
+    SPELL_SUMMON = true,
+}
+
 -- Initialize parser
 function Parser:Initialize()
     playerGUID = UnitGUID("player")
@@ -345,6 +378,9 @@ function Parser:OnCombatLogEvent()
     local timestamp, subEvent, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags,
           destGUID, destName, destFlags, destRaidFlags = CombatLogGetCurrentEventInfo()
 
+    -- Fast early exit for untracked events
+    if not TRACKED_EVENTS[subEvent] then return end
+
     -- Skip events from sources not in our group (for damage/healing)
     -- But keep events targeting us (for damage taken)
     local sourceInGroup = sourceGUID and self:IsInGroup(sourceGUID)
@@ -462,6 +498,9 @@ function Parser:ProcessDamage(segment, timestamp, subEvent, sourceGUID, sourceNa
             end
             destActor.sources[sourceGUID].damage = destActor.sources[sourceGUID].damage + amount
         end
+
+        -- Record damage history for death recap
+        DB:RecordDamageHistory(destGUID, timestamp, sourceName, spellName, spellSchool, amount, overkill)
 
         -- Also update overall segment
         if DB.Data.overallSegment then

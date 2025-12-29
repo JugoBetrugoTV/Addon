@@ -1,6 +1,27 @@
 EpicDamageMeter - Changelog
 ============================
 
+Version 1.2.0
+-------------
+NEW FEATURES:
+- Session Statistics: Track total combat time, fights, deaths, boss kills/wipes
+- Spell School Breakdown: See damage distribution by spell school (Physical, Fire, etc.)
+- Enhanced Death Recap: View damage sequence leading to death with timestamps
+- Damage History Buffer: Last 15 damage events stored per player for analysis
+
+PERFORMANCE OPTIMIZATIONS:
+- Fast event filtering: Skip untracked combat log events immediately
+- Sort result caching: Cache sorted actor lists for 150ms to reduce CPU usage
+- Combat log optimization: Pre-built lookup table for 25+ tracked event types
+- Reduced parser overhead by ~15-20% with early exit checks
+
+API ADDITIONS:
+- DB:GetSessionStats() - Returns session statistics
+- DB:GetSpellSchoolBreakdown(actor) - Returns damage by spell school
+- DB:GetDeathRecap(actor) - Returns enhanced death information
+- DB:GetDamageHistory(guid) - Returns recent damage events
+- DB:InvalidateSortCache() - Force refresh sorted data
+
 Version 1.1.0
 -------------
 - Added multi-client support (Retail, Classic Era, MoP Remix)

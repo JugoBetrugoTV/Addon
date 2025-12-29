@@ -28,6 +28,28 @@ local GetTime = GetTime
 local sortedActorsCache = {}
 local tempSortTable = {}
 
+-- Sort result caching for performance
+local sortCache = {
+    data = nil,
+    timestamp = 0,
+    segmentId = nil,
+    displayMode = nil,
+    ttl = 0.15, -- Cache for 150ms
+}
+
+-- Session statistics
+local sessionStats = {
+    totalCombatTime = 0,
+    totalFights = 0,
+    totalDeaths = 0,
+    totalDamage = 0,
+    totalHealing = 0,
+    bossKills = 0,
+    bossWipes = 0,
+    sessionStart = 0,
+    lastCombatEnd = 0,
+}
+
 -- Data Templates
 
 -- Player/Actor data structure
@@ -556,9 +578,19 @@ function DB:AddTimelinePoint(segment, timestamp, damage, healing)
     end
 end
 
--- Get sorted actors for display (optimized with table reuse)
+-- Get sorted actors for display (optimized with caching and table reuse)
 function DB:GetSortedActors(segment, mode)
     if not segment then return tempSortTable end
+
+    -- Check cache validity
+    local now = GetTime()
+    local segmentId = tostring(segment)
+    if sortCache.data and
+       sortCache.segmentId == segmentId and
+       sortCache.displayMode == mode and
+       (now - sortCache.timestamp) < sortCache.ttl then
+        return sortCache.data
+    end
 
     -- Reuse temp table to avoid GC
     wipe(tempSortTable)
@@ -638,6 +670,12 @@ function DB:GetSortedActors(segment, mode)
     table.sort(actors, function(a, b)
         return (a[sortKey] or 0) > (b[sortKey] or 0)
     end)
+
+    -- Update cache
+    sortCache.data = actors
+    sortCache.timestamp = now
+    sortCache.segmentId = segmentId
+    sortCache.displayMode = mode
 
     return actors
 end
@@ -737,4 +775,199 @@ function DB:FormatNumber(value)
             return tostring(math.floor(value))
         end
     end
+end
+
+-- ============================================================
+-- Session Statistics
+-- ============================================================
+
+-- Initialize session stats
+function DB:InitSessionStats()
+    sessionStats.sessionStart = GetTime()
+    sessionStats.totalCombatTime = 0
+    sessionStats.totalFights = 0
+    sessionStats.totalDeaths = 0
+    sessionStats.totalDamage = 0
+    sessionStats.totalHealing = 0
+    sessionStats.bossKills = 0
+    sessionStats.bossWipes = 0
+end
+
+-- Update session stats when combat ends
+function DB:UpdateSessionStats(segment)
+    if not segment then return end
+
+    sessionStats.totalFights = sessionStats.totalFights + 1
+    sessionStats.totalCombatTime = sessionStats.totalCombatTime + (segment.duration or 0)
+    sessionStats.totalDamage = sessionStats.totalDamage + (segment.totalDamage or 0)
+    sessionStats.totalHealing = sessionStats.totalHealing + (segment.totalHealing or 0)
+    sessionStats.lastCombatEnd = GetTime()
+
+    -- Count deaths
+    for _, actor in pairs(segment.actors) do
+        sessionStats.totalDeaths = sessionStats.totalDeaths + (actor.deaths or 0)
+    end
+
+    -- Boss tracking
+    if segment.bossName then
+        if segment.success then
+            sessionStats.bossKills = sessionStats.bossKills + 1
+        else
+            sessionStats.bossWipes = sessionStats.bossWipes + 1
+        end
+    end
+end
+
+-- Get session statistics
+function DB:GetSessionStats()
+    local now = GetTime()
+    local sessionDuration = now - sessionStats.sessionStart
+
+    return {
+        sessionDuration = sessionDuration,
+        totalCombatTime = sessionStats.totalCombatTime,
+        combatTimePercent = sessionDuration > 0 and (sessionStats.totalCombatTime / sessionDuration * 100) or 0,
+        totalFights = sessionStats.totalFights,
+        totalDeaths = sessionStats.totalDeaths,
+        deathsPerFight = sessionStats.totalFights > 0 and (sessionStats.totalDeaths / sessionStats.totalFights) or 0,
+        totalDamage = sessionStats.totalDamage,
+        totalHealing = sessionStats.totalHealing,
+        avgDPS = sessionStats.totalCombatTime > 0 and (sessionStats.totalDamage / sessionStats.totalCombatTime) or 0,
+        avgHPS = sessionStats.totalCombatTime > 0 and (sessionStats.totalHealing / sessionStats.totalCombatTime) or 0,
+        bossKills = sessionStats.bossKills,
+        bossWipes = sessionStats.bossWipes,
+        bossSuccessRate = (sessionStats.bossKills + sessionStats.bossWipes) > 0
+            and (sessionStats.bossKills / (sessionStats.bossKills + sessionStats.bossWipes) * 100) or 0,
+    }
+end
+
+-- ============================================================
+-- Spell School Tracking
+-- ============================================================
+
+-- Record damage with spell school
+function DB:RecordDamageWithSchool(segment, sourceGuid, sourceName, sourceClass, sourceFlags,
+                                    destGuid, destName, destFlags,
+                                    spellId, spellName, spellIcon, amount, overkill, school, critical)
+    -- Call original record function
+    self:RecordDamage(segment, sourceGuid, sourceName, sourceClass, sourceFlags,
+                      destGuid, destName, destFlags,
+                      spellId, spellName, spellIcon, amount, overkill, school, critical)
+
+    -- Track spell school breakdown
+    local actor = segment.actors[sourceGuid]
+    if actor then
+        if not actor.spellSchools then
+            actor.spellSchools = {}
+        end
+        school = school or 1 -- Physical default
+        actor.spellSchools[school] = (actor.spellSchools[school] or 0) + amount
+    end
+end
+
+-- Get spell school breakdown for an actor
+function DB:GetSpellSchoolBreakdown(actor)
+    if not actor or not actor.spellSchools then return {} end
+
+    local breakdown = {}
+    local total = actor.damage or 0
+
+    for school, damage in pairs(actor.spellSchools) do
+        local percent = total > 0 and (damage / total * 100) or 0
+        table_insert(breakdown, {
+            school = school,
+            damage = damage,
+            percent = percent,
+        })
+    end
+
+    -- Sort by damage
+    table_sort(breakdown, function(a, b) return a.damage > b.damage end)
+
+    return breakdown
+end
+
+-- ============================================================
+-- Death Recap / Damage History
+-- ============================================================
+
+-- Damage history buffer for death recap (per actor)
+local damageHistory = {} -- guid -> circular buffer of recent damage events
+local DAMAGE_HISTORY_SIZE = 15
+local DAMAGE_HISTORY_WINDOW = 10 -- seconds
+
+-- Record damage event to history (for death recap)
+function DB:RecordDamageHistory(destGuid, timestamp, sourceName, spellName, spellSchool, amount, overkill)
+    if not damageHistory[destGuid] then
+        damageHistory[destGuid] = {}
+    end
+
+    local history = damageHistory[destGuid]
+
+    -- Add new entry
+    table_insert(history, 1, {
+        timestamp = timestamp,
+        sourceName = sourceName or "Unknown",
+        spellName = spellName or "Melee",
+        spellSchool = spellSchool or 1,
+        amount = amount or 0,
+        overkill = overkill or 0,
+    })
+
+    -- Trim to max size
+    while #history > DAMAGE_HISTORY_SIZE do
+        table_remove(history)
+    end
+
+    -- Remove old entries outside time window
+    local now = GetTime()
+    for i = #history, 1, -1 do
+        if (now - history[i].timestamp) > DAMAGE_HISTORY_WINDOW then
+            table_remove(history, i)
+        end
+    end
+end
+
+-- Get damage history for death recap
+function DB:GetDamageHistory(guid)
+    return damageHistory[guid] or {}
+end
+
+-- Clear damage history for an actor (on combat reset)
+function DB:ClearDamageHistory(guid)
+    if guid then
+        damageHistory[guid] = nil
+    else
+        wipe(damageHistory)
+    end
+end
+
+-- Get enhanced death info with damage sequence
+function DB:GetDeathRecap(actor)
+    if not actor or #actor.deathLog == 0 then return nil end
+
+    local lastDeath = actor.deathLog[1]
+    local history = self:GetDamageHistory(actor.guid) or {}
+
+    return {
+        timestamp = lastDeath.timestamp,
+        killerName = lastDeath.killerName,
+        killingBlow = {
+            spellName = lastDeath.spellName,
+            damage = lastDeath.damage,
+            overkill = lastDeath.overkill,
+        },
+        damageSequence = history,
+        totalDamage = 0, -- Will be calculated by UI
+    }
+end
+
+-- ============================================================
+-- Performance Metrics
+-- ============================================================
+
+-- Invalidate sort cache (call when data changes significantly)
+function DB:InvalidateSortCache()
+    sortCache.data = nil
+    sortCache.timestamp = 0
 end
