@@ -33,15 +33,15 @@ local CreateColor = CreateColor
 Graph.frame = nil
 Graph.canvas = nil
 Graph.dataPoints = {}
-Graph.maxPoints = 600     -- More data points for smoother graph
-Graph.updateInterval = 0.2 -- Faster updates for smoother animation (was 0.5)
+Graph.maxPoints = 120      -- Reduced from 600 for performance
+Graph.updateInterval = 0.5 -- Slower updates (was 0.2)
 Graph.lastUpdate = 0
 Graph.peakDPS = 0
 Graph.peakHPS = 0
 Graph.animationProgress = 0
 Graph.isAnimating = false
-Graph.smoothingEnabled = true -- Enable curve smoothing
-Graph.interpolationPoints = 3 -- Points to add between each data point for smoothness
+Graph.smoothingEnabled = false -- Disabled for performance
+Graph.interpolationPoints = 0  -- No interpolation for performance
 
 -- Line data
 Graph.lines = {
@@ -549,7 +549,7 @@ function Graph:AddDataPoint(timestamp, dps, hps)
     end
 end
 
--- Draw the graph with beautiful effects
+-- Draw the graph (optimized for performance)
 function Graph:Draw()
     if not self.frame or not self.frame:IsShown() then return end
 
@@ -559,7 +559,7 @@ function Graph:Draw()
     -- Show/hide no data label
     if #self.dataPoints < 2 then
         if self.noDataLabel then self.noDataLabel:Show() end
-        self:LayoutAxisLabels(100, 60) -- Default values for empty graph
+        self:LayoutAxisLabels(100, 60)
         return
     end
     if self.noDataLabel then self.noDataLabel:Hide() end
@@ -570,45 +570,63 @@ function Graph:Draw()
     local width = self.canvas:GetWidth() or 350
     local height = self.canvas:GetHeight() or 150
 
-    -- Find max values
+    -- Find max values (optimized loop)
     local maxDPS = 0
     local maxHPS = 0
     local startTime = self.dataPoints[1].time
     local endTime = self.dataPoints[#self.dataPoints].time
-    local duration = math.max(endTime - startTime, 1)
+    local duration = math_max(endTime - startTime, 1)
 
-    for _, point in ipairs(self.dataPoints) do
+    for i = 1, #self.dataPoints do
+        local point = self.dataPoints[i]
         if point.dps > maxDPS then maxDPS = point.dps end
         if point.hps > maxHPS then maxHPS = point.hps end
     end
 
-    local maxValue = math.max(maxDPS, maxHPS)
+    local maxValue = math_max(maxDPS, maxHPS)
     if maxValue == 0 then maxValue = 100 end
 
     -- Round up max value for cleaner labels
-    local magnitude = 10 ^ math.floor(math.log10(maxValue))
-    maxValue = math.ceil(maxValue / magnitude) * magnitude
+    local magnitude = 10 ^ math_floor(math_log10(maxValue))
+    maxValue = math_ceil(maxValue / magnitude) * magnitude
 
     -- Update axis labels
     self:LayoutAxisLabels(maxValue, duration)
 
     -- Get line width from settings
-    local lineWidth = EDM.db and EDM.db.profile.graph.lineWidth or graphSettings.lineWidth or 2.5
+    local lineWidth = EDM.db and EDM.db.profile.graph.lineWidth or graphSettings.lineWidth or 2
 
-    -- Draw fill areas first (under the lines)
-    self:DrawFillArea(self.dataPoints, startTime, duration, width, height, maxValue, "dps", self.colors.damage.fill)
-    self:DrawFillArea(self.dataPoints, startTime, duration, width, height, maxValue, "hps", self.colors.healing.fill)
-
-    -- Draw glow lines (behind main lines for glow effect)
-    self:DrawLine(self.dataPoints, startTime, duration, width, height, maxValue, "dps", self.colors.damage.glow, lineWidth + 4, true)
-    self:DrawLine(self.dataPoints, startTime, duration, width, height, maxValue, "hps", self.colors.healing.glow, lineWidth + 4, true)
-
-    -- Draw main lines
-    self:DrawLine(self.dataPoints, startTime, duration, width, height, maxValue, "dps", self.colors.damage.primary, lineWidth, false)
-    self:DrawLine(self.dataPoints, startTime, duration, width, height, maxValue, "hps", self.colors.healing.primary, lineWidth, false)
+    -- Draw ONLY main lines (no glow, no fill - much faster)
+    self:DrawLineSimple(self.dataPoints, startTime, duration, width, height, maxValue, "dps", self.colors.damage.primary, lineWidth)
+    self:DrawLineSimple(self.dataPoints, startTime, duration, width, height, maxValue, "hps", self.colors.healing.primary, lineWidth)
 end
 
--- Catmull-Rom spline interpolation for smooth curves
+-- Simple line drawing without interpolation (FAST)
+function Graph:DrawLineSimple(dataPoints, startTime, duration, width, height, maxValue, key, color, lineWidth)
+    if #dataPoints < 2 then return end
+
+    local lastX, lastY
+
+    for i = 1, #dataPoints do
+        local point = dataPoints[i]
+        local value = point[key] or 0
+        local x = ((point.time - startTime) / duration) * width
+        local y = math_max(1, (value / maxValue) * height)
+
+        if lastX and lastY then
+            local line = self:GetLineTexture()
+            line:SetVertexColor(color[1], color[2], color[3], color[4])
+            line:SetThickness(lineWidth)
+            line:ClearAllPoints()
+            line:SetStartPoint("BOTTOMLEFT", self.canvas, lastX, lastY)
+            line:SetEndPoint("BOTTOMLEFT", self.canvas, x, y)
+        end
+
+        lastX, lastY = x, y
+    end
+end
+
+-- Catmull-Rom spline interpolation (kept for optional use)
 function Graph:CatmullRom(p0, p1, p2, p3, t)
     local t2 = t * t
     local t3 = t2 * t

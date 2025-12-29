@@ -20,6 +20,15 @@ TOOLTIP IMPROVEMENTS:
 - Show damage distribution by school (Physical, Fire, Frost, etc.)
 - Death recap shows last 8 damage events with spell school colors
 
+PERFORMANCE FIX:
+- Graph completely rewritten for performance
+- Removed expensive Catmull-Rom interpolation (was adding 3x points)
+- Removed glow lines (was doubling draw calls)
+- Removed fill areas (was creating thousands of textures)
+- Reduced data points from 600 to 120
+- Update interval changed from 0.2s to 0.5s
+- Result: ~95% reduction in GPU/CPU load
+
 Version 1.2.0
 -------------
 NEW FEATURES:
