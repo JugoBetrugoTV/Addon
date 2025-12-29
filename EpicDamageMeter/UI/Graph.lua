@@ -38,10 +38,11 @@ Graph.updateInterval = 0.5 -- Slower updates (was 0.2)
 Graph.lastUpdate = 0
 Graph.peakDPS = 0
 Graph.peakHPS = 0
-Graph.animationProgress = 0
+Graph.animationProgress = 1.0  -- 0 to 1, for animating last point
+Graph.animationSpeed = 3.0     -- How fast animation completes (higher = faster)
 Graph.isAnimating = false
-Graph.smoothingEnabled = false -- Disabled for performance
-Graph.interpolationPoints = 0  -- No interpolation for performance
+Graph.lastAnimatedDPS = 0
+Graph.lastAnimatedHPS = 0
 
 -- Line data
 Graph.lines = {
@@ -601,15 +602,25 @@ function Graph:Draw()
     self:DrawLineSimple(self.dataPoints, startTime, duration, width, height, maxValue, "hps", self.colors.healing.primary, lineWidth)
 end
 
--- Simple line drawing without interpolation (FAST)
+-- Simple line drawing with smooth animation for last point (FAST)
 function Graph:DrawLineSimple(dataPoints, startTime, duration, width, height, maxValue, key, color, lineWidth)
     if #dataPoints < 2 then return end
 
     local lastX, lastY
+    local numPoints = #dataPoints
+    local animProgress = self.animationProgress
 
-    for i = 1, #dataPoints do
+    for i = 1, numPoints do
         local point = dataPoints[i]
         local value = point[key] or 0
+
+        -- Animate only the last point for smooth transition
+        if i == numPoints and animProgress < 1.0 then
+            -- Interpolate from previous value to current
+            local prevValue = dataPoints[numPoints - 1] and dataPoints[numPoints - 1][key] or 0
+            value = prevValue + (value - prevValue) * animProgress
+        end
+
         local x = ((point.time - startTime) / duration) * width
         local y = math_max(1, (value / maxValue) * height)
 
@@ -776,9 +787,55 @@ function Graph:Update()
     -- Update legend with current values
     self:UpdateLegendValues(totalDPS, totalHPS)
 
+    -- Start animation for smooth transition
+    self:StartAnimation()
+
     -- Redraw only if visible
     if self.frame and self.frame:IsShown() then
         self:Draw()
+    end
+end
+
+-- Start smooth animation for new data point
+function Graph:StartAnimation()
+    self.animationProgress = 0
+    self.isAnimating = true
+
+    -- Use simple OnUpdate for animation (lightweight)
+    if self.frame and not self.animationFrame then
+        self.animationFrame = CreateFrame("Frame")
+    end
+
+    if self.animationFrame then
+        self.animationFrame:SetScript("OnUpdate", function(_, elapsed)
+            if not self.isAnimating then
+                self.animationFrame:SetScript("OnUpdate", nil)
+                return
+            end
+
+            -- Smooth easing animation
+            self.animationProgress = self.animationProgress + elapsed * self.animationSpeed
+
+            if self.animationProgress >= 1.0 then
+                self.animationProgress = 1.0
+                self.isAnimating = false
+                self.animationFrame:SetScript("OnUpdate", nil)
+            end
+
+            -- Redraw with new animation progress
+            if self.frame and self.frame:IsShown() then
+                self:Draw()
+            end
+        end)
+    end
+end
+
+-- Stop animation
+function Graph:StopAnimation()
+    self.isAnimating = false
+    self.animationProgress = 1.0
+    if self.animationFrame then
+        self.animationFrame:SetScript("OnUpdate", nil)
     end
 end
 
