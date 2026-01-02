@@ -1,0 +1,20 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+https://raw.githubusercontent.com/Gethe/wow-ui-source/live/Interface/AddOns/Blizzard_SharedXML/UI.xsd">
+
+    <!-- Localization Files -->
+    <!-- English must load first as base language -->
+    <Script file="enUS.lua"/>
+
+    <!-- German -->
+    <Script file="deDE.lua"/>
+
+    <!-- Additional languages can be added here -->
+    <!-- <Script file="frFR.lua"/> -->
+    <!-- <Script file="esES.lua"/> -->
+    <!-- <Script file="ptBR.lua"/> -->
+    <!-- <Script file="ruRU.lua"/> -->
+    <!-- <Script file="zhCN.lua"/> -->
+    <!-- <Script file="zhTW.lua"/> -->
+    <!-- <Script file="koKR.lua"/> -->
+
+</Ui>

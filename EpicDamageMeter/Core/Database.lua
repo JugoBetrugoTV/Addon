@@ -190,6 +190,9 @@ function DB:Initialize()
 
     -- Create current segment
     self:NewSegment()
+
+    -- Initialize session statistics
+    self:InitSessionStats()
 end
 
 -- Create new segment

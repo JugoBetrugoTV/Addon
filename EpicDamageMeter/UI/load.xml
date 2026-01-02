@@ -1,0 +1,33 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+https://raw.githubusercontent.com/Gethe/wow-ui-source/live/Interface/AddOns/Blizzard_SharedXML/UI.xsd">
+
+    <!--
+        EpicDamageMeter UI Component Loader
+        Load order is important - dependencies first!
+    -->
+
+    <!-- Skin system (themes) -->
+    <Script file="Skins.lua"/>
+
+    <!-- Reusable UI widgets -->
+    <Script file="Widgets.lua"/>
+
+    <!-- Data bar system -->
+    <Script file="Bars.lua"/>
+
+    <!-- Real-time graph -->
+    <Script file="Graph.lua"/>
+
+    <!-- Main damage meter window -->
+    <Script file="MainFrame.lua"/>
+
+    <!-- Player/ability detail view -->
+    <Script file="DetailWindow.lua"/>
+
+    <!-- Tooltip system -->
+    <Script file="Tooltip.lua"/>
+
+    <!-- Configuration panel -->
+    <Script file="Config.lua"/>
+
+</Ui>

@@ -1,0 +1,30 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+https://raw.githubusercontent.com/Gethe/wow-ui-source/live/Interface/AddOns/Blizzard_SharedXML/UI.xsd">
+
+    <!--
+        EpicDamageMeter Core Module Loader
+        Load order is important!
+    -->
+
+    <!-- Constants must load first -->
+    <Script file="Constants.lua"/>
+
+    <!-- Utility functions -->
+    <Script file="Utils.lua"/>
+
+    <!-- Database structures -->
+    <Script file="Database.lua"/>
+
+    <!-- Core addon logic -->
+    <Script file="Core.lua"/>
+
+    <!-- Event handling -->
+    <Script file="Events.lua"/>
+
+    <!-- Combat log parser -->
+    <Script file="Parser.lua"/>
+
+    <!-- Combat state management -->
+    <Script file="Combat.lua"/>
+
+</Ui>

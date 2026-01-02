@@ -281,7 +281,7 @@ function Config:CreateQuickPanel()
     panel.bottomBar.version:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
     panel.bottomBar.version:SetPoint("LEFT", 10, 0)
     panel.bottomBar.version:SetTextColor(0.5, 0.5, 0.6, 1)
-    panel.bottomBar.version:SetText("EpicDamageMeter v1.0.6 | Interface 110207")
+    panel.bottomBar.version:SetText("EpicDamageMeter v1.1.0 | Interface 110207 / 11508 / 50508")
 
     -- Save & Reload button
     panel.bottomBar.saveBtn = CreateFrame("Button", nil, panel.bottomBar, "BackdropTemplate")
@@ -1253,19 +1253,20 @@ function Config:BuildCreditsTab()
     changelogRow.text:SetTextColor(0.8, 0.8, 0.85, 1)
     changelogRow.text:SetJustifyH("LEFT")
     changelogRow.text:SetText(
-        "|cff00ff00v1.0.6 - Latest|r\n" ..
+        "|cff00ff00v1.1.0 - Latest|r\n" ..
+        "  - Multi-version support: Retail 11.2.7, Classic 1.15.8, MoP 5.5.8\n" ..
+        "  - New Media Registry system with custom textures\n" ..
+        "  - Complete load.xml structure for all folders\n" ..
+        "  - Enhanced localization system (EN/DE)\n" ..
+        "  - Improved module architecture\n" ..
+        "  - New TOC files for all WoW versions\n\n" ..
+        "|cffccccccv1.0.6|r\n" ..
         "  - Simplified tracking (group/raid only like Recount)\n" ..
-        "  - Fixed data persistence (no more quick resets)\n" ..
-        "  - Fixed all bar settings (class colors, percent, value)\n" ..
-        "  - Added font selection dropdown\n" ..
-        "  - Fixed number format options\n" ..
-        "  - Added Quick Actions in Display tab\n" ..
-        "  - Removed sound settings\n\n" ..
+        "  - Fixed data persistence and bar settings\n" ..
+        "  - Added font selection dropdown\n\n" ..
         "|cffccccccv1.0.5|r\n" ..
         "  - Fixed settings panel tabs\n" ..
-        "  - Fixed font size slider\n" ..
-        "  - Fixed window size/opacity settings\n" ..
-        "  - New minimap icon\n\n" ..
+        "  - Fixed font size slider\n\n" ..
         "|cffccccccv1.0.4|r\n" ..
         "  - Major settings rewrite with tabs\n" ..
         "  - Added 11 custom skins"
@@ -1289,7 +1290,7 @@ function Config:BuildCreditsTab()
     versionRow.text:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
     versionRow.text:SetPoint("LEFT", 10, 0)
     versionRow.text:SetTextColor(0.6, 0.6, 0.7, 1)
-    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.0.6 BETA\nInterface Version: 110207\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
+    versionRow.text:SetText("|cff00ff00EpicDamageMeter|r v1.1.0 BETA\nInterface: Retail 110207 | Classic 11508 | MoP 50508\nBuilt with |cffff0000<3|r for the WoW community by JugoBetrugoTV")
 
     y = y + 70
 
