@@ -12,8 +12,8 @@ local C = EDM.Constants
 -- Addon Info
 C.ADDON_NAME = "EpicDamageMeter"
 C.ADDON_SHORT = "EDM"
-C.VERSION = "1.0.6"
-C.INTERFACE_VERSION = 110207
+C.VERSION = "1.0.7"
+C.INTERFACE_VERSION = 110005
 
 -- Display Modes (Extended like Details!)
 C.DISPLAY_MODE = {
