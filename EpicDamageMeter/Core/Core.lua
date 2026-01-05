@@ -5,12 +5,12 @@
 
 local ADDON_NAME, EDM = ...
 
--- Ace3 Libraries (using isolated EDM version to avoid conflicts)
+-- Ace3 Libraries (using COMPLETELY ISOLATED EDM versions to avoid conflicts)
 local AceAddon = LibStub("AceAddon-3.0-EDM")
-local AceEvent = LibStub("AceEvent-3.0")
-local AceDB = LibStub("AceDB-3.0")
-local AceTimer = LibStub("AceTimer-3.0")
-local AceConsole = LibStub("AceConsole-3.0")
+local AceEvent = LibStub("AceEvent-3.0-EDM")
+local AceDB = LibStub("AceDB-3.0-EDM")
+local AceTimer = LibStub("AceTimer-3.0-EDM")
+local AceConsole = LibStub("AceConsole-3.0-EDM")
 local LDB = LibStub("LibDataBroker-1.1")
 local LDBIcon = LibStub("LibDBIcon-1.0")
 local LSM = LibStub("LibSharedMedia-3.0")

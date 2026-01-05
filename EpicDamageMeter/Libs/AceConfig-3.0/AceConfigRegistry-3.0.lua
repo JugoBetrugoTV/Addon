@@ -1,12 +1,19 @@
---[[ AceConfigRegistry-3.0 - Configuration registry ]]
-local MAJOR, MINOR = "AceConfigRegistry-3.0", 21
-local AceConfigRegistry = LibStub:NewLibrary(MAJOR, MINOR)
+--[[ AceConfigRegistry-3.0-EDM - ISOLATED Configuration registry for EpicDamageMeter ]]
+local MAJOR, MINOR = "AceConfigRegistry-3.0-EDM", 1
+local AceConfigRegistry
 
-if not AceConfigRegistry then return end
+-- Create isolated version
+if LibStub.libs["AceConfigRegistry-3.0-EDM"] then
+    AceConfigRegistry = LibStub.libs["AceConfigRegistry-3.0-EDM"]
+else
+    AceConfigRegistry = {}
+    LibStub.libs["AceConfigRegistry-3.0-EDM"] = AceConfigRegistry
+    LibStub.minors["AceConfigRegistry-3.0-EDM"] = 1
+end
 
 AceConfigRegistry.tables = AceConfigRegistry.tables or {}
 
-local CallbackHandler = LibStub("CallbackHandler-1.0")
+local CallbackHandler = LibStub("CallbackHandler-1.0-EDM")
 if not AceConfigRegistry.callbacks then
     AceConfigRegistry.callbacks = CallbackHandler:New(AceConfigRegistry)
 end

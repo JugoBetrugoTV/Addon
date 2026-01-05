@@ -1,8 +1,15 @@
---[[ AceConsole-3.0 - Console command library ]]
-local MAJOR, MINOR = "AceConsole-3.0", 7
-local AceConsole = LibStub:NewLibrary(MAJOR, MINOR)
+--[[ AceConsole-3.0-EDM - ISOLATED Console command library for EpicDamageMeter ]]
+local MAJOR, MINOR = "AceConsole-3.0-EDM", 1
+local AceConsole
 
-if not AceConsole then return end
+-- Create isolated version
+if LibStub.libs["AceConsole-3.0-EDM"] then
+    AceConsole = LibStub.libs["AceConsole-3.0-EDM"]
+else
+    AceConsole = {}
+    LibStub.libs["AceConsole-3.0-EDM"] = AceConsole
+    LibStub.minors["AceConsole-3.0-EDM"] = 1
+end
 
 AceConsole.embeds = AceConsole.embeds or {}
 AceConsole.commands = AceConsole.commands or {}

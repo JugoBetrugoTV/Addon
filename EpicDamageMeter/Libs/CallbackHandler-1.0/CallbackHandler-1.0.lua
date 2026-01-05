@@ -1,8 +1,15 @@
---[[ CallbackHandler-1.0 - Simplified callback system ]]
-local MAJOR, MINOR = "CallbackHandler-1.0", 8
-local CallbackHandler = LibStub:NewLibrary(MAJOR, MINOR)
+--[[ CallbackHandler-1.0-EDM - ISOLATED Callback system for EpicDamageMeter ]]
+local MAJOR, MINOR = "CallbackHandler-1.0-EDM", 1
+local CallbackHandler
 
-if not CallbackHandler then return end
+-- Create isolated version
+if LibStub.libs["CallbackHandler-1.0-EDM"] then
+    CallbackHandler = LibStub.libs["CallbackHandler-1.0-EDM"]
+else
+    CallbackHandler = {}
+    LibStub.libs["CallbackHandler-1.0-EDM"] = CallbackHandler
+    LibStub.minors["CallbackHandler-1.0-EDM"] = 1
+end
 
 local meta = {__index = function(tbl, key) tbl[key] = {} return tbl[key] end}
 

@@ -1,8 +1,15 @@
---[[ AceGUI-3.0 - GUI Widget Library ]]
-local MAJOR, MINOR = "AceGUI-3.0", 41
-local AceGUI = LibStub:NewLibrary(MAJOR, MINOR)
+--[[ AceGUI-3.0-EDM - ISOLATED GUI Widget Library for EpicDamageMeter ]]
+local MAJOR, MINOR = "AceGUI-3.0-EDM", 1
+local AceGUI
 
-if not AceGUI then return end
+-- Create isolated version
+if LibStub.libs["AceGUI-3.0-EDM"] then
+    AceGUI = LibStub.libs["AceGUI-3.0-EDM"]
+else
+    AceGUI = {}
+    LibStub.libs["AceGUI-3.0-EDM"] = AceGUI
+    LibStub.minors["AceGUI-3.0-EDM"] = 1
+end
 
 AceGUI.WidgetRegistry = AceGUI.WidgetRegistry or {}
 AceGUI.LayoutRegistry = AceGUI.LayoutRegistry or {}

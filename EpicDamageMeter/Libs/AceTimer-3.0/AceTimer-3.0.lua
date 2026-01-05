@@ -1,8 +1,15 @@
---[[ AceTimer-3.0 - Timer library ]]
-local MAJOR, MINOR = "AceTimer-3.0", 17
-local AceTimer = LibStub:NewLibrary(MAJOR, MINOR)
+--[[ AceTimer-3.0-EDM - ISOLATED Timer library for EpicDamageMeter ]]
+local MAJOR, MINOR = "AceTimer-3.0-EDM", 1
+local AceTimer
 
-if not AceTimer then return end
+-- Create isolated version
+if LibStub.libs["AceTimer-3.0-EDM"] then
+    AceTimer = LibStub.libs["AceTimer-3.0-EDM"]
+else
+    AceTimer = {}
+    LibStub.libs["AceTimer-3.0-EDM"] = AceTimer
+    LibStub.minors["AceTimer-3.0-EDM"] = 1
+end
 
 AceTimer.embeds = AceTimer.embeds or {}
 AceTimer.activeTimers = AceTimer.activeTimers or {}

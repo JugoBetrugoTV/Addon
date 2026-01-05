@@ -1,8 +1,15 @@
---[[ AceDB-3.0 - Database library ]]
-local MAJOR, MINOR = "AceDB-3.0", 27
-local AceDB = LibStub:NewLibrary(MAJOR, MINOR)
+--[[ AceDB-3.0-EDM - ISOLATED Database library for EpicDamageMeter ]]
+local MAJOR, MINOR = "AceDB-3.0-EDM", 1
+local AceDB
 
-if not AceDB then return end
+-- Create isolated version
+if LibStub.libs["AceDB-3.0-EDM"] then
+    AceDB = LibStub.libs["AceDB-3.0-EDM"]
+else
+    AceDB = {}
+    LibStub.libs["AceDB-3.0-EDM"] = AceDB
+    LibStub.minors["AceDB-3.0-EDM"] = 1
+end
 
 local type, pairs, next, error = type, pairs, next, error
 local setmetatable, rawset = setmetatable, rawset
@@ -10,7 +17,7 @@ local setmetatable, rawset = setmetatable, rawset
 AceDB.db_registry = AceDB.db_registry or {}
 AceDB.frame = AceDB.frame or CreateFrame("Frame")
 
-local CallbackHandler = LibStub("CallbackHandler-1.0")
+local CallbackHandler = LibStub("CallbackHandler-1.0-EDM")
 local CallbackDummy = { Fire = function() end }
 
 local DBObjectLib = {}

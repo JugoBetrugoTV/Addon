@@ -87,6 +87,14 @@ function AceAddon:GetAddon(name, silent)
     return self.addons[name]
 end
 
+-- Map standard Ace lib names to our isolated EDM versions
+local libNameMapping = {
+    ["AceEvent-3.0"] = "AceEvent-3.0-EDM",
+    ["AceTimer-3.0"] = "AceTimer-3.0-EDM",
+    ["AceConsole-3.0"] = "AceConsole-3.0-EDM",
+    ["AceHook-3.0"] = "AceHook-3.0-EDM",
+}
+
 function AceAddon:EmbedLibraries(object, ...)
     for i = 1, select("#", ...) do
         local libname = select(i, ...)
@@ -95,12 +103,18 @@ function AceAddon:EmbedLibraries(object, ...)
 end
 
 function AceAddon:EmbedLibrary(object, libname, silent, offset)
-    local lib = LibStub:GetLibrary(libname, true)
+    -- Try our isolated EDM version first, then fall back to standard name
+    local edmName = libNameMapping[libname]
+    local lib = edmName and LibStub:GetLibrary(edmName, true)
+    if not lib then
+        lib = LibStub:GetLibrary(libname, true)
+    end
+
     if not lib and not silent then
         error(("Usage: EmbedLibrary(addon, libname, silent, offset): 'libname' - Cannot find a library instance of %q."):format(tostring(libname)), offset or 2)
     elseif lib and type(lib.Embed) == "function" then
         lib:Embed(object)
-        tinsert(self.embeds[object], libname)
+        tinsert(self.embeds[object], edmName or libname)
     end
     return lib
 end

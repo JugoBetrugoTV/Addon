@@ -1,8 +1,15 @@
---[[ AceHook-3.0 - Hook library ]]
-local MAJOR, MINOR = "AceHook-3.0", 8
-local AceHook = LibStub:NewLibrary(MAJOR, MINOR)
+--[[ AceHook-3.0-EDM - ISOLATED Hook library for EpicDamageMeter ]]
+local MAJOR, MINOR = "AceHook-3.0-EDM", 1
+local AceHook
 
-if not AceHook then return end
+-- Create isolated version
+if LibStub.libs["AceHook-3.0-EDM"] then
+    AceHook = LibStub.libs["AceHook-3.0-EDM"]
+else
+    AceHook = {}
+    LibStub.libs["AceHook-3.0-EDM"] = AceHook
+    LibStub.minors["AceHook-3.0-EDM"] = 1
+end
 
 AceHook.embeds = AceHook.embeds or {}
 AceHook.hooks = AceHook.hooks or {}
