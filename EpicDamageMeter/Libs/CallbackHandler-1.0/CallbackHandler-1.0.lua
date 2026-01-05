@@ -1,5 +1,6 @@
---[[ CallbackHandler-1.0-EDM - ISOLATED Callback system for EpicDamageMeter ]]
-local MAJOR, MINOR = "CallbackHandler-1.0-EDM", 1
+--[[ CallbackHandler-1.0-EDM - Callback system for EpicDamageMeter ]]
+-- Also registers as CallbackHandler-1.0 for compatibility with LibDataBroker, LibDBIcon, etc.
+local MAJOR, MINOR = "CallbackHandler-1.0-EDM", 8
 local CallbackHandler
 
 -- Create isolated version
@@ -8,7 +9,13 @@ if LibStub.libs["CallbackHandler-1.0-EDM"] then
 else
     CallbackHandler = {}
     LibStub.libs["CallbackHandler-1.0-EDM"] = CallbackHandler
-    LibStub.minors["CallbackHandler-1.0-EDM"] = 1
+    LibStub.minors["CallbackHandler-1.0-EDM"] = MINOR
+end
+
+-- ALSO register as standard CallbackHandler-1.0 if not already present (for LibDataBroker, LibDBIcon compatibility)
+if not LibStub.libs["CallbackHandler-1.0"] then
+    LibStub.libs["CallbackHandler-1.0"] = CallbackHandler
+    LibStub.minors["CallbackHandler-1.0"] = MINOR
 end
 
 local meta = {__index = function(tbl, key) tbl[key] = {} return tbl[key] end}

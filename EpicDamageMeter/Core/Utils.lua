@@ -5,6 +5,72 @@
 
 local ADDON_NAME, EDM = ...
 
+-- C_Timer polyfill for older WoW versions (MoP, etc.) that don't have C_Timer
+if not C_Timer then
+    C_Timer = {}
+
+    local timerFrame = CreateFrame("Frame")
+    local timers = {}
+    local timerID = 0
+
+    timerFrame:SetScript("OnUpdate", function(self, elapsed)
+        local now = GetTime()
+        for id, timer in pairs(timers) do
+            if now >= timer.endTime then
+                timers[id] = nil
+                local success, err = pcall(timer.callback)
+                if not success then
+                    print("|cffff0000Timer Error:|r " .. tostring(err))
+                end
+            end
+        end
+    end)
+
+    function C_Timer.After(delay, callback)
+        timerID = timerID + 1
+        timers[timerID] = {
+            endTime = GetTime() + delay,
+            callback = callback
+        }
+    end
+
+    function C_Timer.NewTimer(delay, callback)
+        local timer = { cancelled = false }
+        timerID = timerID + 1
+        local id = timerID
+        timers[id] = {
+            endTime = GetTime() + delay,
+            callback = function()
+                if not timer.cancelled then
+                    callback()
+                end
+            end
+        }
+        function timer:Cancel()
+            self.cancelled = true
+            timers[id] = nil
+        end
+        return timer
+    end
+
+    function C_Timer.NewTicker(interval, callback, iterations)
+        local ticker = { cancelled = false, count = 0 }
+        local function tick()
+            if ticker.cancelled then return end
+            ticker.count = ticker.count + 1
+            callback(ticker)
+            if not iterations or ticker.count < iterations then
+                C_Timer.After(interval, tick)
+            end
+        end
+        C_Timer.After(interval, tick)
+        function ticker:Cancel()
+            self.cancelled = true
+        end
+        return ticker
+    end
+end
+
 EDM.Utils = {}
 local Utils = EDM.Utils
 local C = EDM.Constants
