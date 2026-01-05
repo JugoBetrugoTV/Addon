@@ -1,11 +1,18 @@
---[[ AceConfigDialog-3.0 - Configuration dialog ]]
-local MAJOR, MINOR = "AceConfigDialog-3.0", 86
-local AceConfigDialog = LibStub:NewLibrary(MAJOR, MINOR)
+--[[ AceConfigDialog-3.0-EDM - ISOLATED Configuration dialog for EpicDamageMeter ]]
+local MAJOR, MINOR = "AceConfigDialog-3.0-EDM", 1
+local AceConfigDialog
 
-if not AceConfigDialog then return end
+-- Create isolated version
+if LibStub.libs["AceConfigDialog-3.0-EDM"] then
+    AceConfigDialog = LibStub.libs["AceConfigDialog-3.0-EDM"]
+else
+    AceConfigDialog = {}
+    LibStub.libs["AceConfigDialog-3.0-EDM"] = AceConfigDialog
+    LibStub.minors["AceConfigDialog-3.0-EDM"] = 1
+end
 
-local AceGUI = LibStub("AceGUI-3.0")
-local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
+local AceGUI = LibStub("AceGUI-3.0-EDM")
+local AceConfigRegistry = LibStub("AceConfigRegistry-3.0-EDM")
 
 AceConfigDialog.OpenFrames = AceConfigDialog.OpenFrames or {}
 AceConfigDialog.Status = AceConfigDialog.Status or {}

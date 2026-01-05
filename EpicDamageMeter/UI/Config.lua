@@ -7,9 +7,9 @@ local ADDON_NAME, EDM = ...
 
 EDM.Config = {}
 local Config = EDM.Config
-local AceConfig = LibStub("AceConfigRegistry-3.0")
-local AceConfigDialog = LibStub("AceConfigDialog-3.0")
-local AceConfigCmd = LibStub("AceConfigCmd-3.0")
+local AceConfig = LibStub("AceConfigRegistry-3.0-EDM")
+local AceConfigDialog = LibStub("AceConfigDialog-3.0-EDM")
+local AceConfigCmd = LibStub("AceConfigCmd-3.0-EDM")
 local LSM = LibStub("LibSharedMedia-3.0")
 local C = EDM.Constants
 local Skins = EDM.Skins

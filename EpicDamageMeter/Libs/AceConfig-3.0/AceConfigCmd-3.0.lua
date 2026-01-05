@@ -1,11 +1,18 @@
---[[ AceConfigCmd-3.0 - Configuration command line ]]
-local MAJOR, MINOR = "AceConfigCmd-3.0", 14
-local AceConfigCmd = LibStub:NewLibrary(MAJOR, MINOR)
+--[[ AceConfigCmd-3.0-EDM - ISOLATED Configuration command line for EpicDamageMeter ]]
+local MAJOR, MINOR = "AceConfigCmd-3.0-EDM", 1
+local AceConfigCmd
 
-if not AceConfigCmd then return end
+-- Create isolated version
+if LibStub.libs["AceConfigCmd-3.0-EDM"] then
+    AceConfigCmd = LibStub.libs["AceConfigCmd-3.0-EDM"]
+else
+    AceConfigCmd = {}
+    LibStub.libs["AceConfigCmd-3.0-EDM"] = AceConfigCmd
+    LibStub.minors["AceConfigCmd-3.0-EDM"] = 1
+end
 
-local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
-local AceConsole = LibStub("AceConsole-3.0")
+local AceConfigRegistry = LibStub("AceConfigRegistry-3.0-EDM")
+local AceConsole = LibStub("AceConsole-3.0-EDM")
 
 AceConfigCmd.commands = AceConfigCmd.commands or {}
 
