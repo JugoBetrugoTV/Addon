@@ -269,12 +269,14 @@ function AceDB:New(tbl, defaults, defaultProfile)
         parent = self,
     }, dbmt)
 
-    if defaults then
-        db:RegisterDefaults(defaults)
-    end
-
+    -- Add DBObjectLib methods FIRST (before calling RegisterDefaults)
     for funcName, func in pairs(DBObjectLib) do
         db[funcName] = func
+    end
+
+    -- Now we can safely call RegisterDefaults
+    if defaults then
+        db:RegisterDefaults(defaults)
     end
 
     AceDB.db_registry[db] = true
