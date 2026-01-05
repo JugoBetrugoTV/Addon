@@ -265,7 +265,7 @@ function AceDB:New(tbl, defaults, defaultProfile)
         defaults = {
             profile = {},
         },
-        callbacks = CallbackHandler.New({}),
+        callbacks = CallbackHandler:New({}),
         parent = self,
     }, dbmt)
 

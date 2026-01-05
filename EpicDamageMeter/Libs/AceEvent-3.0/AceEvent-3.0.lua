@@ -8,8 +8,8 @@ AceEvent.frame = AceEvent.frame or CreateFrame("Frame")
 AceEvent.embeds = AceEvent.embeds or {}
 
 local CallbackHandler = LibStub("CallbackHandler-1.0")
-AceEvent.events = AceEvent.events or CallbackHandler.New(AceEvent, AceEvent.frame, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents")
-AceEvent.messages = AceEvent.messages or CallbackHandler.New(AceEvent, AceEvent.frame, "RegisterMessage", "UnregisterMessage", "UnregisterAllMessages")
+AceEvent.events = AceEvent.events or CallbackHandler:New(AceEvent.frame, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents")
+AceEvent.messages = AceEvent.messages or CallbackHandler:New(AceEvent.frame, "RegisterMessage", "UnregisterMessage", "UnregisterAllMessages")
 
 function AceEvent.events:OnUsed(target, eventname)
     target:RegisterEvent(eventname)
