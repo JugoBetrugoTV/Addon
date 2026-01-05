@@ -265,7 +265,6 @@ function AceDB:New(tbl, defaults, defaultProfile)
         defaults = {
             profile = {},
         },
-        callbacks = CallbackHandler:New({}),
         parent = self,
     }, dbmt)
 
@@ -273,6 +272,9 @@ function AceDB:New(tbl, defaults, defaultProfile)
     for funcName, func in pairs(DBObjectLib) do
         db[funcName] = func
     end
+
+    -- Create CallbackHandler ON the db object itself (for db.RegisterCallback API)
+    db.callbacks = CallbackHandler:New(db)
 
     -- Now we can safely call RegisterDefaults
     if defaults then

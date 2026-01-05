@@ -5,8 +5,8 @@
 
 local ADDON_NAME, EDM = ...
 
--- Ace3 Libraries
-local AceAddon = LibStub("AceAddon-3.0")
+-- Ace3 Libraries (using isolated EDM version to avoid conflicts)
+local AceAddon = LibStub("AceAddon-3.0-EDM")
 local AceEvent = LibStub("AceEvent-3.0")
 local AceDB = LibStub("AceDB-3.0")
 local AceTimer = LibStub("AceTimer-3.0")

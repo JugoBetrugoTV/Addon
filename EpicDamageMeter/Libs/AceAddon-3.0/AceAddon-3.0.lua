@@ -1,6 +1,6 @@
---[[ AceAddon-3.0 - Addon framework (EDM isolated version) ]]
--- This is a self-contained version that ONLY manages EpicDamageMeter
--- It does NOT interfere with other addons' AceAddon instances
+--[[ AceAddon-3.0-EDM - COMPLETELY ISOLATED Addon framework for EpicDamageMeter ]]
+-- This is a COMPLETELY ISOLATED version that ONLY manages EpicDamageMeter
+-- It does NOT register as "AceAddon-3.0" to avoid ANY interference with other addons
 local MAJOR, MINOR = "AceAddon-3.0-EDM", 1
 local AceAddon
 
@@ -13,13 +13,8 @@ else
     LibStub.minors["AceAddon-3.0-EDM"] = 1
 end
 
--- Also register as AceAddon-3.0 but ONLY if no other addon has registered it yet
--- This prevents us from overwriting a newer version from another addon
-local existingAceAddon = LibStub.libs["AceAddon-3.0"]
-if not existingAceAddon then
-    LibStub.libs["AceAddon-3.0"] = AceAddon
-    LibStub.minors["AceAddon-3.0"] = 13
-end
+-- CRITICAL: Do NOT register as "AceAddon-3.0" - let other addons use their own version
+-- This prevents ALL interference with RXPGuides, Questie, and other addons
 
 -- Initialize our isolated storage
 AceAddon.frame = AceAddon.frame or CreateFrame("Frame")
