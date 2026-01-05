@@ -25,12 +25,22 @@ AceAddon.enablequeue = AceAddon.enablequeue or {}
 AceAddon.embeds = AceAddon.embeds or setmetatable({}, {__index = function(tbl, key) tbl[key] = {} return tbl[key] end })
 AceAddon.ownAddons = AceAddon.ownAddons or {} -- Track addons WE created
 
+-- Safe error handler that works without BugSack
+local function safeErrorHandler(err)
+    local handler = geterrorhandler and geterrorhandler()
+    if handler then
+        handler(err)
+    else
+        -- Fallback to print if no error handler is available
+        print("|cffff0000Error:|r " .. tostring(err))
+    end
+end
+
 local function safecall(func, ...)
     if not func then return true end
     local success, err = pcall(func, ...)
     if not success then
-        local handler = geterrorhandler()
-        if handler then handler(err) end
+        safeErrorHandler(err)
     end
     return success, err
 end

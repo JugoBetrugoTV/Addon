@@ -23,6 +23,17 @@ local LayoutRegistry = AceGUI.LayoutRegistry
 local WidgetBase = AceGUI.WidgetBase
 local WidgetContainerBase = AceGUI.WidgetContainerBase
 
+-- Safe error handler that works without BugSack
+local function safeErrorHandler(err)
+    local handler = geterrorhandler and geterrorhandler()
+    if handler then
+        handler(err)
+    else
+        -- Fallback to print if no error handler is available
+        print("|cffff0000Error:|r " .. tostring(err))
+    end
+end
+
 -- Widget Base Methods
 local WidgetBaseMethods = {
     SetWidth = function(self, width)
@@ -70,7 +81,7 @@ local WidgetBaseMethods = {
             if success then
                 return ret
             else
-                geterrorhandler()(ret)
+                safeErrorHandler(ret)
             end
         end
     end,

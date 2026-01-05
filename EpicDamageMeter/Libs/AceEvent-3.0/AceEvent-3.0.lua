@@ -16,6 +16,17 @@ AceEvent.embeds = AceEvent.embeds or {}
 AceEvent.eventCallbacks = AceEvent.eventCallbacks or {}
 AceEvent.messageCallbacks = AceEvent.messageCallbacks or {}
 
+-- Safe error handler that works without BugSack
+local function safeErrorHandler(err)
+    local handler = geterrorhandler and geterrorhandler()
+    if handler then
+        handler(err)
+    else
+        -- Fallback to print if no error handler is available
+        print("|cffff0000Error:|r " .. tostring(err))
+    end
+end
+
 -- Direct event registration (no CallbackHandler dependency)
 local function RegisterEventImpl(self, event, method)
     if type(event) ~= "string" then return end
@@ -80,7 +91,7 @@ local function SendMessageImpl(self, message, ...)
         if func then
             local success, err = pcall(func, target, message, ...)
             if not success then
-                geterrorhandler()(err)
+                safeErrorHandler(err)
             end
         end
     end
@@ -96,7 +107,7 @@ AceEvent.frame:SetScript("OnEvent", function(frame, event, ...)
         if func then
             local success, err = pcall(func, target, event, ...)
             if not success then
-                geterrorhandler()(err)
+                safeErrorHandler(err)
             end
         end
     end

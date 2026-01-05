@@ -13,6 +13,17 @@ end
 
 local meta = {__index = function(tbl, key) tbl[key] = {} return tbl[key] end}
 
+-- Safe error handler that works without BugSack
+local function safeErrorHandler(err)
+    local handler = geterrorhandler and geterrorhandler()
+    if handler then
+        return handler(err)
+    else
+        -- Fallback to print if no error handler is available
+        print("|cffff0000Error:|r " .. tostring(err))
+    end
+end
+
 function CallbackHandler.New(self, target, RegisterName, UnregisterName, UnregisterAllName)
     RegisterName = RegisterName or "RegisterCallback"
     UnregisterName = UnregisterName or "UnregisterCallback"
@@ -33,7 +44,7 @@ function CallbackHandler.New(self, target, RegisterName, UnregisterName, Unregis
             if type(method) == "string" then
                 func = target[method]
             end
-            xpcall(func, geterrorhandler(), target, ...)
+            xpcall(func, safeErrorHandler, target, ...)
         end
 
         registry.recurse = oldrecurse
