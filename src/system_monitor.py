@@ -23,7 +23,7 @@ import math
 # ============================================================================
 
 class Config:
-    VERSION = "3.0.0"
+    VERSION = "3.1.0"
     APP_NAME = "SystemMonitor Pro"
 
     # Fenster
@@ -34,7 +34,8 @@ class Config:
 
     # Update Intervalle
     UPDATE_INTERVAL = 1000  # ms
-    GRAPH_POINTS = 60
+    GRAPH_POINTS = 60          # Mini-Graphen
+    DETAILED_GRAPH_POINTS = 120  # Detaillierte Graphen (2 Minuten)
 
     # Themes
     THEMES = {
@@ -282,10 +283,10 @@ class AnimatedRing(tk.Canvas):
 
 
 class ModernGraph(tk.Canvas):
-    """Moderner Graph mit Gradient-Fill und Animation"""
+    """Moderner Mini-Graph mit Gradient-Fill"""
 
     def __init__(self, parent, width=400, height=100, theme=None,
-                 color=None, show_grid=True, **kwargs):
+                 color=None, show_grid=True, max_points=60, **kwargs):
         super().__init__(parent, width=width, height=height,
                         highlightthickness=0, **kwargs)
         self.width = width
@@ -293,7 +294,7 @@ class ModernGraph(tk.Canvas):
         self.theme = theme or Config.THEMES['midnight']
         self.color = color or self.theme['accent_primary']
         self.show_grid = show_grid
-        self.data = deque(maxlen=Config.GRAPH_POINTS)
+        self.data = deque(maxlen=max_points)
         self.draw()
 
     def draw(self):
@@ -305,20 +306,16 @@ class ModernGraph(tk.Canvas):
 
         # Grid
         if self.show_grid:
-            # Horizontale Linien
             for i in range(1, 4):
                 y = i * (self.height // 4)
                 self.create_line(0, y, self.width, y,
                                fill=self.theme['card_border'], dash=(2, 4))
-
-            # Vertikale Linien
             for i in range(1, 8):
                 x = i * (self.width // 8)
                 self.create_line(x, 0, x, self.height,
                                fill=self.theme['card_border'], dash=(2, 4))
 
         if len(self.data) < 2:
-            # Placeholder Text
             self.create_text(self.width // 2, self.height // 2,
                            text="Waiting for data...",
                            font=('Segoe UI', 9),
@@ -332,33 +329,283 @@ class ModernGraph(tk.Canvas):
             y = self.height - (value / 100) * (self.height - 10) - 5
             points.extend([x, y])
 
-        # Gefüllter Bereich (Gradient-Effekt simuliert)
         if len(points) >= 4:
-            # Mehrere Schichten für Gradient
+            # Gradient Fill
             for layer in range(5):
-                alpha = 15 - layer * 3
                 fill_points = []
                 for i in range(0, len(points), 2):
                     fill_points.extend([points[i], points[i + 1] + layer * 5])
                 fill_points.extend([self.width, self.height, 0, self.height])
+                self.create_polygon(fill_points, fill=self.color,
+                                   stipple='gray50' if layer > 0 else 'gray75', outline='')
 
-                self.create_polygon(fill_points,
-                                   fill=self.color,
-                                   stipple='gray50' if layer > 0 else 'gray75',
-                                   outline='')
+            # Linie
+            self.create_line(points, fill=self.color, width=2, smooth=True)
+            self.create_line(points, fill=self.color, width=4, smooth=True, stipple='gray50')
+
+            # Endpunkt
+            last_x, last_y = points[-2], points[-1]
+            self.create_oval(last_x - 4, last_y - 4, last_x + 4, last_y + 4,
+                           fill=self.color, outline='white', width=2)
+
+    def add_value(self, value):
+        self.data.append(min(100, max(0, value)))
+        self.draw()
+
+
+class DetailedGraph(tk.Canvas):
+    """Detaillierter Graph mit Achsenbeschriftung, Statistiken und feinem Grid"""
+
+    def __init__(self, parent, width=500, height=180, theme=None,
+                 color=None, title="", unit="%", max_points=120, **kwargs):
+        super().__init__(parent, width=width, height=height,
+                        highlightthickness=0, **kwargs)
+        self.width = width
+        self.height = height
+        self.theme = theme or Config.THEMES['midnight']
+        self.color = color or self.theme['accent_primary']
+        self.title = title
+        self.unit = unit
+        self.data = deque(maxlen=max_points)
+        self.max_points = max_points
+
+        # Margins für Achsen
+        self.margin_left = 45
+        self.margin_right = 15
+        self.margin_top = 35
+        self.margin_bottom = 25
+
+        # Graph-Bereich
+        self.graph_width = self.width - self.margin_left - self.margin_right
+        self.graph_height = self.height - self.margin_top - self.margin_bottom
+
+        # Hover
+        self.hover_x = None
+        self.bind('<Motion>', self.on_motion)
+        self.bind('<Leave>', self.on_leave)
+
+        self.draw()
+
+    def draw(self):
+        self.delete('all')
+
+        # Hintergrund
+        self.create_rectangle(0, 0, self.width, self.height,
+                            fill=self.theme['bg_gradient_end'], outline='')
+
+        # Graph-Bereich Hintergrund
+        self.create_rectangle(
+            self.margin_left, self.margin_top,
+            self.width - self.margin_right, self.height - self.margin_bottom,
+            fill=self.theme['card_bg'], outline=self.theme['card_border']
+        )
+
+        # Titel und Statistiken
+        self.draw_header()
+
+        # Y-Achse
+        self.draw_y_axis()
+
+        # X-Achse (Zeit)
+        self.draw_x_axis()
+
+        # Grid
+        self.draw_grid()
+
+        # Daten
+        if len(self.data) >= 2:
+            self.draw_data()
+
+            # Hover-Linie
+            if self.hover_x is not None:
+                self.draw_hover()
+
+    def draw_header(self):
+        # Titel
+        self.create_text(self.margin_left, 12, text=self.title,
+                        font=('Segoe UI', 11, 'bold'),
+                        fill=self.theme['text_primary'], anchor='w')
+
+        # Statistiken
+        if len(self.data) > 0:
+            current = self.data[-1]
+            avg = sum(self.data) / len(self.data)
+            min_val = min(self.data)
+            max_val = max(self.data)
+
+            stats_text = f"Current: {current:.1f}{self.unit}  │  Avg: {avg:.1f}{self.unit}  │  Min: {min_val:.1f}{self.unit}  │  Max: {max_val:.1f}{self.unit}"
+
+            self.create_text(self.width - self.margin_right, 12, text=stats_text,
+                            font=('Segoe UI', 9),
+                            fill=self.theme['text_secondary'], anchor='e')
+
+    def draw_y_axis(self):
+        # Y-Achsen Beschriftungen (0%, 25%, 50%, 75%, 100%)
+        labels = [0, 25, 50, 75, 100]
+
+        for label in labels:
+            y = self.margin_top + self.graph_height - (label / 100) * self.graph_height
+
+            # Label
+            self.create_text(self.margin_left - 8, y,
+                           text=f"{label}{self.unit}",
+                           font=('Segoe UI', 8),
+                           fill=self.theme['text_muted'], anchor='e')
+
+            # Tick
+            self.create_line(self.margin_left - 3, y, self.margin_left, y,
+                           fill=self.theme['text_muted'])
+
+    def draw_x_axis(self):
+        # Zeit-Labels (letzte 2 Minuten bei 120 Punkten = 1 Punkt/Sekunde)
+        time_labels = ['2m', '1m30s', '1m', '30s', 'now']
+        num_labels = len(time_labels)
+
+        for i, label in enumerate(time_labels):
+            x = self.margin_left + (i / (num_labels - 1)) * self.graph_width
+
+            # Label
+            self.create_text(x, self.height - 8,
+                           text=label,
+                           font=('Segoe UI', 8),
+                           fill=self.theme['text_muted'])
+
+            # Tick
+            self.create_line(x, self.height - self.margin_bottom,
+                           x, self.height - self.margin_bottom + 3,
+                           fill=self.theme['text_muted'])
+
+    def draw_grid(self):
+        # Horizontale Linien (bei 25%, 50%, 75%)
+        for pct in [25, 50, 75]:
+            y = self.margin_top + self.graph_height - (pct / 100) * self.graph_height
+            self.create_line(
+                self.margin_left, y,
+                self.width - self.margin_right, y,
+                fill=self.theme['card_border'], dash=(2, 4)
+            )
+
+        # Vertikale Linien (alle 30 Sekunden = 30 Punkte)
+        for i in range(1, 4):
+            x = self.margin_left + (i / 4) * self.graph_width
+            self.create_line(
+                x, self.margin_top,
+                x, self.height - self.margin_bottom,
+                fill=self.theme['card_border'], dash=(2, 4)
+            )
+
+    def draw_data(self):
+        points = []
+        data_list = list(self.data)
+
+        for i, value in enumerate(data_list):
+            x = self.margin_left + (i / (self.max_points - 1)) * self.graph_width
+            y = self.margin_top + self.graph_height - (value / 100) * self.graph_height
+            points.extend([x, y])
+
+        if len(points) >= 4:
+            # Gradient Fill (mehrere Schichten)
+            for layer in range(8):
+                fill_points = []
+                offset = layer * 3
+                for i in range(0, len(points), 2):
+                    fill_points.extend([points[i], min(points[i + 1] + offset,
+                                                      self.height - self.margin_bottom)])
+                fill_points.extend([
+                    points[-2], self.height - self.margin_bottom,
+                    points[0], self.height - self.margin_bottom
+                ])
+
+                alpha_stipple = 'gray75' if layer < 2 else 'gray50' if layer < 5 else 'gray25'
+                self.create_polygon(fill_points, fill=self.color,
+                                   stipple=alpha_stipple, outline='')
+
+            # Glow-Linie (breitere, transparente Linie)
+            self.create_line(points, fill=self.color, width=6,
+                           smooth=True, stipple='gray50')
 
             # Hauptlinie
             self.create_line(points, fill=self.color, width=2, smooth=True)
 
-            # Glow-Linie
-            self.create_line(points, fill=self.color, width=4,
-                           smooth=True, stipple='gray50')
-
-            # Aktueller Wert Punkt
+            # Aktueller Wert - leuchtender Punkt
             last_x, last_y = points[-2], points[-1]
-            self.create_oval(last_x - 4, last_y - 4,
-                           last_x + 4, last_y + 4,
+
+            # Äußerer Glow
+            for r in range(3, 0, -1):
+                size = 4 + r * 2
+                self.create_oval(last_x - size, last_y - size,
+                               last_x + size, last_y + size,
+                               fill='', outline=self.color,
+                               width=1)
+
+            # Hauptpunkt
+            self.create_oval(last_x - 5, last_y - 5, last_x + 5, last_y + 5,
                            fill=self.color, outline='white', width=2)
+
+            # Aktueller Wert als Text neben dem Punkt
+            current_value = data_list[-1]
+            self.create_text(last_x - 10, last_y - 15,
+                           text=f"{current_value:.1f}{self.unit}",
+                           font=('Segoe UI', 9, 'bold'),
+                           fill=self.color, anchor='e')
+
+    def draw_hover(self):
+        if self.hover_x is None or len(self.data) < 2:
+            return
+
+        # Berechne Index aus X-Position
+        rel_x = self.hover_x - self.margin_left
+        if rel_x < 0 or rel_x > self.graph_width:
+            return
+
+        index = int((rel_x / self.graph_width) * (len(self.data) - 1))
+        index = max(0, min(index, len(self.data) - 1))
+
+        value = list(self.data)[index]
+
+        # X-Position für diese Datenpunkt
+        x = self.margin_left + (index / (self.max_points - 1)) * self.graph_width
+        y = self.margin_top + self.graph_height - (value / 100) * self.graph_height
+
+        # Vertikale Linie
+        self.create_line(x, self.margin_top, x, self.height - self.margin_bottom,
+                        fill=self.theme['text_muted'], dash=(3, 3))
+
+        # Horizontale Linie zum Wert
+        self.create_line(self.margin_left, y, x, y,
+                        fill=self.theme['text_muted'], dash=(3, 3))
+
+        # Punkt
+        self.create_oval(x - 4, y - 4, x + 4, y + 4,
+                        fill='white', outline=self.color, width=2)
+
+        # Tooltip
+        tooltip_text = f"{value:.1f}{self.unit}"
+        time_ago = int(((self.max_points - 1 - index) / self.max_points) * 120)
+        if time_ago > 0:
+            tooltip_text += f" ({time_ago}s ago)"
+
+        # Tooltip Hintergrund
+        text_width = len(tooltip_text) * 6 + 10
+        tooltip_x = x + 10 if x < self.width - 80 else x - text_width - 10
+        tooltip_y = y - 10 if y > 30 else y + 20
+
+        self.create_rectangle(tooltip_x - 5, tooltip_y - 10,
+                            tooltip_x + text_width, tooltip_y + 10,
+                            fill=self.theme['bg_gradient_end'],
+                            outline=self.theme['card_border'])
+
+        self.create_text(tooltip_x, tooltip_y, text=tooltip_text,
+                        font=('Segoe UI', 9, 'bold'),
+                        fill=self.theme['text_primary'], anchor='w')
+
+    def on_motion(self, event):
+        self.hover_x = event.x
+        self.draw()
+
+    def on_leave(self, event):
+        self.hover_x = None
+        self.draw()
 
     def add_value(self, value):
         self.data.append(min(100, max(0, value)))
@@ -824,39 +1071,37 @@ class SystemMonitorPro:
                                 theme=self.theme)
         self.net_card.pack(side='left', fill='both', expand=True, padx=(10, 0))
 
-        # Mittlere Zeile - Große Graphen
+        # Mittlere Zeile - Detaillierte Graphen
         mid_row = tk.Frame(page, bg=self.theme['bg_gradient_start'])
         mid_row.pack(fill='x', pady=15)
 
-        # CPU Graph Card
-        cpu_graph_frame = tk.Frame(mid_row, bg=self.theme['card_bg'])
+        # CPU Graph - Detailliert
+        cpu_graph_frame = tk.Frame(mid_row, bg=self.theme['bg_gradient_end'])
         cpu_graph_frame.pack(side='left', fill='both', expand=True, padx=(0, 10))
 
-        tk.Label(cpu_graph_frame, text="CPU Usage History",
-                font=('Segoe UI', 11, 'bold'),
-                bg=self.theme['card_bg'],
-                fg=self.theme['text_secondary']).pack(anchor='w', padx=15, pady=(15, 10))
+        self.cpu_big_graph = DetailedGraph(cpu_graph_frame,
+                                          width=450, height=180,
+                                          theme=self.theme,
+                                          color=self.theme['accent_primary'],
+                                          title="CPU Usage",
+                                          unit="%",
+                                          max_points=Config.DETAILED_GRAPH_POINTS,
+                                          bg=self.theme['bg_gradient_end'])
+        self.cpu_big_graph.pack(fill='both', expand=True, padx=5, pady=5)
 
-        self.cpu_big_graph = ModernGraph(cpu_graph_frame, width=400, height=120,
-                                        theme=self.theme,
-                                        color=self.theme['accent_primary'],
-                                        bg=self.theme['card_bg'])
-        self.cpu_big_graph.pack(fill='x', padx=15, pady=(0, 15))
-
-        # RAM Graph Card
-        ram_graph_frame = tk.Frame(mid_row, bg=self.theme['card_bg'])
+        # RAM Graph - Detailliert
+        ram_graph_frame = tk.Frame(mid_row, bg=self.theme['bg_gradient_end'])
         ram_graph_frame.pack(side='left', fill='both', expand=True, padx=(10, 0))
 
-        tk.Label(ram_graph_frame, text="Memory Usage History",
-                font=('Segoe UI', 11, 'bold'),
-                bg=self.theme['card_bg'],
-                fg=self.theme['text_secondary']).pack(anchor='w', padx=15, pady=(15, 10))
-
-        self.ram_big_graph = ModernGraph(ram_graph_frame, width=400, height=120,
-                                        theme=self.theme,
-                                        color=self.theme['accent_success'],
-                                        bg=self.theme['card_bg'])
-        self.ram_big_graph.pack(fill='x', padx=15, pady=(0, 15))
+        self.ram_big_graph = DetailedGraph(ram_graph_frame,
+                                          width=450, height=180,
+                                          theme=self.theme,
+                                          color=self.theme['accent_success'],
+                                          title="Memory Usage",
+                                          unit="%",
+                                          max_points=Config.DETAILED_GRAPH_POINTS,
+                                          bg=self.theme['bg_gradient_end'])
+        self.ram_big_graph.pack(fill='both', expand=True, padx=5, pady=5)
 
         # Untere Zeile - System Info & Top Processes
         bottom_row = tk.Frame(page, bg=self.theme['bg_gradient_start'])
@@ -1129,6 +1374,38 @@ class SystemMonitorPro:
                                           bg=self.theme['card_bg'],
                                           fg=self.theme['text_muted'])
         self.upload_total_label.pack(pady=(0, 20))
+
+        # Netzwerk Graphen
+        graph_row = tk.Frame(page, bg=self.theme['bg_gradient_start'])
+        graph_row.pack(fill='x', pady=(0, 15))
+
+        # Download Graph
+        dl_graph_frame = tk.Frame(graph_row, bg=self.theme['bg_gradient_end'])
+        dl_graph_frame.pack(side='left', fill='both', expand=True, padx=(0, 10))
+
+        self.download_graph = DetailedGraph(dl_graph_frame,
+                                           width=450, height=150,
+                                           theme=self.theme,
+                                           color=self.theme['accent_success'],
+                                           title="Download Speed",
+                                           unit=" KB/s",
+                                           max_points=Config.DETAILED_GRAPH_POINTS,
+                                           bg=self.theme['bg_gradient_end'])
+        self.download_graph.pack(fill='both', expand=True, padx=5, pady=5)
+
+        # Upload Graph
+        ul_graph_frame = tk.Frame(graph_row, bg=self.theme['bg_gradient_end'])
+        ul_graph_frame.pack(side='left', fill='both', expand=True, padx=(10, 0))
+
+        self.upload_graph = DetailedGraph(ul_graph_frame,
+                                         width=450, height=150,
+                                         theme=self.theme,
+                                         color=self.theme['accent_secondary'],
+                                         title="Upload Speed",
+                                         unit=" KB/s",
+                                         max_points=Config.DETAILED_GRAPH_POINTS,
+                                         bg=self.theme['bg_gradient_end'])
+        self.upload_graph.pack(fill='both', expand=True, padx=5, pady=5)
 
         # Network Interfaces
         interfaces_frame = tk.Frame(page, bg=self.theme['card_bg'])
@@ -1525,6 +1802,14 @@ class SystemMonitorPro:
                 self.upload_speed_label.config(text=self.format_speed(sent_speed))
                 self.download_total_label.config(text=f"Total: {self.format_bytes(net.bytes_recv)}")
                 self.upload_total_label.config(text=f"Total: {self.format_bytes(net.bytes_sent)}")
+
+            # Netzwerk Graphen (in KB/s, max 1000 KB/s = 100%)
+            if hasattr(self, 'download_graph'):
+                dl_kb = recv_speed / 1024  # Bytes zu KB
+                ul_kb = sent_speed / 1024
+                # Skaliere auf 0-100 (max 1 MB/s = 100%)
+                self.download_graph.add_value(min(100, dl_kb / 10))
+                self.upload_graph.add_value(min(100, ul_kb / 10))
 
             # Top Processes
             self.update_top_processes()

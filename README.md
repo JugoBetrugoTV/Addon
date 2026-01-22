@@ -1,10 +1,10 @@
-# SystemMonitor Pro v3.0
+# SystemMonitor Pro v3.1
 
-Ein **ultra-modernes** Echtzeit-System-Monitoring Tool für Windows 11 mit Glasmorphism UI, animierten Widgets und professionellem Design.
+Ein **ultra-modernes** Echtzeit-System-Monitoring Tool für Windows 11 mit Glasmorphism UI, detaillierten Graphen und professionellem Design.
 
 ![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?style=for-the-badge&logo=windows11)
 ![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/Version-3.0.0-10B981?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-3.1.0-10B981?style=for-the-badge)
 
 ## Highlights
 
@@ -42,10 +42,34 @@ Ein **ultra-modernes** Echtzeit-System-Monitoring Tool für Windows 11 mit Glasm
 └──────────┴───┴───────────────┴┴─────────────┴┴────────────────┴─┘
 ```
 
+### Detaillierte Graphen (NEU in v3.1)
+
+```
+┌─ CPU Usage ────────────────── Current: 45.2%  │  Avg: 38.5%  │  Min: 12.0%  │  Max: 78.3% ─┐
+│                                                                                              │
+│ 100% ┤                                                                                       │
+│  75% ┤                    ╭───╮                                                              │
+│  50% ┤     ╭──────╮      ╱     ╲           ╭─────╮                          ●45.2%          │
+│  25% ┤────╱        ╲────╱       ╲─────────╱       ╲────────────────────────╱                │
+│   0% ┼────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼────                 │
+│      2m       1m30s       1m        30s       now                                            │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Features der DetailedGraph Widgets:**
+- **120 Datenpunkte** - 2 Minuten Verlauf
+- **Y-Achse** - 0%, 25%, 50%, 75%, 100% Beschriftung
+- **X-Achse** - Zeitliche Beschriftung (2m, 1m30s, 1m, 30s, now)
+- **Statistiken** - Current, Avg, Min, Max Werte in der Kopfzeile
+- **Hover-Tooltip** - Zeigt Wert und Zeit bei Mausposition
+- **Gradient-Fill** - Mehrschichtiger Farbverlauf
+- **Glow-Effekt** - Leuchtender Endpunkt
+
 ### Animierte Widgets
 
 - **AnimatedRing** - Kreisförmige Fortschrittsanzeige mit Glow und pulsierendem Endpunkt
-- **ModernGraph** - Verlaufsgraph mit Gradient-Fill und animiertem Datenpunkt
+- **DetailedGraph** - Professioneller Graph mit Achsen, Grid, Statistiken und Hover
+- **ModernGraph** - Mini-Verlaufsgraph mit Gradient-Fill
 - **ModernProgressBar** - Progressbar mit Shimmer-Animation
 - **SidebarButton** - Buttons mit Hover-Animation und Active-Indikator
 - **StatCard** - Kombinierte Karte mit Ring, Details und Mini-Graph
@@ -141,7 +165,17 @@ bar.set_value(60)  # Animiert mit Shimmer-Effekt
 
 ## Changelog
 
-### v3.0.0 (Aktuell)
+### v3.1.0 (Aktuell)
+- **DetailedGraph Widget** mit professionellen Features
+- 120 Datenpunkte (2 Minuten Verlauf)
+- Y-Achse mit Prozent-Beschriftung
+- X-Achse mit Zeit-Beschriftung
+- Min/Max/Avg Statistiken in Echtzeit
+- Hover-Tooltips mit Wert und Zeit
+- Netzwerk-Graphen (Download/Upload History)
+- Verbessertes Grid-System
+
+### v3.0.0
 - Komplett neues Ultra-Modern UI
 - Sidebar-Navigation
 - 3 Themes (Midnight, Aurora, Cyber)
