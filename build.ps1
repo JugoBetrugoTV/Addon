@@ -32,21 +32,20 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Package
-Write-Host "`n[3/4] Packaging with Electron..." -ForegroundColor Yellow
-npx electron-builder --win portable
+# Package with Electron Packager
+Write-Host "`n[3/4] Packaging with Electron Packager..." -ForegroundColor Yellow
+npx electron-packager . "Codex Mortis" --platform=win32 --arch=x64 --out=release --overwrite --ignore="(src|\.git|node_modules/(typescript|ts-loader|webpack|html-webpack-plugin|@types))" --asar
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "[WARNING] Trying dir target..." -ForegroundColor Yellow
-    npx electron-builder --win dir
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[ERROR] Packaging failed!" -ForegroundColor Red
-        Read-Host "Press Enter to exit"
-        exit 1
-    }
+    Write-Host "[WARNING] Packaging failed. You can still run:" -ForegroundColor Yellow
+    Write-Host "  npx electron dist/main.js" -ForegroundColor White
+    Read-Host "Press Enter to exit"
+    exit 1
 }
 
 Write-Host "`n========================================" -ForegroundColor Green
 Write-Host "  BUILD COMPLETE!" -ForegroundColor Green
-Write-Host "  Output: dist/ folder" -ForegroundColor Green
+Write-Host "  EXE: release\Codex Mortis-win32-x64\Codex Mortis.exe" -ForegroundColor Green
+Write-Host "" -ForegroundColor Green
+Write-Host "  Or run directly: npx electron dist/main.js" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Read-Host "`nPress Enter to exit"

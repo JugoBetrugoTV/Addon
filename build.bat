@@ -31,22 +31,23 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/4] Packaging with Electron...
-call npx electron-builder --win portable
+echo [3/4] Packaging with Electron Packager...
+call npx electron-packager . "Codex Mortis" --platform=win32 --arch=x64 --out=release --overwrite --ignore="(src|\.git|node_modules/(typescript|ts-loader|webpack|html-webpack-plugin|@types))" --asar
 if errorlevel 1 (
-    echo [WARNING] Electron builder failed. Trying dir target...
-    call npx electron-builder --win dir
-    if errorlevel 1 (
-        echo [ERROR] Packaging failed!
-        pause
-        exit /b 1
-    )
+    echo [WARNING] Packaging failed. You can still run the game with:
+    echo   npx electron dist/main.js
+    echo.
+    pause
+    exit /b 1
 )
 
 echo.
 echo ========================================
 echo   BUILD COMPLETE!
-echo   Output: dist/ folder
+echo.
+echo   EXE: release\Codex Mortis-win32-x64\Codex Mortis.exe
+echo.
+echo   Or run directly: npx electron dist/main.js
 echo ========================================
 echo.
 pause
