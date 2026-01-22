@@ -1,85 +1,52 @@
 @echo off
-echo ==========================================
-echo   Battlefield: Python Edition - Build
-echo ==========================================
+echo ========================================
+echo   CODEX MORTIS - Build Script
+echo   Vampire Survivors-like Game
+echo ========================================
 echo.
 
-:: Python finden
-set PYTHON_CMD=
-
-python --version >nul 2>&1
-if not errorlevel 1 (
-    set PYTHON_CMD=python
-    goto :found
+:: Check for Node.js
+where node >nul 2>nul
+if errorlevel 1 (
+    echo [ERROR] Node.js not found! Please install from https://nodejs.org
+    pause
+    exit /b 1
 )
 
-py --version >nul 2>&1
-if not errorlevel 1 (
-    set PYTHON_CMD=py
-    goto :found
+echo [1/4] Installing dependencies...
+call npm install
+if errorlevel 1 (
+    echo [ERROR] npm install failed!
+    pause
+    exit /b 1
 )
 
-python3 --version >nul 2>&1
-if not errorlevel 1 (
-    set PYTHON_CMD=python3
-    goto :found
+echo.
+echo [2/4] Building TypeScript...
+call npx webpack --config webpack.config.js
+if errorlevel 1 (
+    echo [ERROR] Build failed!
+    pause
+    exit /b 1
 )
 
-for %%P in (
-    "%LOCALAPPDATA%\Programs\Python\Python314\python.exe"
-    "%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
-    "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-    "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-    "%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
-    "%USERPROFILE%\AppData\Local\Microsoft\WindowsApps\python.exe"
-) do (
-    if exist %%P (
-        set PYTHON_CMD=%%P
-        goto :found
+echo.
+echo [3/4] Packaging with Electron...
+call npx electron-builder --win portable
+if errorlevel 1 (
+    echo [WARNING] Electron builder failed. Trying dir target...
+    call npx electron-builder --win dir
+    if errorlevel 1 (
+        echo [ERROR] Packaging failed!
+        pause
+        exit /b 1
     )
 )
 
-echo [FEHLER] Python nicht gefunden!
-echo Installiere Python von https://python.org (Add to PATH aktivieren!)
-pause
-exit /b 1
-
-:found
-echo [OK] Python: %PYTHON_CMD%
 echo.
-
-echo [1/3] Installiere Abhaengigkeiten...
-%PYTHON_CMD% -m pip uninstall pygame -y >nul 2>&1
-%PYTHON_CMD% -m pip install pygame-ce pyinstaller
-
-if errorlevel 1 (
-    echo [FEHLER] Installation fehlgeschlagen!
-    pause
-    exit /b 1
-)
-
-echo.
-echo [2/3] Erstelle EXE...
-%PYTHON_CMD% -m PyInstaller --noconfirm --onefile --windowed ^
-    --name "Battlefield Python Edition" ^
-    --hidden-import pygame ^
-    src/battlefield.py
-
-if errorlevel 1 (
-    echo [FEHLER] Build fehlgeschlagen!
-    pause
-    exit /b 1
-)
-
-echo.
-echo [3/3] Aufraeumen...
-rmdir /s /q build 2>nul
-del /q *.spec 2>nul
-
-echo.
-echo ==========================================
-echo   Build erfolgreich!
-echo   EXE: dist\Battlefield Python Edition.exe
-echo ==========================================
+echo ========================================
+echo   BUILD COMPLETE!
+echo   Output: dist/ folder
+echo ========================================
 echo.
 pause

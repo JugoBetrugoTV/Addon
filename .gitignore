@@ -1,27 +1,7 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.venv/
-
-# PyInstaller
-build/
+node_modules/
 dist/
-*.spec
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
+build/
+*.exe
+*.tgz
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
