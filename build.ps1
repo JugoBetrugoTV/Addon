@@ -30,7 +30,8 @@ if (-not $pythonCmd) {
 Write-Host "[OK] Python: $pythonCmd" -ForegroundColor Green
 
 Write-Host "`n[1/3] Installiere Abhaengigkeiten..." -ForegroundColor Yellow
-& $pythonCmd -m pip install -r requirements.txt
+& $pythonCmd -m pip uninstall pygame -y 2>$null
+& $pythonCmd -m pip install pygame-ce pyinstaller
 
 Write-Host "`n[2/3] Erstelle EXE..." -ForegroundColor Yellow
 & $pythonCmd -m PyInstaller --noconfirm --onefile --windowed `

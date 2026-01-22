@@ -49,7 +49,8 @@ echo [OK] Python: %PYTHON_CMD%
 echo.
 
 echo [1/3] Installiere Abhaengigkeiten...
-%PYTHON_CMD% -m pip install -r requirements.txt
+%PYTHON_CMD% -m pip uninstall pygame -y >nul 2>&1
+%PYTHON_CMD% -m pip install pygame-ce pyinstaller
 
 if errorlevel 1 (
     echo [FEHLER] Installation fehlgeschlagen!
