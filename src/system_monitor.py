@@ -696,7 +696,7 @@ class SidebarButton(tk.Canvas):
         # Hintergrund
         if self.active:
             self.create_rectangle(0, 0, self.width, self.height,
-                                fill=self.theme['accent_primary'] + '30', outline='')
+                                fill=self.theme['card_glow'], outline='')
             # Linker Indikator
             self.create_rectangle(0, 5, 4, self.height - 5,
                                 fill=self.theme['accent_primary'], outline='')
