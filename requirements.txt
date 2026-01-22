@@ -1,5 +1,2 @@
-# SystemMonitor Pro - Dependencies
-# Installation: pip install -r requirements.txt
-
-psutil>=5.9.0
+pygame>=2.5.0
 pyinstaller>=6.0.0
