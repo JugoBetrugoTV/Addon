@@ -43,9 +43,9 @@ class Config:
             'name': 'Midnight',
             'bg_gradient_start': '#0a0a0f',
             'bg_gradient_end': '#1a1a2e',
-            'card_bg': '#ffffff08',
-            'card_border': '#ffffff15',
-            'card_glow': '#3b82f620',
+            'card_bg': '#16162a',
+            'card_border': '#2a2a40',
+            'card_glow': '#162844',
             'accent_primary': '#3b82f6',
             'accent_secondary': '#8b5cf6',
             'accent_success': '#10b981',
@@ -61,9 +61,9 @@ class Config:
             'name': 'Aurora',
             'bg_gradient_start': '#0f172a',
             'bg_gradient_end': '#1e1b4b',
-            'card_bg': '#ffffff08',
-            'card_border': '#a855f720',
-            'card_glow': '#a855f620',
+            'card_bg': '#1c1a38',
+            'card_border': '#2e1d50',
+            'card_glow': '#2a1a4a',
             'accent_primary': '#a855f7',
             'accent_secondary': '#ec4899',
             'accent_success': '#22c55e',
@@ -79,9 +79,9 @@ class Config:
             'name': 'Cyber',
             'bg_gradient_start': '#000000',
             'bg_gradient_end': '#0a1628',
-            'card_bg': '#00ff8808',
-            'card_border': '#00ff8830',
-            'card_glow': '#00ff8820',
+            'card_bg': '#041a10',
+            'card_border': '#0a3520',
+            'card_glow': '#062a18',
             'accent_primary': '#00ff88',
             'accent_secondary': '#00d4ff',
             'accent_success': '#00ff88',
@@ -144,7 +144,7 @@ class GlowingCard(tk.Canvas):
         # Top highlight für Glaseffekt
         self.create_rectangle(
             3, 3, self.width - 3, 20,
-            fill='#ffffff05', outline=''
+            fill='#141420', outline=''
         )
 
     def on_enter(self, event):
