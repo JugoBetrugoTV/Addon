@@ -1,187 +1,173 @@
-# SystemMonitor Pro v2.0
+# SystemMonitor Pro v3.0
 
-Ein professionelles Echtzeit-System-Monitoring Tool für Windows 11 mit modernem Dark-Mode UI, animierten Graphen und umfangreichen Features.
+Ein **ultra-modernes** Echtzeit-System-Monitoring Tool für Windows 11 mit Glasmorphism UI, animierten Widgets und professionellem Design.
 
-![Windows 11](https://img.shields.io/badge/Windows-11-blue?logo=windows)
-![Python](https://img.shields.io/badge/Python-3.8+-yellow?logo=python)
-![Version](https://img.shields.io/badge/Version-2.0.0-green)
+![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?style=for-the-badge&logo=windows11)
+![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Version](https://img.shields.io/badge/Version-3.0.0-10B981?style=for-the-badge)
+
+## Highlights
+
+- **Ultra-Modern UI** - Glasmorphism Design mit Glow-Effekten
+- **3 Themes** - Midnight (Blau), Aurora (Lila), Cyber (Grün/Matrix)
+- **Animierte Widgets** - Smooth Animationen überall
+- **Sidebar Navigation** - Moderne App-ähnliche Navigation
+- **Per-Core CPU** - Individuelle Auslastung pro CPU-Kern
+- **Live Graphen** - Echtzeit-Verlaufsgraphen mit Gradient-Fill
 
 ## Features
 
 ### Dashboard
-- **CPU-Monitoring** - Echtzeit CPU-Auslastung mit animierter Kreisanzeige und Verlaufsgraph
-- **RAM-Überwachung** - Speicherverbrauch mit detaillierten Infos und Mini-Graph
-- **Festplatten-Status** - Belegter Speicherplatz mit Visualisierung
-- **Netzwerk-Statistiken** - Live Download/Upload Geschwindigkeit
-- **Top Prozesse** - Die 5 aktivsten Prozesse auf einen Blick
-
-### Prozesse Tab
-- Vollständige Prozessliste mit PID, Name, Status, CPU%, RAM%, Threads
-- **Suchfunktion** - Prozesse schnell finden
-- **Sortierung** - Klicke auf Spaltenheader zum Sortieren
-- **Prozess beenden** - Ausgewählte Prozesse terminieren
-
-### Netzwerk Tab
-- **Download/Upload Geschwindigkeit** - Live-Anzeige in Echtzeit
-- **Gesamt-Traffic** - Übersicht über übertragene Daten
-- **Interface-Liste** - Alle Netzwerkadapter mit IP, MAC und Status
-
-### Festplatten Tab
-- **Disk I/O** - Lese-/Schreibgeschwindigkeit in Echtzeit
-- **Partitionen** - Alle Laufwerke mit Belegung und animierten Fortschrittsbalken
-
-### System Tab
-- **Hardware-Info** - CPU, RAM, Architektur
-- **Software-Info** - OS, Hostname, Python-Version
-- **Batterie-Status** - Ladezustand und verbleibende Zeit (bei Laptops)
-
-### Weitere Features
-- **Export** - Systemdaten als CSV oder JSON exportieren
-- **Tastenkürzel** - F5 (Aktualisieren), Ctrl+E (Export), Esc (Beenden)
-- **Dark Theme** - Modernes, augenfreundliches Design
-- **Animierte UI** - Sanfte Übergänge und Animationen
-- **System-Uptime** - Anzeige der Laufzeit seit Boot
-
-## Screenshot
-
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  SystemMonitor PRO  v2.0.0          12:34:56  Uptime: 02:15:30      │
-├─────────────────────────────────────────────────────────────────────┤
-│  Dashboard │ Prozesse │ Netzwerk │ Festplatten │ System             │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐                     │
-│  │  CPU   │  │  RAM   │  │  Disk  │  │Network │                     │
-│  │ ╭──╮   │  │ ╭──╮   │  │ ╭──╮   │  │ ╭──╮   │                     │
-│  │ │45│%  │  │ │62│%  │  │ │73│%  │  │ │2.1│  │                     │
-│  │ ╰──╯   │  │ ╰──╯   │  │ ╰──╯   │  │ ╰──╯MB │                     │
-│  │▁▃▅▇▅▃▁ │  │▂▄▆▇▆▄▂ │  │▇▇▇▇▇▇▇ │  │▁▂▃▄▃▂▁ │                     │
-│  └────────┘  └────────┘  └────────┘  └────────┘                     │
-│                                                                      │
-│  ┌─ CPU Verlauf ──────────────┐  ┌─ RAM Verlauf ──────────────┐     │
-│  │ ▁▂▃▄▅▆▇▆▅▄▃▂▁▂▃▄▅▆▇▆▅▄▃▂▁ │  │ ▃▃▃▄▄▅▅▆▆▇▇▆▆▅▅▄▄▃▃▃▃▃▃▃▃ │     │
-│  └────────────────────────────┘  └────────────────────────────┘     │
-│                                                                      │
-│  ┌─ System Info ──────────────┐  ┌─ Top Prozesse ─────────────┐     │
-│  │ ● Hostname: DESKTOP-PC     │  │ chrome.exe          12.5%  │     │
-│  │ ● OS: Windows 11           │  │ code.exe             8.3%  │     │
-│  │ ● CPU: Intel Core i7       │  │ explorer.exe         3.2%  │     │
-│  │ ● Kerne: 8 / 16 logisch    │  │ python.exe           2.1%  │     │
-│  └────────────────────────────┘  └────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  ◉ SystemMonitor PRO                    │   14:32:18            │
+│                                         │   Uptime: 05:23:41    │
+├──────────┬──────────────────────────────┴───────────────────────┤
+│          │                                                       │
+│  ◫ Dash  │   ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐            │
+│  ☰ Procs │   │ CPU  │  │ RAM  │  │ Disk │  │ Net  │            │
+│  ◎ Net   │   │ ╭─╮  │  │ ╭─╮  │  │ ╭─╮  │  │ ╭─╮  │            │
+│  ◔ Disks │   │ │45│% │  │ │62│% │  │ │73│% │  │2.1MB│            │
+│  ⚙ Sys   │   │ ╰─╯  │  │ ╰─╯  │  │ ╰─╯  │  │ ╰─╯  │            │
+│          │   │▁▃▅▇▅▃│  │▂▄▆▇▆▄│  │▇▇▇▇▇▇│  │▁▂▃▄▃▂│            │
+│ ────────│   └──────┘  └──────┘  └──────┘  └──────┘            │
+│  Theme   │                                                       │
+│  ● ● ●   │   ┌─ CPU History ─────────┐┌─ RAM History ─────────┐ │
+│          │   │ ▁▂▃▄▅▆▇▆▅▄▃▂▁▂▃▄▅▆▇▆ ││ ▃▃▄▄▅▅▆▆▇▇▆▆▅▅▄▄▃▃▃▃ │ │
+│          │   └───────────────────────┘└───────────────────────┘ │
+│          │                                                       │
+│  v3.0.0  │   ┌─ System Info ─┐┌─ Top Procs ─┐┌─ CPU Cores ────┐ │
+│          │   │ ◉ Host: PC    ││ chrome  12% ││ Core 0 ███░ 45%│ │
+│          │   │ ◉ OS: Win 11  ││ code     8% ││ Core 1 ██░░ 32%│ │
+└──────────┴───┴───────────────┴┴─────────────┴┴────────────────┴─┘
 ```
+
+### Animierte Widgets
+
+- **AnimatedRing** - Kreisförmige Fortschrittsanzeige mit Glow und pulsierendem Endpunkt
+- **ModernGraph** - Verlaufsgraph mit Gradient-Fill und animiertem Datenpunkt
+- **ModernProgressBar** - Progressbar mit Shimmer-Animation
+- **SidebarButton** - Buttons mit Hover-Animation und Active-Indikator
+- **StatCard** - Kombinierte Karte mit Ring, Details und Mini-Graph
+
+### Themes
+
+| Theme | Akzentfarbe | Beschreibung |
+|-------|-------------|--------------|
+| **Midnight** | Blau | Klassisches dunkles Theme |
+| **Aurora** | Lila/Pink | Lebendige Farben |
+| **Cyber** | Neon-Grün | Matrix/Hacker Style |
+
+### Pages
+
+| Seite | Features |
+|-------|----------|
+| **Dashboard** | 4 Stat-Cards, 2 große Graphen, System-Info, Top Prozesse, Per-Core CPU |
+| **Prozesse** | Suchfunktion, Sortierung, Task beenden |
+| **Netzwerk** | Download/Upload Speed, Interface-Liste |
+| **Festplatten** | Read/Write I/O, Partitionen mit Balken |
+| **System** | Hardware-Info, Software-Info, Batterie |
 
 ## Installation
 
 ### Voraussetzungen
 
-- Windows 10/11 (auch auf Linux/Mac lauffähig)
-- Python 3.8 oder höher
-- pip (Python Package Manager)
+- Windows 10/11 (auch Linux/Mac kompatibel)
+- Python 3.8+
 
 ### Schnellstart
 
-1. **Repository klonen:**
-   ```bash
-   git clone https://github.com/JugoBetrugoTV/Addon.git
-   cd Addon
-   ```
+```bash
+# Repository klonen
+git clone https://github.com/JugoBetrugoTV/Addon.git
+cd Addon
 
-2. **Dependencies installieren:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Dependencies installieren
+pip install -r requirements.txt
 
-3. **Direkt ausführen:**
-   ```bash
-   python src/system_monitor.py
-   ```
+# Starten
+python src/system_monitor.py
+```
 
 ## EXE erstellen
 
-### Option 1: Build-Skript (empfohlen)
-
-**Mit Batch-Datei (Windows CMD):**
+### Windows (CMD)
 ```cmd
 build.bat
 ```
 
-**Mit PowerShell:**
+### PowerShell
 ```powershell
 .\build.ps1
 ```
 
-### Option 2: Manuell
-
+### Manuell
 ```bash
 pip install pyinstaller
 pyinstaller --onefile --windowed --name "SystemMonitor Pro" src/system_monitor.py
 ```
 
-Die fertige EXE findest du im `dist/` Ordner.
-
-## Tastenkürzel
-
-| Taste | Funktion |
-|-------|----------|
-| `F5` | Prozessliste aktualisieren |
-| `Ctrl+E` | Daten exportieren |
-| `Esc` | Anwendung beenden |
+Die EXE findest du in `dist/SystemMonitor Pro.exe`
 
 ## Projektstruktur
 
 ```
 Addon/
 ├── src/
-│   └── system_monitor.py   # Hauptanwendung (~1300 Zeilen)
-├── requirements.txt        # Python Dependencies
-├── build.bat              # Windows Batch Build-Skript
-├── build.ps1              # PowerShell Build-Skript
-├── .gitignore
-└── README.md              # Diese Datei
+│   └── system_monitor.py   # Hauptanwendung (~1700 Zeilen)
+├── requirements.txt        # psutil, pyinstaller
+├── build.bat              # Windows Build
+├── build.ps1              # PowerShell Build
+└── README.md
 ```
 
-## Technologien
+## Custom Widgets
 
-- **Python 3** - Programmiersprache
-- **Tkinter** - GUI Framework (in Python integriert)
-- **psutil** - System-Informationen und Prozess-Management
-- **PyInstaller** - EXE-Erstellung
+Das Tool enthält mehrere selbst entwickelte Widgets:
 
-## Neue Features in v2.0
+```python
+# Animierter Ring mit Glow
+ring = AnimatedRing(parent, size=120, thickness=12, theme=theme)
+ring.set_value(75)  # Animiert zum Wert
 
-- Komplett neues UI-Design mit Dark Theme
-- Animierte Kreisförmige Fortschrittsanzeigen
-- Echtzeit-Verlaufsgraphen für CPU und RAM
-- Tab-basierte Navigation (Dashboard, Prozesse, Netzwerk, Festplatten, System)
-- Prozess-Suchfunktion und Sortierung
-- Prozess beenden Funktion
-- Disk I/O Monitoring
-- Netzwerk-Interface Übersicht
-- Batterie-Monitoring (bei Laptops)
-- Export-Funktion (CSV/JSON)
-- Tastenkürzel-Support
-- System-Uptime Anzeige
+# Moderner Graph mit Gradient
+graph = ModernGraph(parent, width=400, height=100, color='#3b82f6')
+graph.add_value(45)  # Fügt Datenpunkt hinzu
+
+# Progress Bar mit Shimmer
+bar = ModernProgressBar(parent, width=300, height=8)
+bar.set_value(60)  # Animiert mit Shimmer-Effekt
+```
 
 ## Changelog
 
+### v3.0.0 (Aktuell)
+- Komplett neues Ultra-Modern UI
+- Sidebar-Navigation
+- 3 Themes (Midnight, Aurora, Cyber)
+- Animierte Ring-Widgets mit Glow
+- Per-Core CPU Monitoring
+- Gradient-Graphen
+- Hover-Animationen
+- Glasmorphism Design
+
 ### v2.0.0
-- Komplettes UI-Redesign
-- Neue Tab-Navigation
-- Animierte Widgets
-- Verlaufsgraphen
+- Tab-basierte Navigation
 - Export-Funktion
 - Prozess-Management
-- Netzwerk-Details
-- Batterie-Status
 
 ### v1.0.0
-- Initiale Version
 - Basis-Monitoring
+
+## Technologien
+
+- **Python 3** mit Tkinter
+- **psutil** für System-Daten
+- **PyInstaller** für EXE
 
 ## Lizenz
 
-MIT License - Frei verwendbar
+MIT License
 
 ---
 
