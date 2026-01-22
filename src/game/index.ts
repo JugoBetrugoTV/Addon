@@ -1,17 +1,17 @@
 import * as PIXI from 'pixi.js';
 import {
   createWorld, addEntity, removeEntity, addComponent,
-  hasComponent, defineQuery, enterQuery, exitQuery,
+  hasComponent, defineQuery,
   IWorld,
 } from 'bitecs';
 import {
   Position, Velocity, Health, Collision, Player, Enemy,
   Weapon, Projectile, XPGem, SpriteComponent, Lifetime,
   Particle, AreaEffect, PlayerTag, EnemyTag, ProjectileTag,
-  XPGemTag, ParticleTag, WeaponTag, AreaEffectTag, FlashEffect,
+  XPGemTag, ParticleTag, WeaponTag, AreaEffectTag,
 } from './ecs/components';
 import { WEAPONS, WEAPON_TYPES, getWeaponDef } from './data/weapons';
-import { ENEMIES, ENEMY_TYPES, getEnemyDef, WAVES, WaveConfig } from './data/enemies';
+import { ENEMY_TYPES, getEnemyDef, WAVES, WaveConfig } from './data/enemies';
 import { PASSIVE_UPGRADES, PlayerStats, BASE_STATS, XP_TABLE } from './data/upgrades';
 
 // ============================================================
@@ -23,7 +23,7 @@ interface GameState {
   playerEid: number;
   stats: PlayerStats;
   passiveLevels: number[];
-  weaponLevels: Map<number, number>; // weaponType -> level
+  weaponLevels: Map<number, number>;
   gameTime: number;
   paused: boolean;
   levelUpActive: boolean;
@@ -76,7 +76,7 @@ const MAP_TILE_SIZE = 64;
 // ============================================================
 
 class Game {
-  private app!: PIXI.Application;
+  private app: PIXI.Application;
   private gameContainer!: PIXI.Container;
   private uiContainer!: PIXI.Container;
   private bgContainer!: PIXI.Container;
@@ -91,9 +91,8 @@ class Game {
   private titleContainer!: PIXI.Container;
   private gameOverContainer!: PIXI.Container;
 
-  async init(): Promise<void> {
-    this.app = new PIXI.Application();
-    await this.app.init({
+  constructor() {
+    this.app = new PIXI.Application({
       width: window.innerWidth,
       height: window.innerHeight,
       backgroundColor: 0x0a0a0f,
@@ -101,11 +100,13 @@ class Game {
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
     });
+  }
 
+  init(): void {
     const loadingEl = document.getElementById('loading');
     if (loadingEl) loadingEl.remove();
 
-    document.body.appendChild(this.app.canvas as HTMLCanvasElement);
+    document.body.appendChild(this.app.view as HTMLCanvasElement);
 
     window.addEventListener('resize', () => {
       this.app.renderer.resize(window.innerWidth, window.innerHeight);
@@ -177,57 +178,47 @@ class Game {
     const h = window.innerHeight;
 
     const bg = new PIXI.Graphics();
-    bg.rect(0, 0, w, h).fill({ color: 0x0a0a0f });
+    bg.beginFill(0x0a0a0f);
+    bg.drawRect(0, 0, w, h);
+    bg.endFill();
     this.titleContainer.addChild(bg);
 
-    const title = new PIXI.Text({
-      text: 'CODEX MORTIS',
-      style: {
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: 72,
-        fontWeight: 'bold',
-        fill: 0xc4a0ff,
-        dropShadow: true,
-        dropShadowColor: 0x8b5cf6,
-        dropShadowBlur: 20,
-        dropShadowDistance: 0,
-      },
+    const title = new PIXI.Text('CODEX MORTIS', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: 72,
+      fontWeight: 'bold',
+      fill: 0xc4a0ff,
+      dropShadow: true,
+      dropShadowColor: 0x8b5cf6,
+      dropShadowBlur: 20,
+      dropShadowDistance: 0,
     });
     title.anchor.set(0.5);
     title.position.set(w / 2, h / 2 - 80);
     this.titleContainer.addChild(title);
 
-    const subtitle = new PIXI.Text({
-      text: 'Survive the endless hordes of darkness',
-      style: {
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: 20,
-        fill: 0x8b8b9a,
-      },
+    const subtitle = new PIXI.Text('Survive the endless hordes of darkness', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: 20,
+      fill: 0x8b8b9a,
     });
     subtitle.anchor.set(0.5);
     subtitle.position.set(w / 2, h / 2);
     this.titleContainer.addChild(subtitle);
 
-    const start = new PIXI.Text({
-      text: 'Press any key to start',
-      style: {
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: 18,
-        fill: 0xc4a0ff,
-      },
+    const start = new PIXI.Text('Press any key to start', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: 18,
+      fill: 0xc4a0ff,
     });
     start.anchor.set(0.5);
     start.position.set(w / 2, h / 2 + 80);
     this.titleContainer.addChild(start);
 
-    const controls = new PIXI.Text({
-      text: 'WASD - Move  |  Weapons auto-attack  |  Survive!',
-      style: {
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: 14,
-        fill: 0x555566,
-      },
+    const controls = new PIXI.Text('WASD - Move  |  Weapons auto-attack  |  Survive!', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: 14,
+      fill: 0x555566,
     });
     controls.anchor.set(0.5);
     controls.position.set(w / 2, h - 60);
@@ -235,7 +226,6 @@ class Game {
   }
 
   private startGame(): void {
-    // Clean up previous game
     this.entityContainer.removeChildren();
     this.particleContainer.removeChildren();
     this.bgContainer.removeChildren();
@@ -244,7 +234,6 @@ class Game {
 
     const world = createWorld();
 
-    // Create player
     const playerEid = addEntity(world);
     addComponent(world, Position, playerEid);
     addComponent(world, Velocity, playerEid);
@@ -290,15 +279,9 @@ class Game {
       damageNumbers: [],
     };
 
-    // Give player starting weapon
     this.addWeaponToPlayer(WEAPON_TYPES.MAGIC_BOLT);
-
-    // Generate background tiles
     this.generateBackground();
-
-    // Create player sprite
     this.createPlayerSprite(playerEid);
-
     this.lastTime = performance.now();
   }
 
@@ -309,16 +292,19 @@ class Game {
     for (let y = 0; y < tileCount; y++) {
       for (let x = 0; x < tileCount; x++) {
         const shade = ((x + y) % 2 === 0) ? 0x12121a : 0x0e0e16;
-        bg.rect(x * MAP_TILE_SIZE, y * MAP_TILE_SIZE, MAP_TILE_SIZE, MAP_TILE_SIZE).fill({ color: shade });
+        bg.beginFill(shade);
+        bg.drawRect(x * MAP_TILE_SIZE, y * MAP_TILE_SIZE, MAP_TILE_SIZE, MAP_TILE_SIZE);
+        bg.endFill();
       }
     }
 
-    // Add some decorative elements
     for (let i = 0; i < 200; i++) {
       const x = Math.random() * WORLD_SIZE;
       const y = Math.random() * WORLD_SIZE;
       const size = 2 + Math.random() * 4;
-      bg.circle(x, y, size).fill({ color: 0x1a1a2e, alpha: 0.5 });
+      bg.beginFill(0x1a1a2e, 0.5);
+      bg.drawCircle(x, y, size);
+      bg.endFill();
     }
 
     this.bgContainer.addChild(bg);
@@ -328,13 +314,18 @@ class Game {
     const container = new PIXI.Container();
     const gfx = new PIXI.Graphics();
 
-    // Body
-    gfx.circle(0, 0, 14).fill({ color: 0xc4a0ff });
-    // Eyes
-    gfx.circle(-4, -3, 3).fill({ color: 0x1a1a2e });
-    gfx.circle(4, -3, 3).fill({ color: 0x1a1a2e });
-    // Inner glow
-    gfx.circle(0, 0, 10).fill({ color: 0xd8b4fe, alpha: 0.3 });
+    gfx.beginFill(0xc4a0ff);
+    gfx.drawCircle(0, 0, 14);
+    gfx.endFill();
+
+    gfx.beginFill(0x1a1a2e);
+    gfx.drawCircle(-4, -3, 3);
+    gfx.drawCircle(4, -3, 3);
+    gfx.endFill();
+
+    gfx.beginFill(0xd8b4fe, 0.3);
+    gfx.drawCircle(0, 0, 10);
+    gfx.endFill();
 
     container.addChild(gfx);
     container.position.set(Position.x[eid], Position.y[eid]);
@@ -349,28 +340,52 @@ class Game {
     const gfx = new PIXI.Graphics();
 
     if (enemyType === ENEMY_TYPES.BAT) {
-      // Bat shape
-      gfx.moveTo(-def.size, 0).lineTo(-def.size / 2, -def.size / 2).lineTo(0, -2).lineTo(def.size / 2, -def.size / 2).lineTo(def.size, 0).lineTo(0, def.size / 2).closePath().fill({ color: def.color });
+      gfx.beginFill(def.color);
+      gfx.moveTo(-def.size, 0);
+      gfx.lineTo(-def.size / 2, -def.size / 2);
+      gfx.lineTo(0, -2);
+      gfx.lineTo(def.size / 2, -def.size / 2);
+      gfx.lineTo(def.size, 0);
+      gfx.lineTo(0, def.size / 2);
+      gfx.closePath();
+      gfx.endFill();
     } else if (enemyType === ENEMY_TYPES.GHOST) {
-      // Ghost shape
-      gfx.circle(0, -def.size / 4, def.size / 2).fill({ color: def.color, alpha: 0.7 });
-      gfx.rect(-def.size / 2, -def.size / 4, def.size, def.size / 2).fill({ color: def.color, alpha: 0.7 });
-      // Wavy bottom
+      gfx.beginFill(def.color, 0.7);
+      gfx.drawCircle(0, -def.size / 4, def.size / 2);
+      gfx.drawRect(-def.size / 2, -def.size / 4, def.size, def.size / 2);
+      gfx.endFill();
       for (let i = 0; i < 3; i++) {
         const wx = -def.size / 2 + i * (def.size / 3);
-        gfx.circle(wx + def.size / 6, def.size / 4, def.size / 6).fill({ color: def.color, alpha: 0.7 });
+        gfx.beginFill(def.color, 0.7);
+        gfx.drawCircle(wx + def.size / 6, def.size / 4, def.size / 6);
+        gfx.endFill();
       }
     } else if (enemyType === ENEMY_TYPES.BOSS) {
-      // Boss - big diamond
-      gfx.moveTo(0, -def.size).lineTo(def.size, 0).lineTo(0, def.size).lineTo(-def.size, 0).closePath().fill({ color: def.color });
-      gfx.circle(0, 0, def.size * 0.4).fill({ color: 0xff0000 });
-      // Crown
-      gfx.moveTo(-def.size * 0.5, -def.size * 0.8).lineTo(-def.size * 0.3, -def.size * 1.1).lineTo(0, -def.size * 0.9).lineTo(def.size * 0.3, -def.size * 1.1).lineTo(def.size * 0.5, -def.size * 0.8).fill({ color: 0xffd700 });
+      gfx.beginFill(def.color);
+      gfx.moveTo(0, -def.size);
+      gfx.lineTo(def.size, 0);
+      gfx.lineTo(0, def.size);
+      gfx.lineTo(-def.size, 0);
+      gfx.closePath();
+      gfx.endFill();
+      gfx.beginFill(0xff0000);
+      gfx.drawCircle(0, 0, def.size * 0.4);
+      gfx.endFill();
+      gfx.beginFill(0xffd700);
+      gfx.moveTo(-def.size * 0.5, -def.size * 0.8);
+      gfx.lineTo(-def.size * 0.3, -def.size * 1.1);
+      gfx.lineTo(0, -def.size * 0.9);
+      gfx.lineTo(def.size * 0.3, -def.size * 1.1);
+      gfx.lineTo(def.size * 0.5, -def.size * 0.8);
+      gfx.endFill();
     } else {
-      // Default - circle with eyes
-      gfx.circle(0, 0, def.size).fill({ color: def.color });
-      gfx.circle(-def.size * 0.3, -def.size * 0.2, def.size * 0.2).fill({ color: 0x1a1a2e });
-      gfx.circle(def.size * 0.3, -def.size * 0.2, def.size * 0.2).fill({ color: 0x1a1a2e });
+      gfx.beginFill(def.color);
+      gfx.drawCircle(0, 0, def.size);
+      gfx.endFill();
+      gfx.beginFill(0x1a1a2e);
+      gfx.drawCircle(-def.size * 0.3, -def.size * 0.2, def.size * 0.2);
+      gfx.drawCircle(def.size * 0.3, -def.size * 0.2, def.size * 0.2);
+      gfx.endFill();
     }
 
     container.addChild(gfx);
@@ -386,21 +401,38 @@ class Game {
     const def = getWeaponDef(weaponType);
 
     if (weaponType === WEAPON_TYPES.WHIP) {
-      gfx.rect(-60, -5, 120, 10).fill({ color: def.color, alpha: 0.8 });
+      gfx.beginFill(def.color, 0.8);
+      gfx.drawRect(-60, -5, 120, 10);
+      gfx.endFill();
     } else if (weaponType === WEAPON_TYPES.HOLY_CROSS) {
-      gfx.rect(-3, -12, 6, 24).fill({ color: def.color });
-      gfx.rect(-8, -3, 16, 6).fill({ color: def.color });
+      gfx.beginFill(def.color);
+      gfx.drawRect(-3, -12, 6, 24);
+      gfx.drawRect(-8, -3, 16, 6);
+      gfx.endFill();
     } else if (weaponType === WEAPON_TYPES.SCYTHE) {
+      gfx.beginFill(def.color);
       gfx.arc(0, 0, 12, -Math.PI * 0.7, Math.PI * 0.3, false);
       gfx.lineTo(0, 0);
       gfx.closePath();
-      gfx.fill({ color: def.color });
+      gfx.endFill();
     } else if (weaponType === WEAPON_TYPES.BLOOD_WAVE) {
-      gfx.ellipse(0, 0, 20, 6).fill({ color: def.color, alpha: 0.7 });
+      gfx.beginFill(def.color, 0.7);
+      gfx.drawEllipse(0, 0, 20, 6);
+      gfx.endFill();
+    } else if (weaponType === WEAPON_TYPES.FIRE_CIRCLE) {
+      gfx.beginFill(def.color);
+      gfx.drawCircle(0, 0, 8);
+      gfx.endFill();
+      gfx.beginFill(0xfff000, 0.6);
+      gfx.drawCircle(0, 0, 4);
+      gfx.endFill();
     } else {
-      // Default projectile (bolt)
-      gfx.circle(0, 0, 5).fill({ color: def.color });
-      gfx.circle(0, 0, 3).fill({ color: 0xffffff, alpha: 0.5 });
+      gfx.beginFill(def.color);
+      gfx.drawCircle(0, 0, 5);
+      gfx.endFill();
+      gfx.beginFill(0xffffff, 0.5);
+      gfx.drawCircle(0, 0, 3);
+      gfx.endFill();
     }
 
     container.addChild(gfx);
@@ -416,9 +448,21 @@ class Game {
     const color = value >= 10 ? 0xfbbf24 : value >= 5 ? 0x3b82f6 : 0x4ade80;
     const size = value >= 10 ? 6 : value >= 5 ? 5 : 4;
 
-    // Diamond shape
-    gfx.moveTo(0, -size).lineTo(size, 0).lineTo(0, size).lineTo(-size, 0).closePath().fill({ color });
-    gfx.moveTo(0, -size + 1).lineTo(size - 1, 0).lineTo(0, size - 1).lineTo(-size + 1, 0).closePath().fill({ color: 0xffffff, alpha: 0.3 });
+    gfx.beginFill(color);
+    gfx.moveTo(0, -size);
+    gfx.lineTo(size, 0);
+    gfx.lineTo(0, size);
+    gfx.lineTo(-size, 0);
+    gfx.closePath();
+    gfx.endFill();
+
+    gfx.beginFill(0xffffff, 0.3);
+    gfx.moveTo(0, -size + 1);
+    gfx.lineTo(size - 1, 0);
+    gfx.lineTo(0, size - 1);
+    gfx.lineTo(-size + 1, 0);
+    gfx.closePath();
+    gfx.endFill();
 
     container.addChild(gfx);
     container.position.set(Position.x[eid], Position.y[eid]);
@@ -454,14 +498,12 @@ class Game {
     const newLevel = currentLevel + 1;
     this.state.weaponLevels.set(weaponType, newLevel);
 
-    // Find weapon entity and update stats
     const weaponQuery = defineQuery([Weapon, WeaponTag]);
     const weapons = weaponQuery(world);
     for (const wEid of weapons) {
       if (Weapon.type[wEid] === weaponType) {
         Weapon.level[wEid] = newLevel;
         const def = getWeaponDef(weaponType);
-        // Progressive upgrades
         Weapon.damage[wEid] = def.baseDamage * (1 + (newLevel - 1) * 0.25);
         Weapon.cooldown[wEid] = def.baseCooldown * Math.max(0.3, 1 - (newLevel - 1) * 0.08);
         Weapon.count[wEid] = def.baseCount + Math.floor((newLevel - 1) / 2);
@@ -483,7 +525,7 @@ class Game {
     if (this.titleScreen || !this.state) return;
 
     const now = performance.now();
-    const dt = Math.min((now - this.lastTime) / 1000, 0.05); // Cap at 50ms
+    const dt = Math.min((now - this.lastTime) / 1000, 0.05);
     this.lastTime = now;
 
     if (this.state.paused || this.state.levelUpActive || this.state.gameOver) {
@@ -510,7 +552,6 @@ class Game {
     this.drawHUD();
     this.drawMinimap();
 
-    // Recovery
     if (this.state.stats.recovery > 0) {
       const playerEid = this.state.playerEid;
       Health.current[playerEid] = Math.min(
@@ -519,7 +560,6 @@ class Game {
       );
     }
 
-    // Screen shake decay
     if (this.state.screenShake > 0) {
       this.state.screenShake *= 0.9;
       if (this.state.screenShake < 0.5) this.state.screenShake = 0;
@@ -527,10 +567,10 @@ class Game {
   }
 
   // ============================================================
-  // INPUT SYSTEM
+  // INPUT
   // ============================================================
 
-  private updateInput(dt: number): void {
+  private updateInput(_dt: number): void {
     const { keys, playerEid, stats } = this.state;
     let mx = 0, my = 0;
 
@@ -539,7 +579,6 @@ class Game {
     if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
     if (keys.has('d') || keys.has('arrowright')) mx += 1;
 
-    // Normalize
     const len = Math.sqrt(mx * mx + my * my);
     if (len > 0) {
       mx /= len;
@@ -552,37 +591,30 @@ class Game {
   }
 
   // ============================================================
-  // MOVEMENT SYSTEM
+  // MOVEMENT
   // ============================================================
 
   private updateMovement(dt: number): void {
     const { world, playerEid } = this.state;
 
-    // Player movement
     Position.x[playerEid] += Velocity.x[playerEid] * dt;
     Position.y[playerEid] += Velocity.y[playerEid] * dt;
-
-    // Clamp to world bounds
     Position.x[playerEid] = Math.max(20, Math.min(WORLD_SIZE - 20, Position.x[playerEid]));
     Position.y[playerEid] = Math.max(20, Math.min(WORLD_SIZE - 20, Position.y[playerEid]));
 
-    // Enemy movement
     const enemyQuery = defineQuery([Enemy, EnemyTag, Position, Velocity]);
     const enemies = enemyQuery(world);
     for (const eid of enemies) {
-      // Apply knockback
       if (Math.abs(Enemy.knockbackX[eid]) > 0.1 || Math.abs(Enemy.knockbackY[eid]) > 0.1) {
         Position.x[eid] += Enemy.knockbackX[eid] * dt;
         Position.y[eid] += Enemy.knockbackY[eid] * dt;
         Enemy.knockbackX[eid] *= 0.85;
         Enemy.knockbackY[eid] *= 0.85;
       }
-
       Position.x[eid] += Velocity.x[eid] * dt;
       Position.y[eid] += Velocity.y[eid] * dt;
     }
 
-    // Projectile movement
     const projQuery = defineQuery([Projectile, ProjectileTag, Position, Velocity]);
     const projs = projQuery(world);
     for (const eid of projs) {
@@ -590,21 +622,20 @@ class Game {
       Position.y[eid] += Velocity.y[eid] * dt;
     }
 
-    // Particle movement
     const particleQuery = defineQuery([Particle, ParticleTag, Position, Velocity]);
     const particles = particleQuery(world);
     for (const eid of particles) {
       Position.x[eid] += Velocity.x[eid] * dt;
       Position.y[eid] += Velocity.y[eid] * dt;
-      Velocity.y[eid] += 100 * dt; // gravity
+      Velocity.y[eid] += 100 * dt;
     }
   }
 
   // ============================================================
-  // ENEMY AI SYSTEM
+  // ENEMY AI
   // ============================================================
 
-  private updateEnemyAI(dt: number): void {
+  private updateEnemyAI(_dt: number): void {
     const { world, playerEid } = this.state;
     const px = Position.x[playerEid];
     const py = Position.y[playerEid];
@@ -616,7 +647,6 @@ class Game {
       const dx = px - Position.x[eid];
       const dy = py - Position.y[eid];
       const dist = Math.sqrt(dx * dx + dy * dy);
-
       if (dist > 1) {
         const speed = Enemy.speed[eid];
         Velocity.x[eid] = (dx / dist) * speed;
@@ -626,13 +656,12 @@ class Game {
   }
 
   // ============================================================
-  // WAVE SPAWNING SYSTEM
+  // WAVE SPAWNING
   // ============================================================
 
   private updateWaveSpawning(dt: number): void {
-    const { gameTime, world, playerEid } = this.state;
+    const { gameTime, playerEid } = this.state;
 
-    // Check for new waves to start
     while (this.state.currentWaveIndex < WAVES.length &&
            WAVES[this.state.currentWaveIndex].time <= gameTime) {
       const wave = WAVES[this.state.currentWaveIndex];
@@ -644,7 +673,6 @@ class Game {
       this.state.currentWaveIndex++;
     }
 
-    // Process active waves
     const px = Position.x[playerEid];
     const py = Position.y[playerEid];
 
@@ -653,12 +681,7 @@ class Game {
       waveState.timer -= dt;
       if (waveState.timer <= 0 && waveState.spawned < waveState.config.count) {
         if (this.state.enemyCount < this.state.maxEnemies) {
-          this.spawnEnemy(
-            px, py,
-            waveState.config.enemyType,
-            waveState.config.healthMult,
-            waveState.config.speedMult
-          );
+          this.spawnEnemy(px, py, waveState.config.enemyType, waveState.config.healthMult, waveState.config.speedMult);
           waveState.spawned++;
           waveState.timer = waveState.config.interval;
         }
@@ -669,7 +692,6 @@ class Game {
     });
     toRemove.forEach(i => this.state.waveSpawnTimers.delete(i));
 
-    // Continuous spawning after all waves (difficulty scaling)
     if (this.state.currentWaveIndex >= WAVES.length && this.state.enemyCount < 50) {
       const scaleFactor = 1 + (gameTime - 600) / 120;
       const types = [0, 1, 2, 3, 4];
@@ -682,15 +704,10 @@ class Game {
     const { world } = this.state;
     const def = getEnemyDef(type);
 
-    // Spawn at edge of screen
     const angle = Math.random() * Math.PI * 2;
     const dist = SPAWN_DISTANCE + Math.random() * 100;
-    const x = px + Math.cos(angle) * dist;
-    const y = py + Math.sin(angle) * dist;
-
-    // Clamp to world
-    const sx = Math.max(10, Math.min(WORLD_SIZE - 10, x));
-    const sy = Math.max(10, Math.min(WORLD_SIZE - 10, y));
+    const sx = Math.max(10, Math.min(WORLD_SIZE - 10, px + Math.cos(angle) * dist));
+    const sy = Math.max(10, Math.min(WORLD_SIZE - 10, py + Math.sin(angle) * dist));
 
     const eid = addEntity(world);
     addComponent(world, Position, eid);
@@ -779,7 +796,6 @@ class Game {
   private fireProjectiles(px: number, py: number, count: number, damage: number, speed: number, pierce: number, range: number, weaponType: number, area: number): void {
     const { world } = this.state;
 
-    // Find nearest enemies for targeting
     const enemyQuery = defineQuery([Enemy, EnemyTag, Position]);
     const enemies = enemyQuery(world);
     const targets: { eid: number; dist: number; angle: number }[] = [];
@@ -849,7 +865,7 @@ class Game {
       Velocity.y[eid] = Math.sin(angle) * 50;
       Collision.radius[eid] = range * area * 0.5;
       Projectile.damage[eid] = damage;
-      Projectile.pierce[eid] = -1; // hits all
+      Projectile.pierce[eid] = -1;
       Projectile.ownerWeaponType[eid] = WEAPON_TYPES.WHIP;
       Lifetime.remaining[eid] = 0.3;
       SpriteComponent.alpha[eid] = 1;
@@ -860,7 +876,6 @@ class Game {
   }
 
   private fireOrbitingProjectiles(px: number, py: number, count: number, damage: number, speed: number, range: number, area: number): void {
-    // Fire circle creates orbiting projectiles
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 * i) / count;
       const { world } = this.state;
@@ -876,7 +891,6 @@ class Game {
 
       Position.x[eid] = px + Math.cos(angle) * range * area;
       Position.y[eid] = py + Math.sin(angle) * range * area;
-      // Orbit velocity (perpendicular)
       Velocity.x[eid] = Math.cos(angle + Math.PI / 2) * speed;
       Velocity.y[eid] = Math.sin(angle + Math.PI / 2) * speed;
       Collision.radius[eid] = 10 * area;
@@ -951,20 +965,15 @@ class Game {
       }
     }
 
-    // Strike random enemies
     const strikes = Math.min(count, inRange.length);
     for (let i = 0; i < strikes; i++) {
       const targetIdx = Math.floor(Math.random() * inRange.length);
       const targetEid = inRange[targetIdx];
 
-      // Apply damage
       Health.current[targetEid] -= damage * this.state.stats.damage;
       this.addDamageNumber(Position.x[targetEid], Position.y[targetEid], damage * this.state.stats.damage, 0x60a5fa);
-
-      // Visual lightning bolt
       this.spawnLightningEffect(px, py, Position.x[targetEid], Position.y[targetEid]);
 
-      // Chain to nearby enemies
       let chainSource = targetEid;
       for (let c = 0; c < chains; c++) {
         let closestDist = 150 * 150;
@@ -991,7 +1000,6 @@ class Game {
   }
 
   private spawnLightningEffect(x1: number, y1: number, x2: number, y2: number): void {
-    // Create particle line effect
     const steps = 5;
     for (let i = 0; i < steps; i++) {
       const t = i / steps;
@@ -1051,7 +1059,7 @@ class Game {
   }
 
   // ============================================================
-  // AREA EFFECTS SYSTEM
+  // AREA EFFECTS
   // ============================================================
 
   private updateAreaEffects(dt: number): void {
@@ -1060,7 +1068,6 @@ class Game {
     const areas = areaQuery(world);
 
     for (const eid of areas) {
-      // Follow player
       if (AreaEffect.followPlayer[eid]) {
         Position.x[eid] = Position.x[playerEid];
         Position.y[eid] = Position.y[playerEid];
@@ -1070,7 +1077,6 @@ class Game {
       if (AreaEffect.tickTimer[eid] <= 0) {
         AreaEffect.tickTimer[eid] = AreaEffect.tickRate[eid];
 
-        // Damage enemies in radius
         const ax = Position.x[eid];
         const ay = Position.y[eid];
         const radius = AreaEffect.radius[eid] * stats.area;
@@ -1083,7 +1089,6 @@ class Game {
           const dy = Position.y[eeid] - ay;
           if (dx * dx + dy * dy < radius * radius) {
             Health.current[eeid] -= damage;
-            // Knockback
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
             Enemy.knockbackX[eeid] += (dx / dist) * 200;
             Enemy.knockbackY[eeid] += (dy / dist) * 200;
@@ -1091,27 +1096,24 @@ class Game {
           }
         }
 
-        // Visual pulse
         this.spawnParticle(ax, ay, 0x4ade80, 0.5);
       }
     }
   }
 
   // ============================================================
-  // PROJECTILE SYSTEM
+  // PROJECTILES
   // ============================================================
 
-  private updateProjectiles(dt: number): void {
+  private updateProjectiles(_dt: number): void {
     const { world, playerEid } = this.state;
     const projQuery = defineQuery([Projectile, ProjectileTag, Position]);
     const projs = projQuery(world);
 
     for (const eid of projs) {
-      // Boomerang return logic
       if (Projectile.ownerWeaponType[eid] === WEAPON_TYPES.HOLY_CROSS) {
         const lifetime = Lifetime.remaining[eid];
         if (lifetime < 1.0) {
-          // Return to player
           const dx = Position.x[playerEid] - Position.x[eid];
           const dy = Position.y[playerEid] - Position.y[eid];
           const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1123,21 +1125,19 @@ class Game {
         }
       }
 
-      // Scythe spinning
       if (Projectile.ownerWeaponType[eid] === WEAPON_TYPES.SCYTHE) {
-        SpriteComponent.rotation[eid] += dt * 10;
+        SpriteComponent.rotation[eid] += 0.3;
       }
     }
   }
 
   // ============================================================
-  // COLLISION SYSTEM
+  // COLLISIONS
   // ============================================================
 
   private updateCollisions(dt: number): void {
     const { world, playerEid, stats } = this.state;
 
-    // Projectile vs Enemy
     const projQuery = defineQuery([Projectile, ProjectileTag, Position, Collision]);
     const enemyQuery = defineQuery([Enemy, EnemyTag, Position, Collision, Health]);
     const projs = projQuery(world);
@@ -1160,18 +1160,15 @@ class Game {
         const minDist = pr + er;
 
         if (distSq < minDist * minDist) {
-          // Hit!
           const damage = Projectile.damage[pEid];
           Health.current[eEid] -= damage;
 
-          // Knockback
           const dist = Math.sqrt(distSq) || 1;
           Enemy.knockbackX[eEid] += (dx / dist) * -150;
           Enemy.knockbackY[eEid] += (dy / dist) * -150;
 
           this.addDamageNumber(ex, ey, damage, getWeaponDef(Projectile.ownerWeaponType[pEid]).color);
 
-          // Check pierce
           if (Projectile.pierce[pEid] !== -1) {
             Projectile.pierce[pEid]--;
             if (Projectile.pierce[pEid] <= 0) {
@@ -1183,24 +1180,21 @@ class Game {
       }
     }
 
-    // Remove spent projectiles
     for (const eid of projsToRemove) {
       this.removeEntity(eid);
     }
 
-    // Check enemy deaths
     for (const eEid of enemies) {
       if (Health.current[eEid] <= 0) {
         this.onEnemyDeath(eEid);
       }
     }
 
-    // Enemy vs Player
-    const pHealth = Health.current[playerEid];
     if (Health.invincibleTimer[playerEid] > 0) {
       Health.invincibleTimer[playerEid] -= dt;
     } else {
       for (const eEid of enemies) {
+        if (Health.current[eEid] <= 0) continue;
         const dx = Position.x[playerEid] - Position.x[eEid];
         const dy = Position.y[playerEid] - Position.y[eEid];
         const distSq = dx * dx + dy * dy;
@@ -1216,7 +1210,6 @@ class Game {
             this.state.screenShake = 5;
             this.addDamageNumber(Position.x[playerEid], Position.y[playerEid], damage, 0xef4444);
 
-            // Push player away
             const dist = Math.sqrt(distSq) || 1;
             Position.x[playerEid] += (dx / dist) * 20;
             Position.y[playerEid] += (dy / dist) * 20;
@@ -1232,12 +1225,8 @@ class Game {
   }
 
   private onEnemyDeath(eid: number): void {
-    const { world } = this.state;
-
-    // Drop XP gem
     this.spawnXPGem(Position.x[eid], Position.y[eid], Enemy.xpDrop[eid]);
 
-    // Death particles
     const color = getEnemyDef(Enemy.type[eid]).color;
     for (let i = 0; i < 6; i++) {
       this.spawnParticle(Position.x[eid], Position.y[eid], color, 0.6);
@@ -1268,7 +1257,7 @@ class Game {
   }
 
   // ============================================================
-  // XP COLLECTION SYSTEM
+  // XP COLLECTION
   // ============================================================
 
   private updateXPCollection(dt: number): void {
@@ -1287,7 +1276,6 @@ class Game {
       const dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist < magnetRange) {
-        // Magnetize toward player
         const speed = 300 + (magnetRange - dist) * 3;
         Position.x[eid] += (dx / dist) * speed * dt;
         Position.y[eid] += (dy / dist) * speed * dt;
@@ -1303,7 +1291,6 @@ class Game {
       const xpValue = XPGem.value[eid] * stats.xpBonus;
       Player.xp[playerEid] += xpValue;
 
-      // Check level up
       while (Player.xp[playerEid] >= Player.xpToNext[playerEid]) {
         Player.xp[playerEid] -= Player.xpToNext[playerEid];
         Player.level[playerEid]++;
@@ -1317,21 +1304,16 @@ class Game {
   }
 
   // ============================================================
-  // LEVEL UP SYSTEM
+  // LEVEL UP
   // ============================================================
 
   private onLevelUp(): void {
     this.state.levelUpActive = true;
     this.state.screenShake = 3;
 
-    // Generate choices
     const choices: LevelUpChoice[] = [];
-    const numChoices = 3;
-
-    // Collect possible upgrades
     const possible: LevelUpChoice[] = [];
 
-    // New weapons (not yet acquired)
     for (let i = 0; i < WEAPONS.length; i++) {
       if (!this.state.weaponLevels.has(i) && this.state.weaponLevels.size < 6) {
         possible.push({
@@ -1346,7 +1328,6 @@ class Game {
       }
     }
 
-    // Weapon upgrades
     this.state.weaponLevels.forEach((level, type) => {
       if (level < WEAPONS[type].maxLevel) {
         possible.push({
@@ -1361,7 +1342,6 @@ class Game {
       }
     });
 
-    // Passive upgrades
     for (let i = 0; i < PASSIVE_UPGRADES.length; i++) {
       if (this.state.passiveLevels[i] < PASSIVE_UPGRADES[i].maxLevel) {
         possible.push({
@@ -1376,13 +1356,12 @@ class Game {
       }
     }
 
-    // Shuffle and pick
     for (let i = possible.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [possible[i], possible[j]] = [possible[j], possible[i]];
     }
 
-    for (let i = 0; i < Math.min(numChoices, possible.length); i++) {
+    for (let i = 0; i < Math.min(3, possible.length); i++) {
       choices.push(possible[i]);
     }
 
@@ -1397,27 +1376,23 @@ class Game {
     const w = window.innerWidth;
     const h = window.innerHeight;
 
-    // Dim background
     const dim = new PIXI.Graphics();
-    dim.rect(0, 0, w, h).fill({ color: 0x000000, alpha: 0.7 });
+    dim.beginFill(0x000000, 0.7);
+    dim.drawRect(0, 0, w, h);
+    dim.endFill();
     dim.interactive = true;
     this.levelUpContainer.addChild(dim);
 
-    // Title
-    const title = new PIXI.Text({
-      text: `LEVEL UP! (Lv.${Player.level[this.state.playerEid]})`,
-      style: {
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: 36,
-        fontWeight: 'bold',
-        fill: 0xfbbf24,
-      },
+    const title = new PIXI.Text(`LEVEL UP! (Lv.${Player.level[this.state.playerEid]})`, {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: 36,
+      fontWeight: 'bold',
+      fill: 0xfbbf24,
     });
     title.anchor.set(0.5);
     title.position.set(w / 2, h / 2 - 160);
     this.levelUpContainer.addChild(title);
 
-    // Choice cards
     const cardWidth = 220;
     const cardHeight = 140;
     const totalWidth = this.state.levelUpChoices.length * (cardWidth + 20) - 20;
@@ -1430,59 +1405,50 @@ class Game {
       card.cursor = 'pointer';
 
       const bg = new PIXI.Graphics();
-      bg.roundRect(0, 0, cardWidth, cardHeight, 10).fill({ color: 0x1a1a2e });
-      bg.roundRect(0, 0, cardWidth, cardHeight, 10).stroke({ color: choice.color, width: 2, alpha: 0.8 });
+      bg.beginFill(0x1a1a2e);
+      bg.drawRoundedRect(0, 0, cardWidth, cardHeight, 10);
+      bg.endFill();
+      bg.lineStyle(2, choice.color, 0.8);
+      bg.drawRoundedRect(0, 0, cardWidth, cardHeight, 10);
       card.addChild(bg);
 
-      // Color accent bar
       const accent = new PIXI.Graphics();
-      accent.rect(0, 0, cardWidth, 4).fill({ color: choice.color });
+      accent.beginFill(choice.color);
+      accent.drawRect(0, 0, cardWidth, 4);
+      accent.endFill();
       card.addChild(accent);
 
-      const nameText = new PIXI.Text({
-        text: choice.name,
-        style: {
-          fontFamily: 'Segoe UI, sans-serif',
-          fontSize: 16,
-          fontWeight: 'bold',
-          fill: 0xffffff,
-        },
+      const nameText = new PIXI.Text(choice.name, {
+        fontFamily: 'Segoe UI, sans-serif',
+        fontSize: 16,
+        fontWeight: 'bold',
+        fill: 0xffffff,
       });
       nameText.position.set(15, 20);
       card.addChild(nameText);
 
-      const levelText = new PIXI.Text({
-        text: choice.level === 0 ? 'NEW!' : `Lv.${choice.level} → ${choice.level + 1}`,
-        style: {
-          fontFamily: 'Segoe UI, sans-serif',
-          fontSize: 12,
-          fill: choice.level === 0 ? 0x4ade80 : 0x8b8b9a,
-        },
+      const levelText = new PIXI.Text(choice.level === 0 ? 'NEW!' : `Lv.${choice.level} → ${choice.level + 1}`, {
+        fontFamily: 'Segoe UI, sans-serif',
+        fontSize: 12,
+        fill: choice.level === 0 ? 0x4ade80 : 0x8b8b9a,
       });
       levelText.position.set(15, 45);
       card.addChild(levelText);
 
-      const descText = new PIXI.Text({
-        text: choice.description,
-        style: {
-          fontFamily: 'Segoe UI, sans-serif',
-          fontSize: 13,
-          fill: 0xccccdd,
-          wordWrap: true,
-          wordWrapWidth: cardWidth - 30,
-        },
+      const descText = new PIXI.Text(choice.description, {
+        fontFamily: 'Segoe UI, sans-serif',
+        fontSize: 13,
+        fill: 0xccccdd,
+        wordWrap: true,
+        wordWrapWidth: cardWidth - 30,
       });
       descText.position.set(15, 70);
       card.addChild(descText);
 
-      // Key hint
-      const keyText = new PIXI.Text({
-        text: `[${i + 1}]`,
-        style: {
-          fontFamily: 'Segoe UI, sans-serif',
-          fontSize: 14,
-          fill: 0x666677,
-        },
+      const keyText = new PIXI.Text(`[${i + 1}]`, {
+        fontFamily: 'Segoe UI, sans-serif',
+        fontSize: 14,
+        fill: 0x666677,
       });
       keyText.position.set(cardWidth - 30, cardHeight - 25);
       card.addChild(keyText);
@@ -1491,7 +1457,6 @@ class Game {
       this.levelUpContainer.addChild(card);
     });
 
-    // Key listener for number keys
     const keyHandler = (e: KeyboardEvent) => {
       const num = parseInt(e.key);
       if (num >= 1 && num <= this.state.levelUpChoices.length) {
@@ -1508,14 +1473,11 @@ class Game {
 
     if (choice.type === 'weapon') {
       if (choice.level === 0) {
-        // New weapon
         this.addWeaponToPlayer(choice.index);
       } else {
-        // Upgrade existing
         this.upgradeWeapon(choice.index);
       }
     } else {
-      // Passive upgrade
       this.state.passiveLevels[choice.index]++;
       const upgrade = PASSIVE_UPGRADES[choice.index];
       const statKey = upgrade.effect as keyof PlayerStats;
@@ -1524,7 +1486,6 @@ class Game {
       } else {
         (this.state.stats[statKey] as number) += upgrade.valuePerLevel;
       }
-      // Apply max HP
       if (statKey === 'maxHp') {
         Health.max[this.state.playerEid] = this.state.stats.maxHp;
         Health.current[this.state.playerEid] = Math.min(Health.current[this.state.playerEid] + upgrade.valuePerLevel, Health.max[this.state.playerEid]);
@@ -1534,24 +1495,23 @@ class Game {
     this.state.levelUpActive = false;
     this.levelUpContainer.visible = false;
 
-    // Level up particles
     for (let i = 0; i < 15; i++) {
       this.spawnParticle(Position.x[this.state.playerEid], Position.y[this.state.playerEid], 0xfbbf24, 0.8);
     }
   }
 
   // ============================================================
-  // LIFETIME SYSTEM
+  // LIFETIME
   // ============================================================
 
-  private updateLifetimes(dt: number): void {
+  private updateLifetimes(_dt: number): void {
     const { world } = this.state;
     const lifetimeQuery = defineQuery([Lifetime]);
     const entities = lifetimeQuery(world);
     const toRemove: number[] = [];
 
     for (const eid of entities) {
-      Lifetime.remaining[eid] -= dt;
+      Lifetime.remaining[eid] -= 0.016; // fixed step for stability
       if (Lifetime.remaining[eid] <= 0) {
         toRemove.push(eid);
       }
@@ -1563,7 +1523,7 @@ class Game {
   }
 
   // ============================================================
-  // PARTICLE SYSTEM
+  // PARTICLES
   // ============================================================
 
   private spawnParticle(x: number, y: number, color: number, lifetime: number): void {
@@ -1585,15 +1545,16 @@ class Game {
     SpriteComponent.tint[eid] = color;
     SpriteComponent.scaleX[eid] = 1;
 
-    // Create particle sprite
     const gfx = new PIXI.Graphics();
-    gfx.circle(0, 0, 3 + Math.random() * 3).fill({ color });
+    gfx.beginFill(color);
+    gfx.drawCircle(0, 0, 3 + Math.random() * 3);
+    gfx.endFill();
     gfx.position.set(x, y);
     this.particleContainer.addChild(gfx);
     this.state.entitySprites.set(eid, gfx);
   }
 
-  private updateParticles(dt: number): void {
+  private updateParticles(_dt: number): void {
     const { world } = this.state;
     const particleQuery = defineQuery([Particle, ParticleTag, Position, Lifetime]);
     const particles = particleQuery(world);
@@ -1636,7 +1597,7 @@ class Game {
   }
 
   // ============================================================
-  // CAMERA SYSTEM
+  // CAMERA
   // ============================================================
 
   private updateCamera(dt: number): void {
@@ -1644,7 +1605,6 @@ class Game {
     const targetX = Position.x[playerEid];
     const targetY = Position.y[playerEid];
 
-    // Smooth follow
     this.state.cameraX += (targetX - this.state.cameraX) * 5 * dt;
     this.state.cameraY += (targetY - this.state.cameraY) * 5 * dt;
 
@@ -1654,7 +1614,6 @@ class Game {
     let offsetX = screenW / 2 - this.state.cameraX;
     let offsetY = screenH / 2 - this.state.cameraY;
 
-    // Screen shake
     if (this.state.screenShake > 0) {
       offsetX += (Math.random() - 0.5) * this.state.screenShake * 2;
       offsetY += (Math.random() - 0.5) * this.state.screenShake * 2;
@@ -1670,12 +1629,10 @@ class Game {
   private updateSprites(): void {
     const { world, playerEid } = this.state;
 
-    // Update all entity positions on screen
     this.state.entitySprites.forEach((sprite, eid) => {
       if (hasComponent(world, Position, eid)) {
         sprite.position.set(Position.x[eid], Position.y[eid]);
 
-        // Rotation for projectiles
         if (hasComponent(world, Projectile, eid)) {
           if (Projectile.ownerWeaponType[eid] === WEAPON_TYPES.SCYTHE ||
               Projectile.ownerWeaponType[eid] === WEAPON_TYPES.HOLY_CROSS) {
@@ -1685,7 +1642,6 @@ class Game {
           }
         }
 
-        // Fade out near death for projectiles
         if (hasComponent(world, Lifetime, eid) && hasComponent(world, Projectile, eid)) {
           const remaining = Lifetime.remaining[eid];
           if (remaining < 0.3) {
@@ -1693,14 +1649,12 @@ class Game {
           }
         }
 
-        // Player invincibility flash
         if (eid === playerEid && Health.invincibleTimer[playerEid] > 0) {
           sprite.alpha = Math.sin(Health.invincibleTimer[playerEid] * 30) > 0 ? 1 : 0.3;
         } else if (eid === playerEid) {
           sprite.alpha = 1;
         }
 
-        // XP gem bobbing
         if (hasComponent(world, XPGem, eid)) {
           sprite.scale.set(0.8 + Math.sin(this.state.gameTime * 4 + eid) * 0.2);
         }
@@ -1709,7 +1663,7 @@ class Game {
   }
 
   // ============================================================
-  // HUD DRAWING
+  // HUD
   // ============================================================
 
   private drawHUD(): void {
@@ -1718,7 +1672,7 @@ class Game {
 
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const { playerEid, gameTime, killCount, stats } = this.state;
+    const { playerEid, gameTime, killCount } = this.state;
 
     // HP Bar
     const hpWidth = 250;
@@ -1727,9 +1681,15 @@ class Game {
     const hpY = 20;
     const hpRatio = Health.current[playerEid] / Health.max[playerEid];
 
-    g.roundRect(hpX, hpY, hpWidth, hpHeight, 4).fill({ color: 0x1a1a2e });
-    g.roundRect(hpX, hpY, hpWidth * hpRatio, hpHeight, 4).fill({ color: hpRatio > 0.3 ? 0x4ade80 : 0xef4444 });
-    g.roundRect(hpX, hpY, hpWidth, hpHeight, 4).stroke({ color: 0x333344, width: 1 });
+    g.beginFill(0x1a1a2e);
+    g.drawRoundedRect(hpX, hpY, hpWidth, hpHeight, 4);
+    g.endFill();
+    g.beginFill(hpRatio > 0.3 ? 0x4ade80 : 0xef4444);
+    g.drawRoundedRect(hpX, hpY, hpWidth * Math.max(0, hpRatio), hpHeight, 4);
+    g.endFill();
+    g.lineStyle(1, 0x333344);
+    g.drawRoundedRect(hpX, hpY, hpWidth, hpHeight, 4);
+    g.lineStyle(0);
 
     // XP Bar
     const xpWidth = 250;
@@ -1738,53 +1698,65 @@ class Game {
     const xpY = 42;
     const xpRatio = Player.xp[playerEid] / Player.xpToNext[playerEid];
 
-    g.roundRect(xpX, xpY, xpWidth, xpHeight, 3).fill({ color: 0x1a1a2e });
-    g.roundRect(xpX, xpY, xpWidth * xpRatio, xpHeight, 3).fill({ color: 0xa855f7 });
+    g.beginFill(0x1a1a2e);
+    g.drawRoundedRect(xpX, xpY, xpWidth, xpHeight, 3);
+    g.endFill();
+    g.beginFill(0xa855f7);
+    g.drawRoundedRect(xpX, xpY, xpWidth * Math.max(0, Math.min(1, xpRatio)), xpHeight, 3);
+    g.endFill();
 
     // Timer
     const minutes = Math.floor(gameTime / 60);
     const seconds = Math.floor(gameTime % 60);
     const timerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-    // Remove old text children and redraw
+    // Remove old UI text children (keep graphics + minimap + levelup container)
     while (this.uiContainer.children.length > 3) {
       this.uiContainer.removeChildAt(3);
     }
 
-    const timerDisplay = new PIXI.Text({
-      text: timerText,
-      style: { fontFamily: 'Segoe UI', fontSize: 28, fontWeight: 'bold', fill: 0xffffff },
+    const timerDisplay = new PIXI.Text(timerText, {
+      fontFamily: 'Segoe UI',
+      fontSize: 28,
+      fontWeight: 'bold',
+      fill: 0xffffff,
     });
     timerDisplay.anchor.set(0.5, 0);
     timerDisplay.position.set(w / 2, 10);
     this.uiContainer.addChild(timerDisplay);
 
-    // Kill counter
-    const killDisplay = new PIXI.Text({
-      text: `Kills: ${killCount}`,
-      style: { fontFamily: 'Segoe UI', fontSize: 14, fill: 0x8b8b9a },
+    const killDisplay = new PIXI.Text(`Kills: ${killCount}`, {
+      fontFamily: 'Segoe UI',
+      fontSize: 14,
+      fill: 0x8b8b9a,
     });
     killDisplay.position.set(20, 58);
     this.uiContainer.addChild(killDisplay);
 
-    // Level
-    const levelDisplay = new PIXI.Text({
-      text: `Lv.${Player.level[playerEid]}`,
-      style: { fontFamily: 'Segoe UI', fontSize: 16, fontWeight: 'bold', fill: 0xfbbf24 },
+    const levelDisplay = new PIXI.Text(`Lv.${Player.level[playerEid]}`, {
+      fontFamily: 'Segoe UI',
+      fontSize: 16,
+      fontWeight: 'bold',
+      fill: 0xfbbf24,
     });
     levelDisplay.position.set(hpX + hpWidth + 10, hpY);
     this.uiContainer.addChild(levelDisplay);
 
-    // Weapon icons
+    // Weapon list
     let weaponY = h - 60;
     this.state.weaponLevels.forEach((level, type) => {
       const def = getWeaponDef(type);
-      g.roundRect(20, weaponY, 180, 22, 4).fill({ color: 0x1a1a2e, alpha: 0.8 });
-      g.rect(20, weaponY, 4, 22).fill({ color: def.color });
+      g.beginFill(0x1a1a2e, 0.8);
+      g.drawRoundedRect(20, weaponY, 180, 22, 4);
+      g.endFill();
+      g.beginFill(def.color);
+      g.drawRect(20, weaponY, 4, 22);
+      g.endFill();
 
-      const wText = new PIXI.Text({
-        text: `${def.name} Lv.${level}`,
-        style: { fontFamily: 'Segoe UI', fontSize: 12, fill: 0xccccdd },
+      const wText = new PIXI.Text(`${def.name} Lv.${level}`, {
+        fontFamily: 'Segoe UI',
+        fontSize: 12,
+        fill: 0xccccdd,
       });
       wText.position.set(30, weaponY + 4);
       this.uiContainer.addChild(wText);
@@ -1792,19 +1764,16 @@ class Game {
       weaponY -= 28;
     });
 
-    // Damage numbers (world space)
+    // Damage numbers
     for (const dn of this.state.damageNumbers) {
       const screenX = dn.x - this.state.cameraX + w / 2;
       const screenY = dn.y - this.state.cameraY + h / 2;
       if (screenX > -50 && screenX < w + 50 && screenY > -50 && screenY < h + 50) {
-        const dmgText = new PIXI.Text({
-          text: `${dn.value}`,
-          style: {
-            fontFamily: 'Segoe UI',
-            fontSize: 14 + dn.value / 5,
-            fontWeight: 'bold',
-            fill: dn.color,
-          },
+        const dmgText = new PIXI.Text(`${dn.value}`, {
+          fontFamily: 'Segoe UI',
+          fontSize: 14 + dn.value / 5,
+          fontWeight: 'bold',
+          fill: dn.color,
         });
         dmgText.anchor.set(0.5);
         dmgText.position.set(screenX, screenY);
@@ -1813,10 +1782,11 @@ class Game {
       }
     }
 
-    // HP text
-    const hpText = new PIXI.Text({
-      text: `${Math.ceil(Health.current[playerEid])}/${Math.ceil(Health.max[playerEid])}`,
-      style: { fontFamily: 'Segoe UI', fontSize: 11, fill: 0xffffff },
+    // HP text overlay
+    const hpText = new PIXI.Text(`${Math.ceil(Health.current[playerEid])}/${Math.ceil(Health.max[playerEid])}`, {
+      fontFamily: 'Segoe UI',
+      fontSize: 11,
+      fill: 0xffffff,
     });
     hpText.anchor.set(0.5);
     hpText.position.set(hpX + hpWidth / 2, hpY + hpHeight / 2);
@@ -1837,33 +1807,43 @@ class Game {
     const mapY = 15;
     const scale = mapSize / WORLD_SIZE;
 
-    // Background
-    g.roundRect(mapX, mapY, mapSize, mapSize, 4).fill({ color: 0x0a0a0f, alpha: 0.8 });
-    g.roundRect(mapX, mapY, mapSize, mapSize, 4).stroke({ color: 0x333344, width: 1 });
+    g.beginFill(0x0a0a0f, 0.8);
+    g.drawRoundedRect(mapX, mapY, mapSize, mapSize, 4);
+    g.endFill();
+    g.lineStyle(1, 0x333344);
+    g.drawRoundedRect(mapX, mapY, mapSize, mapSize, 4);
+    g.lineStyle(0);
 
-    // Enemies (red dots)
     const { world, playerEid } = this.state;
+
+    // Enemies
     const enemyQuery = defineQuery([Enemy, EnemyTag, Position]);
     const enemies = enemyQuery(world);
     for (const eid of enemies) {
       const ex = mapX + Position.x[eid] * scale;
       const ey = mapY + Position.y[eid] * scale;
-      g.circle(ex, ey, 1).fill({ color: 0xef4444 });
+      g.beginFill(0xef4444);
+      g.drawCircle(ex, ey, 1);
+      g.endFill();
     }
 
-    // XP gems (green dots)
+    // XP gems
     const gemQuery = defineQuery([XPGem, XPGemTag, Position]);
     const gems = gemQuery(world);
     for (const eid of gems) {
       const gx = mapX + Position.x[eid] * scale;
       const gy = mapY + Position.y[eid] * scale;
-      g.circle(gx, gy, 1).fill({ color: 0x4ade80, alpha: 0.5 });
+      g.beginFill(0x4ade80, 0.5);
+      g.drawCircle(gx, gy, 1);
+      g.endFill();
     }
 
-    // Player (white dot)
+    // Player
     const px = mapX + Position.x[playerEid] * scale;
     const py = mapY + Position.y[playerEid] * scale;
-    g.circle(px, py, 3).fill({ color: 0xc4a0ff });
+    g.beginFill(0xc4a0ff);
+    g.drawCircle(px, py, 3);
+    g.endFill();
   }
 
   // ============================================================
@@ -1879,21 +1859,20 @@ class Game {
     const h = window.innerHeight;
 
     const bg = new PIXI.Graphics();
-    bg.rect(0, 0, w, h).fill({ color: 0x000000, alpha: 0.85 });
+    bg.beginFill(0x000000, 0.85);
+    bg.drawRect(0, 0, w, h);
+    bg.endFill();
     this.gameOverContainer.addChild(bg);
 
-    const title = new PIXI.Text({
-      text: 'YOU DIED',
-      style: {
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: 64,
-        fontWeight: 'bold',
-        fill: 0xef4444,
-        dropShadow: true,
-        dropShadowColor: 0x7f0000,
-        dropShadowBlur: 20,
-        dropShadowDistance: 0,
-      },
+    const title = new PIXI.Text('YOU DIED', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: 64,
+      fontWeight: 'bold',
+      fill: 0xef4444,
+      dropShadow: true,
+      dropShadowColor: 0x7f0000,
+      dropShadowBlur: 20,
+      dropShadowDistance: 0,
     });
     title.anchor.set(0.5);
     title.position.set(w / 2, h / 2 - 80);
@@ -1902,25 +1881,22 @@ class Game {
     const minutes = Math.floor(this.state.gameTime / 60);
     const seconds = Math.floor(this.state.gameTime % 60);
 
-    const statsText = new PIXI.Text({
-      text: `Time: ${minutes}:${seconds.toString().padStart(2, '0')}  |  Kills: ${this.state.killCount}  |  Level: ${Player.level[this.state.playerEid]}`,
-      style: {
+    const statsText = new PIXI.Text(
+      `Time: ${minutes}:${seconds.toString().padStart(2, '0')}  |  Kills: ${this.state.killCount}  |  Level: ${Player.level[this.state.playerEid]}`,
+      {
         fontFamily: 'Segoe UI, sans-serif',
         fontSize: 20,
         fill: 0xccccdd,
-      },
-    });
+      }
+    );
     statsText.anchor.set(0.5);
     statsText.position.set(w / 2, h / 2);
     this.gameOverContainer.addChild(statsText);
 
-    const restart = new PIXI.Text({
-      text: 'Press any key to restart',
-      style: {
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: 16,
-        fill: 0x8b8b9a,
-      },
+    const restart = new PIXI.Text('Press any key to restart', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: 16,
+      fill: 0x8b8b9a,
     });
     restart.anchor.set(0.5);
     restart.position.set(w / 2, h / 2 + 60);
@@ -1947,4 +1923,4 @@ class Game {
 // ============================================================
 
 const game = new Game();
-game.init().catch(console.error);
+game.init();
