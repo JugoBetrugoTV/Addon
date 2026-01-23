@@ -1,119 +1,86 @@
 /**
- * HUD.ts - Persistent heads-up display elements.
- * Shows HP bar, XP bar, timer, level, kills, and weapon icons.
- * All text/graphics objects are created once and updated each frame.
+ * HUD.ts - HTML-based heads-up display.
+ * Shows: minimap placeholder, position, FPS, NPC count, district.
+ * Uses DOM elements for zero-impact on Three.js rendering.
  */
 
-import * as PIXI from 'pixi.js';
-
 export class HUD {
-  private container: PIXI.Container;
-  private hpBar: PIXI.Graphics;
-  private hpText: PIXI.Text;
-  private xpBar: PIXI.Graphics;
-  private levelText: PIXI.Text;
-  private timerText: PIXI.Text;
-  private killsText: PIXI.Text;
+  private container: HTMLElement;
+  private infoEl: HTMLElement;
+  private crosshair: HTMLElement;
+  private messageEl: HTMLElement;
+  private messageTimer: number = 0;
 
-  private screenW: number;
-  private screenH: number;
+  constructor() {
+    this.container = document.getElementById('hud')!;
 
-  constructor(parent: PIXI.Container, screenW: number, screenH: number) {
-    this.container = new PIXI.Container();
-    this.container.zIndex = 100;
-    parent.addChild(this.container);
-    this.screenW = screenW;
-    this.screenH = screenH;
+    // Info panel (top-left)
+    this.infoEl = document.createElement('div');
+    this.infoEl.style.cssText = `
+      position: absolute; top: 10px; left: 10px;
+      color: #e2e8f0; font-size: 12px; font-family: 'Courier New', monospace;
+      background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 4px;
+      line-height: 1.6; pointer-events: none;
+    `;
+    this.container.appendChild(this.infoEl);
 
-    // HP Bar
-    this.hpBar = new PIXI.Graphics();
-    this.container.addChild(this.hpBar);
+    // Crosshair (center)
+    this.crosshair = document.createElement('div');
+    this.crosshair.style.cssText = `
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px; height: 6px;
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 50%;
+      pointer-events: none;
+    `;
+    this.container.appendChild(this.crosshair);
 
-    this.hpText = new PIXI.Text('100/100', {
-      fontFamily: 'Arial', fontSize: 13, fill: '#ffffff',
-      stroke: '#000000', strokeThickness: 2,
-    });
-    this.hpText.anchor.set(0.5, 0.5);
-    this.container.addChild(this.hpText);
-
-    // XP Bar
-    this.xpBar = new PIXI.Graphics();
-    this.container.addChild(this.xpBar);
-
-    // Level
-    this.levelText = new PIXI.Text('Lv.1', {
-      fontFamily: 'Arial', fontSize: 14, fontWeight: 'bold', fill: '#fbbf24',
-      stroke: '#000000', strokeThickness: 2,
-    });
-    this.levelText.anchor.set(0, 0.5);
-    this.container.addChild(this.levelText);
-
-    // Timer
-    this.timerText = new PIXI.Text('0:00', {
-      fontFamily: 'Arial', fontSize: 18, fontWeight: 'bold', fill: '#e2e8f0',
-      stroke: '#000000', strokeThickness: 3,
-    });
-    this.timerText.anchor.set(0.5, 0);
-    this.container.addChild(this.timerText);
-
-    // Kills
-    this.killsText = new PIXI.Text('Kills: 0', {
-      fontFamily: 'Arial', fontSize: 13, fill: '#a1a1aa',
-      stroke: '#000000', strokeThickness: 2,
-    });
-    this.killsText.anchor.set(1, 0);
-    this.container.addChild(this.killsText);
+    // Message area (bottom-center)
+    this.messageEl = document.createElement('div');
+    this.messageEl.style.cssText = `
+      position: absolute; bottom: 40px; left: 50%;
+      transform: translateX(-50%);
+      color: #fbbf24; font-size: 14px; font-family: 'Segoe UI', sans-serif;
+      background: rgba(0,0,0,0.6); padding: 6px 16px; border-radius: 4px;
+      pointer-events: none; opacity: 0; transition: opacity 0.3s;
+    `;
+    this.container.appendChild(this.messageEl);
   }
 
-  /** Update all HUD elements with current game state */
-  update(hp: number, maxHp: number, xp: number, xpNeeded: number, level: number, time: string, kills: number): void {
-    const barW = 200;
-    const barH = 16;
-    const barX = 10;
-    const barY = 10;
+  /** Update HUD with current game state */
+  update(data: {
+    fps: number;
+    playerX: number;
+    playerZ: number;
+    district: string;
+    npcs: number;
+    chunks: number;
+  }, dt: number): void {
+    this.infoEl.innerHTML = [
+      `FPS: ${Math.round(data.fps)}`,
+      `Pos: ${Math.round(data.playerX)}, ${Math.round(data.playerZ)}`,
+      `District: ${data.district}`,
+      `NPCs: ${data.npcs}`,
+      `Chunks: ${data.chunks}`,
+      ``,
+      `<span style="color:#a0aec0">WASD move | Mouse look</span>`,
+      `<span style="color:#a0aec0">Shift run | Click to lock</span>`,
+    ].join('<br>');
 
-    // HP Bar
-    this.hpBar.clear();
-    this.hpBar.beginFill(0x1f1f1f);
-    this.hpBar.drawRoundedRect(barX, barY, barW, barH, 4);
-    this.hpBar.endFill();
-    const hpRatio = Math.max(0, hp / maxHp);
-    const hpColor = hpRatio > 0.5 ? 0x22c55e : hpRatio > 0.25 ? 0xfbbf24 : 0xef4444;
-    this.hpBar.beginFill(hpColor);
-    this.hpBar.drawRoundedRect(barX, barY, barW * hpRatio, barH, 4);
-    this.hpBar.endFill();
-
-    this.hpText.text = `${Math.ceil(hp)}/${Math.ceil(maxHp)}`;
-    this.hpText.position.set(barX + barW / 2, barY + barH / 2);
-
-    // XP Bar
-    const xpY = barY + barH + 4;
-    const xpH = 8;
-    this.xpBar.clear();
-    this.xpBar.beginFill(0x1f1f1f);
-    this.xpBar.drawRoundedRect(barX, xpY, barW, xpH, 3);
-    this.xpBar.endFill();
-    const xpRatio = Math.min(1, xp / Math.max(1, xpNeeded));
-    this.xpBar.beginFill(0x8b5cf6);
-    this.xpBar.drawRoundedRect(barX, xpY, barW * xpRatio, xpH, 3);
-    this.xpBar.endFill();
-
-    // Level
-    this.levelText.text = `Lv.${level}`;
-    this.levelText.position.set(barX + barW + 8, barY + barH / 2);
-
-    // Timer
-    this.timerText.text = time;
-    this.timerText.position.set(this.screenW / 2, 10);
-
-    // Kills
-    this.killsText.text = `Kills: ${kills}`;
-    this.killsText.position.set(this.screenW - 10, 10);
+    // Message fade
+    if (this.messageTimer > 0) {
+      this.messageTimer -= dt;
+      if (this.messageTimer <= 0) {
+        this.messageEl.style.opacity = '0';
+      }
+    }
   }
 
-  /** Handle screen resize */
-  resize(screenW: number, screenH: number): void {
-    this.screenW = screenW;
-    this.screenH = screenH;
+  /** Show a temporary message */
+  showMessage(text: string, duration: number = 3): void {
+    this.messageEl.textContent = text;
+    this.messageEl.style.opacity = '1';
+    this.messageTimer = duration;
   }
 }

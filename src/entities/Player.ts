@@ -1,61 +1,78 @@
 /**
- * Player.ts - Player entity creation and sprite management.
- * Creates the ECS entity and attaches a PIXI sprite to it.
+ * Player.ts - Player entity creation and mesh.
+ * Creates a capsule-shaped character with basic coloring.
  */
 
-import * as PIXI from 'pixi.js';
-import { addEntity, addComponent, IWorld } from 'bitecs';
-import { Position, Velocity, Health, Collision, Player, PlayerTag } from './World';
-import { PLAYER_BASE_SPEED, PLAYER_BASE_HP, WORLD_SIZE } from '../core/Constants';
+import * as THREE from 'three';
+import { World, EntityId } from '../core/ECS';
+import { Transform, MeshRef, PlayerComp, CollisionComp, TransformData } from './Components';
+import { PLAYER_HEIGHT, PLAYER_RADIUS, PLAYER_WALK_SPEED, PLAYER_BASE_HP, WORLD_SIZE } from '../core/Constants';
 
-export class PlayerEntity {
-  eid: number;
-  sprite: PIXI.Sprite;
+export function createPlayer(world: World, scene: THREE.Scene): EntityId {
+  const eid = world.createEntity();
 
-  constructor(world: IWorld, container: PIXI.Container, texture: PIXI.Texture) {
-    this.eid = addEntity(world);
+  // Transform
+  const startX = WORLD_SIZE / 2;
+  const startZ = WORLD_SIZE / 2;
+  world.add(Transform, eid, {
+    position: new THREE.Vector3(startX, 0, startZ),
+    rotation: new THREE.Euler(0, 0, 0),
+    velocity: new THREE.Vector3(0, 0, 0),
+    grounded: true,
+  });
 
-    addComponent(world, Position, this.eid);
-    addComponent(world, Velocity, this.eid);
-    addComponent(world, Health, this.eid);
-    addComponent(world, Collision, this.eid);
-    addComponent(world, Player, this.eid);
-    addComponent(world, PlayerTag, this.eid);
+  // Player data
+  world.add(PlayerComp, eid, {
+    speed: PLAYER_WALK_SPEED,
+    health: PLAYER_BASE_HP,
+    maxHealth: PLAYER_BASE_HP,
+    heat: 0,
+    inVehicle: false,
+    vehicleId: 0,
+  });
 
-    Position.x[this.eid] = WORLD_SIZE / 2;
-    Position.y[this.eid] = WORLD_SIZE / 2;
-    Velocity.x[this.eid] = 0;
-    Velocity.y[this.eid] = 0;
-    Health.current[this.eid] = PLAYER_BASE_HP;
-    Health.max[this.eid] = PLAYER_BASE_HP;
-    Health.invincibleTimer[this.eid] = 0;
-    Collision.radius[this.eid] = 14;
-    Player.speed[this.eid] = PLAYER_BASE_SPEED;
-    Player.xp[this.eid] = 0;
-    Player.level[this.eid] = 1;
-    Player.xpToNext[this.eid] = 5;
+  // Collision
+  world.add(CollisionComp, eid, {
+    radius: PLAYER_RADIUS,
+    height: PLAYER_HEIGHT,
+    isStatic: false,
+  });
 
-    this.sprite = new PIXI.Sprite(texture);
-    this.sprite.anchor.set(0.5);
-    this.sprite.position.set(WORLD_SIZE / 2, WORLD_SIZE / 2);
-    container.addChild(this.sprite);
-  }
+  // Create mesh (capsule body + head)
+  const group = new THREE.Group();
 
-  /** Update sprite to match ECS position */
-  updateSprite(): void {
-    this.sprite.position.set(Position.x[this.eid], Position.y[this.eid]);
-  }
+  // Body (cylinder)
+  const bodyGeo = new THREE.CylinderGeometry(0.25, 0.3, 1.2, 8);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2d3748, roughness: 0.8 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.7;
+  body.castShadow = true;
+  group.add(body);
 
-  /** Apply movement from input, respecting world bounds */
-  move(mx: number, my: number, speed: number, dt: number): void {
-    const px = Position.x[this.eid] + mx * speed * dt;
-    const py = Position.y[this.eid] + my * speed * dt;
-    Position.x[this.eid] = Math.max(20, Math.min(WORLD_SIZE - 20, px));
-    Position.y[this.eid] = Math.max(20, Math.min(WORLD_SIZE - 20, py));
-  }
+  // Head (sphere)
+  const headGeo = new THREE.SphereGeometry(0.2, 8, 6);
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.6 });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.y = 1.5;
+  head.castShadow = true;
+  group.add(head);
 
-  get x(): number { return Position.x[this.eid]; }
-  get y(): number { return Position.y[this.eid]; }
-  get hp(): number { return Health.current[this.eid]; }
-  get maxHp(): number { return Health.max[this.eid]; }
+  // Legs (two thin cylinders)
+  const legGeo = new THREE.CylinderGeometry(0.08, 0.1, 0.8, 6);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x1a202c, roughness: 0.9 });
+  const legL = new THREE.Mesh(legGeo, legMat);
+  legL.position.set(-0.12, 0.15, 0);
+  legL.castShadow = true;
+  group.add(legL);
+  const legR = new THREE.Mesh(legGeo, legMat);
+  legR.position.set(0.12, 0.15, 0);
+  legR.castShadow = true;
+  group.add(legR);
+
+  group.position.set(startX, 0, startZ);
+  scene.add(group);
+
+  world.add(MeshRef, eid, { object: group, visible: true });
+
+  return eid;
 }

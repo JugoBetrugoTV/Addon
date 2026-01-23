@@ -1,63 +1,78 @@
 /**
- * Input.ts - Centralized input handling.
- * Tracks currently pressed keys and provides movement vector.
+ * Input.ts - Keyboard + mouse input for 3D game.
+ * Tracks keys, mouse movement (pointer lock), and mouse buttons.
  */
 
 export class Input {
   private keys: Set<string> = new Set();
-  private _enabled: boolean = true;
+  private mouseX: number = 0;
+  private mouseY: number = 0;
+  private mouseDX: number = 0;
+  private mouseDY: number = 0;
+  private mouseButtons: Set<number> = new Set();
+  private _locked: boolean = false;
 
-  constructor() {
+  constructor(canvas: HTMLCanvasElement) {
     window.addEventListener('keydown', (e) => {
-      if (this._enabled) {
-        this.keys.add(e.key.toLowerCase());
-      }
+      this.keys.add(e.code);
+      e.preventDefault();
     });
     window.addEventListener('keyup', (e) => {
-      this.keys.delete(e.key.toLowerCase());
+      this.keys.delete(e.code);
     });
-    // Prevent keys sticking when window loses focus
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('blur', () => {
+      this.keys.clear();
+      this.mouseButtons.clear();
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+      this.mouseButtons.add(e.button);
+      if (!this._locked) {
+        canvas.requestPointerLock();
+      }
+    });
+    canvas.addEventListener('mouseup', (e) => {
+      this.mouseButtons.delete(e.button);
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (this._locked) {
+        this.mouseDX += e.movementX;
+        this.mouseDY += e.movementY;
+      }
+      this.mouseX = e.clientX;
+      this.mouseY = e.clientY;
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+      this._locked = document.pointerLockElement === canvas;
+    });
   }
 
-  /** Returns normalized movement direction vector [x, y] */
-  getMovement(): [number, number] {
-    let mx = 0, my = 0;
-    if (this.keys.has('w') || this.keys.has('arrowup')) my -= 1;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) my += 1;
-    if (this.keys.has('a') || this.keys.has('arrowleft')) mx -= 1;
-    if (this.keys.has('d') || this.keys.has('arrowright')) mx += 1;
-
-    const len = Math.sqrt(mx * mx + my * my);
-    if (len > 0) {
-      mx /= len;
-      my /= len;
-    }
-    return [mx, my];
+  /** Get and reset mouse delta (for camera rotation) */
+  consumeMouseDelta(): { dx: number; dy: number } {
+    const dx = this.mouseDX;
+    const dy = this.mouseDY;
+    this.mouseDX = 0;
+    this.mouseDY = 0;
+    return { dx, dy };
   }
 
-  /** Check if a specific key is pressed */
-  isDown(key: string): boolean {
-    return this.keys.has(key.toLowerCase());
+  /** Get WASD movement vector (normalized) */
+  getMovement(): { x: number; z: number } {
+    let x = 0, z = 0;
+    if (this.keys.has('KeyW')) z -= 1;
+    if (this.keys.has('KeyS')) z += 1;
+    if (this.keys.has('KeyA')) x -= 1;
+    if (this.keys.has('KeyD')) x += 1;
+    const len = Math.sqrt(x * x + z * z);
+    if (len > 0) { x /= len; z /= len; }
+    return { x, z };
   }
 
-  /** Check if any key is pressed (for title screen, etc.) */
-  anyKeyPressed(): boolean {
-    return this.keys.size > 0;
-  }
-
-  /** Enable/disable input processing */
-  set enabled(val: boolean) {
-    this._enabled = val;
-    if (!val) this.keys.clear();
-  }
-
-  get enabled(): boolean {
-    return this._enabled;
-  }
-
-  /** Clear all pressed keys */
-  clear(): void {
-    this.keys.clear();
-  }
+  isDown(code: string): boolean { return this.keys.has(code); }
+  get isRunning(): boolean { return this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'); }
+  get isMouseDown(): boolean { return this.mouseButtons.has(0); }
+  get isRightMouseDown(): boolean { return this.mouseButtons.has(2); }
+  get isLocked(): boolean { return this._locked; }
 }

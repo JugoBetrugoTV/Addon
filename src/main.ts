@@ -9,7 +9,7 @@ function createWindow(): void {
     height: 720,
     fullscreen: false,
     resizable: true,
-    title: 'Codex Mortis',
+    title: 'Open World',
     backgroundColor: '#0a0a0f',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
