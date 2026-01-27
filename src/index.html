@@ -17,182 +17,263 @@
     body { background: var(--bg-0); color: var(--text-0); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
 
     /* Sidebar */
-    .sidebar { width: 200px; background: var(--bg-1); border-right: 1px solid var(--bg-3); padding: 16px 0; flex-shrink: 0; }
+    .sidebar { width: 220px; background: var(--bg-1); border-right: 1px solid var(--bg-3); padding: 16px 0; flex-shrink: 0; display: flex; flex-direction: column; }
     .logo { padding: 0 16px 16px; border-bottom: 1px solid var(--bg-3); margin-bottom: 8px; }
-    .logo h1 { font-size: 16px; color: var(--accent); } .logo span { font-size: 11px; color: var(--text-1); }
-    .nav-btn { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: none; background: none; color: var(--text-1); font-size: 13px; cursor: pointer; width: 100%; text-align: left; transition: all 0.15s; }
+    .logo h1 { font-size: 18px; color: var(--accent); } .logo span { font-size: 11px; color: var(--text-1); display: block; }
+    #current-season { font-size: 10px; color: var(--purple); margin-top: 4px; }
+    .nav-btn { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border: none; background: none; color: var(--text-1); font-size: 13px; cursor: pointer; width: 100%; text-align: left; transition: all 0.15s; }
     .nav-btn:hover { background: var(--bg-2); color: var(--text-0); }
-    .nav-btn.active { background: var(--bg-2); color: var(--accent); border-left: 2px solid var(--accent); }
-    .nav-icon { font-size: 16px; }
+    .nav-btn.active { background: var(--bg-2); color: var(--accent); border-left: 3px solid var(--accent); }
 
     /* Main */
     .main { flex: 1; padding: 24px 32px; overflow-y: auto; max-height: 100vh; }
     .view { display: none; } .view.active { display: block; }
-    h2 { font-size: 20px; margin-bottom: 16px; font-weight: 600; }
-    h3 { font-size: 14px; margin-bottom: 10px; color: var(--text-1); font-weight: 500; }
+    h2 { font-size: 22px; margin-bottom: 20px; font-weight: 600; }
+    h3 { font-size: 14px; margin-bottom: 12px; color: var(--text-1); font-weight: 500; }
+    h4 { font-size: 13px; margin-bottom: 8px; color: var(--text-0); font-weight: 500; }
+    .section { margin-bottom: 24px; }
 
     /* Forms */
-    input, select { background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 6px; padding: 8px 12px; color: var(--text-0); font-size: 13px; }
+    input, select { background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 6px; padding: 10px 14px; color: var(--text-0); font-size: 13px; }
     input:focus, select:focus { outline: none; border-color: var(--accent); }
     input::placeholder { color: var(--text-2); }
-    .btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; cursor: pointer; transition: background 0.15s; }
+    .btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 13px; cursor: pointer; transition: background 0.15s; font-weight: 500; }
     .btn:hover { background: var(--accent-h); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* Search Form */
-    .search-form { display: flex; gap: 10px; margin-bottom: 24px; }
-    .search-form input { width: 200px; }
+    .search-form { display: flex; gap: 10px; margin-bottom: 24px; position: relative; }
+    .search-form input { width: 220px; }
+    .realm-input-wrap { position: relative; }
+    #realm-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 6px; margin-top: 4px; display: none; z-index: 10; max-height: 200px; overflow-y: auto; }
+    .realm-suggestion { padding: 10px 14px; cursor: pointer; font-size: 13px; }
+    .realm-suggestion:hover { background: var(--bg-3); }
 
     /* Profile Card */
-    .profile-card { background: var(--bg-1); border: 1px solid var(--bg-3); border-radius: 8px; padding: 20px; }
-    .profile-header { display: flex; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--bg-3); margin-bottom: 16px; }
-    .avatar { width: 72px; height: 72px; border-radius: 6px; border: 2px solid var(--bg-3); }
-    .avatar-placeholder { width: 72px; height: 72px; border-radius: 6px; background: var(--bg-2); }
-    .profile-info h2 { font-size: 20px; margin-bottom: 6px; }
-    .profile-meta { display: flex; gap: 8px; margin-bottom: 6px; }
-    .profile-meta span { background: var(--bg-2); padding: 3px 8px; border-radius: 4px; font-size: 12px; }
-    .profile-extra { font-size: 12px; color: var(--text-1); display: flex; gap: 12px; }
+    .profile-card { background: var(--bg-1); border: 1px solid var(--bg-3); border-radius: 10px; overflow: hidden; }
+    .profile-header { display: flex; gap: 20px; padding: 24px; background: var(--bg-2); }
+    .avatar-section { position: relative; }
+    .avatar { width: 84px; height: 84px; border-radius: 8px; border: 3px solid var(--bg-3); }
+    .avatar-placeholder { width: 84px; height: 84px; border-radius: 8px; background: var(--bg-3); }
+    .inset-image { display: none; }
+    .profile-info { flex: 1; }
+    .profile-info h2 { font-size: 22px; margin-bottom: 8px; }
+    .profile-meta { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .profile-meta span { background: var(--bg-1); padding: 4px 10px; border-radius: 4px; font-size: 12px; }
+    .profile-location { display: flex; gap: 10px; margin-bottom: 6px; font-size: 12px; color: var(--text-1); }
+    .profile-extra { font-size: 12px; color: var(--text-1); display: flex; gap: 12px; flex-wrap: wrap; }
+    .guild { color: var(--green); }
     .faction-alliance { color: var(--alliance); text-transform: capitalize; }
     .faction-horde { color: var(--horde); text-transform: capitalize; }
-    .honor-stats { margin-left: auto; text-align: right; color: var(--text-1); font-size: 13px; }
-    .honor-level { font-size: 18px; color: var(--purple); font-weight: 600; }
+    .highest-tier { margin-top: 8px; font-size: 14px; font-weight: 600; }
+    .honor-stats { margin-left: auto; display: flex; flex-direction: column; gap: 6px; text-align: right; }
+    .honor-stats > div { display: flex; flex-direction: column; }
+    .honor-stats .label { font-size: 10px; color: var(--text-2); }
+    .honor-stats .value { font-size: 16px; font-weight: 600; color: var(--text-0); }
 
     /* Ratings */
-    .ratings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-    .rating-card { background: var(--bg-2); border-radius: 6px; padding: 12px; text-align: center; }
-    .bracket-name { font-size: 11px; color: var(--text-1); margin-bottom: 4px; }
-    .current-rating { font-size: 28px; font-weight: 700; }
-    .rating-title { font-size: 11px; color: var(--text-1); margin-bottom: 6px; }
-    .season-high { font-size: 11px; color: var(--text-2); }
-    .record { font-size: 12px; color: var(--text-1); margin-top: 6px; }
-    .winrate { font-size: 11px; color: var(--green); }
+    .ratings-section { padding: 20px 24px; }
+    .ratings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+    .rating-card { background: var(--bg-2); border-radius: 8px; padding: 16px; text-align: center; }
+    .bracket-name { font-size: 12px; color: var(--text-1); margin-bottom: 6px; font-weight: 500; }
+    .current-rating { font-size: 36px; font-weight: 700; line-height: 1; }
+    .rating-tier { font-size: 12px; margin: 6px 0; font-weight: 500; }
+    .rating-details { display: flex; justify-content: center; gap: 16px; margin: 10px 0; }
+    .rating-details .detail { text-align: center; }
+    .rating-details .label { font-size: 10px; color: var(--text-2); display: block; }
+    .rating-details .value { font-size: 13px; color: var(--text-1); }
+    .record { font-size: 13px; display: flex; justify-content: center; gap: 10px; }
+    .record .wins { color: var(--green); }
+    .record .losses { color: var(--red); }
+    .record .winrate { color: var(--text-1); }
+
+    /* Profile Tabs */
+    .profile-tabs { display: flex; gap: 4px; padding: 0 24px; background: var(--bg-1); border-bottom: 1px solid var(--bg-3); }
+    .profile-tab { padding: 12px 18px; background: none; border: none; color: var(--text-1); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .profile-tab:hover { color: var(--text-0); }
+    .profile-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .profile-tab-content { padding: 20px 24px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
 
     /* Rating History */
-    .history-section { margin-top: 20px; }
-    .history-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
-    .history-tab { padding: 6px 12px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 4px; color: var(--text-1); font-size: 11px; cursor: pointer; }
+    .history-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+    .history-tab { padding: 8px 14px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 6px; color: var(--text-1); font-size: 12px; cursor: pointer; }
     .history-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .history-chart { height: 120px; background: var(--bg-2); border-radius: 6px; position: relative; }
+    .history-chart { height: 160px; background: var(--bg-2); border-radius: 8px; position: relative; padding: 10px; }
     .chart-svg { width: 100%; height: 100%; }
-    .chart-labels { position: absolute; right: 8px; top: 8px; bottom: 8px; display: flex; flex-direction: column; justify-content: space-between; font-size: 10px; color: var(--text-2); }
+    .chart-labels { position: absolute; right: 16px; top: 16px; bottom: 36px; display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; color: var(--text-2); }
+    .chart-dates { position: absolute; bottom: 10px; left: 20px; right: 20px; display: flex; justify-content: space-between; font-size: 10px; color: var(--text-2); }
+
+    /* Equipment */
+    .equipment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+    .equipment-item { background: var(--bg-2); border-radius: 6px; padding: 12px; border-left: 3px solid; }
+    .item-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .item-slot { font-size: 11px; color: var(--text-2); }
+    .item-ilvl { font-size: 12px; color: var(--green); font-weight: 600; }
+    .item-name { font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+    .item-enchant, .item-gems, .item-set { font-size: 11px; color: var(--green); margin-bottom: 2px; }
+    .item-stats { font-size: 10px; color: var(--text-1); display: flex; flex-wrap: wrap; gap: 6px; }
+    .equipment-summary { margin-top: 16px; display: flex; gap: 24px; font-size: 13px; color: var(--text-1); }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .stats-section { background: var(--bg-2); border-radius: 8px; padding: 14px; }
+    .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--bg-3); }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row .highlight { color: var(--green); font-weight: 500; }
+
+    /* Talents */
+    .talents-container { }
+    .talents-header { margin-bottom: 16px; }
+    .spec-info { font-size: 14px; color: var(--accent); font-weight: 500; }
+    .talent-section { margin-bottom: 20px; }
+    .talent-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .talent-item { background: var(--bg-2); padding: 8px 12px; border-radius: 6px; font-size: 12px; cursor: help; }
+    .talent-rank { color: var(--accent); margin-left: 6px; }
 
     /* Achievements */
-    .achievements-section { margin-top: 20px; }
-    .achievements-list { display: flex; flex-wrap: wrap; gap: 8px; }
-    .achievement { background: var(--bg-2); padding: 6px 10px; border-radius: 4px; font-size: 12px; display: flex; gap: 8px; }
-    .achievement-gladiator { border-left: 2px solid #ff8000; }
-    .achievement-duelist { border-left: 2px solid #a335ee; }
-    .achievement-rival { border-left: 2px solid #0070dd; }
-    .achievement-challenger { border-left: 2px solid #1eff00; }
-    .achievement-combatant { border-left: 2px solid #fff; }
-    .achievement-elite { border-left: 2px solid #ffd700; }
+    .achievements-list { display: flex; flex-direction: column; gap: 8px; }
+    .achievement { background: var(--bg-2); padding: 10px 14px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid; }
+    .ach-main { flex: 1; }
+    .ach-name { font-size: 13px; font-weight: 500; }
+    .ach-desc { font-size: 11px; color: var(--text-2); display: block; margin-top: 2px; }
+    .ach-meta { display: flex; gap: 12px; font-size: 11px; }
     .ach-date { color: var(--text-2); }
-
-    /* Alts */
-    .alts-section { margin-top: 20px; }
-    .alts-list { display: flex; flex-wrap: wrap; gap: 10px; }
-    .alt-card { background: var(--bg-2); padding: 10px 12px; border-radius: 6px; font-size: 12px; }
-    .alt-name { font-weight: 600; } .alt-spec { color: var(--text-1); margin-left: 6px; }
-    .alt-rating { display: block; margin-top: 4px; color: var(--text-1); }
+    .ach-points { color: var(--purple); }
 
     /* === BUILDS === */
-    .mode-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
-    .mode-btn { padding: 6px 14px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 4px; color: var(--text-1); font-size: 12px; cursor: pointer; }
+    .mode-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .mode-btn { padding: 8px 16px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 6px; color: var(--text-1); font-size: 12px; cursor: pointer; transition: all 0.15s; }
+    .mode-btn:hover { border-color: var(--accent); }
     .mode-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-    #class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-bottom: 16px; }
-    .class-btn { padding: 10px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 6px; color: var(--text-0); font-size: 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: all 0.15s; }
-    .class-btn:hover { border-color: var(--class-color); }
-    .class-btn.selected { background: var(--bg-3); border-color: var(--class-color); box-shadow: 0 0 0 1px var(--class-color); }
-    #spec-grid { display: none; gap: 8px; margin-bottom: 20px; }
-    .spec-btn { padding: 8px 14px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 4px; color: var(--text-0); font-size: 12px; cursor: pointer; }
+    #class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; }
+    .class-btn { padding: 12px; background: var(--bg-2); border: 2px solid var(--bg-3); border-radius: 8px; color: var(--text-0); font-size: 12px; cursor: pointer; text-align: center; transition: all 0.15s; }
+    .class-btn:hover { border-color: var(--class-color); background: var(--bg-3); }
+    .class-btn.selected { border-color: var(--class-color); box-shadow: 0 0 0 1px var(--class-color); }
+    #spec-grid { display: none; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+    .spec-btn { padding: 10px 18px; background: var(--bg-2); border: 2px solid var(--bg-3); border-radius: 6px; color: var(--text-0); font-size: 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .spec-btn:hover { border-color: var(--class-color); }
     .spec-btn.selected { border-color: var(--class-color); background: var(--bg-3); }
-    .spec-role { color: var(--text-2); margin-left: 6px; font-size: 10px; }
+    .spec-role { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: var(--bg-3); }
+    .role-dps { color: var(--red); }
+    .role-healer { color: var(--green); }
+    .role-tank { color: var(--accent); }
 
     /* Build Content */
-    .build-section { background: var(--bg-1); border: 1px solid var(--bg-3); border-radius: 6px; padding: 14px; margin-bottom: 14px; }
-    .stat-bars { display: flex; flex-direction: column; gap: 8px; }
-    .stat-bar { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+    .build-header { padding: 16px 20px; background: var(--bg-2); border-radius: 8px; margin-bottom: 20px; border-left: 4px solid; display: flex; align-items: center; justify-content: space-between; }
+    .build-header h2 { margin: 0; font-size: 18px; }
+    .game-mode { font-size: 12px; color: var(--text-1); background: var(--bg-1); padding: 4px 10px; border-radius: 4px; }
+    .sample-size { font-size: 11px; color: var(--text-2); }
+    .build-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .build-section { background: var(--bg-1); border: 1px solid var(--bg-3); border-radius: 8px; padding: 16px; }
+    .stat-bars { display: flex; flex-direction: column; gap: 10px; }
+    .stat-bar { display: flex; align-items: center; gap: 12px; font-size: 12px; }
     .stat-name { width: 100px; color: var(--text-1); }
-    .bar-track { flex: 1; height: 8px; background: var(--bg-2); border-radius: 4px; overflow: hidden; }
-    .bar-fill { height: 100%; background: var(--accent); border-radius: 4px; }
-    .stat-pct { width: 40px; text-align: right; color: var(--text-1); }
-
-    .talent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 6px; margin-bottom: 10px; }
-    .talent-node { background: var(--bg-2); border-radius: 4px; padding: 8px; text-align: center; position: relative; }
-    .talent-node::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(88,166,255, calc(var(--usage) / 100)) 0%, transparent 100%); border-radius: 4px; }
-    .talent-icon { width: 24px; height: 24px; background: var(--bg-3); border-radius: 4px; margin: 0 auto 4px; }
-    .talent-usage { font-size: 10px; color: var(--text-1); position: relative; }
-    .heatmap-legend { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-2); }
-    .legend-bar { flex: 1; height: 6px; background: linear-gradient(90deg, var(--bg-2) 0%, var(--accent) 100%); border-radius: 3px; }
-
-    .pvp-talents { display: flex; gap: 10px; }
-    .pvp-talent { background: var(--bg-2); padding: 8px 12px; border-radius: 4px; font-size: 12px; display: flex; justify-content: space-between; gap: 12px; flex: 1; }
-    .pvp-usage { color: var(--green); }
-
-    .gear-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
-    .gear-item { background: var(--bg-2); padding: 8px 10px; border-radius: 4px; font-size: 11px; display: grid; grid-template-columns: 60px 1fr auto auto; gap: 6px; align-items: center; }
-    .gear-slot { color: var(--text-2); } .gear-ilvl { color: var(--green); } .gear-source { color: var(--text-2); } .gear-usage { color: var(--accent); }
-
-    .build-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-    .enchant-row, .gem-row, .race-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--bg-2); font-size: 12px; }
-    .enchant-slot, .gem-stat { color: var(--text-2); font-size: 11px; }
-    .enchant-usage, .gem-usage, .race-pct { color: var(--accent); }
-
-    .build-footer { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-2); padding-top: 10px; }
+    .bar-track { flex: 1; height: 10px; background: var(--bg-2); border-radius: 5px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 5px; transition: width 0.3s; }
+    .stat-pct { width: 40px; text-align: right; font-weight: 500; }
+    .pvp-talents { display: flex; flex-direction: column; gap: 8px; }
+    .pvp-talent { display: flex; align-items: center; gap: 12px; }
+    .pvp-name { flex: 1; font-size: 12px; }
+    .usage-bar { width: 80px; height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden; }
+    .usage-fill { height: 100%; background: var(--green); }
+    .pvp-usage { font-size: 11px; color: var(--green); width: 40px; }
+    .gear-recommendations { display: flex; flex-direction: column; gap: 6px; }
+    .gear-rec { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--bg-2); font-size: 12px; }
+    .gear-slot { width: 80px; color: var(--text-2); }
+    .gear-items { flex: 1; }
+    .gear-item { display: flex; gap: 8px; align-items: center; }
+    .item-source { color: var(--text-2); font-size: 10px; }
+    .item-usage { color: var(--accent); }
+    .enchant-list, .gem-list, .embellishment-list, .race-list { }
+    .enchant-row, .gem-row, .embellishment-row, .race-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--bg-2); font-size: 12px; }
+    .enchant-slot, .gem-type { width: 70px; color: var(--text-2); }
+    .enchant-name, .gem-name, .emb-name, .race-name { flex: 1; }
+    .enchant-stat, .gem-stat, .emb-effect { color: var(--text-2); font-size: 11px; }
+    .enchant-usage, .gem-usage, .emb-usage, .race-pct { color: var(--accent); width: 40px; text-align: right; }
+    .race-faction { font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+    .race-bar { width: 80px; height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden; }
+    .race-fill { height: 100%; background: var(--accent); }
+    .build-footer { text-align: center; font-size: 11px; color: var(--text-2); padding-top: 16px; }
 
     /* === META === */
-    .meta-filters { display: flex; gap: 16px; margin-bottom: 20px; }
+    .meta-filters { display: flex; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
     .filter-group { display: flex; gap: 6px; }
-    .meta-mode-btn, .meta-role-btn { padding: 6px 12px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 4px; color: var(--text-1); font-size: 12px; cursor: pointer; }
+    .meta-mode-btn, .meta-role-btn { padding: 8px 14px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 6px; color: var(--text-1); font-size: 12px; cursor: pointer; }
     .meta-mode-btn.active, .meta-role-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .tier-section { margin-bottom: 20px; }
-    .tier-label { font-size: 24px; font-weight: 700; margin-bottom: 10px; }
-    .tier-S .tier-label { color: #ff8000; } .tier-A .tier-label { color: #a335ee; } .tier-B .tier-label { color: #0070dd; } .tier-C .tier-label { color: #1eff00; } .tier-D .tier-label { color: var(--text-1); }
-    .tier-specs { display: flex; flex-wrap: wrap; gap: 10px; }
-    .spec-card { background: var(--bg-1); border: 1px solid var(--bg-3); border-left: 3px solid; border-radius: 6px; padding: 10px 12px; min-width: 160px; }
-    .spec-header { margin-bottom: 6px; } .spec-header .spec-name { font-weight: 600; } .spec-header .class-name { font-size: 11px; display: block; opacity: 0.8; }
-    .spec-stats { font-size: 11px; color: var(--text-1); display: flex; gap: 8px; }
+    .meta-header { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 12px; color: var(--text-2); }
+    .tier-section { margin-bottom: 24px; display: flex; gap: 16px; }
+    .tier-label { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; border-radius: 8px; flex-shrink: 0; }
+    .tier-specs { display: flex; flex-wrap: wrap; gap: 12px; flex: 1; }
+    .spec-card { background: var(--bg-1); border: 1px solid var(--bg-3); border-left: 4px solid; border-radius: 8px; padding: 14px; min-width: 200px; position: relative; }
+    .spec-header { margin-bottom: 10px; }
+    .spec-header .spec-name { font-size: 14px; font-weight: 600; }
+    .spec-header .class-name { font-size: 11px; color: var(--text-1); display: block; }
+    .spec-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; }
+    .stat-item { }
+    .stat-label { color: var(--text-2); display: block; }
+    .stat-value { font-weight: 500; }
+    .stat-value.positive { color: var(--green); }
+    .stat-value.negative { color: var(--red); }
+    .spec-trend { position: absolute; top: 10px; right: 10px; font-size: 12px; }
     .trend-up { color: var(--green); } .trend-down { color: var(--red); } .trend-stable { color: var(--text-2); }
 
     /* === LEADERBOARD === */
-    .lb-filters { display: flex; gap: 6px; margin-bottom: 16px; }
-    .lb-bracket-btn { padding: 6px 14px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 4px; color: var(--text-1); font-size: 12px; cursor: pointer; }
+    .lb-filters { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .lb-bracket-btn { padding: 8px 16px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 6px; color: var(--text-1); font-size: 12px; cursor: pointer; }
     .lb-bracket-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .lb-table { width: 100%; border-collapse: collapse; background: var(--bg-1); border-radius: 6px; overflow: hidden; }
-    .lb-table th, .lb-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--bg-3); }
+    .lb-header { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 12px; color: var(--text-1); }
+    .lb-pagination { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+    .lb-pagination button { padding: 8px 14px; background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: 6px; color: var(--text-1); font-size: 12px; cursor: pointer; }
+    .lb-pagination button:hover { border-color: var(--accent); }
+    #lb-page-info { font-size: 12px; color: var(--text-2); }
+    .lb-table { width: 100%; border-collapse: collapse; background: var(--bg-1); border-radius: 8px; overflow: hidden; }
+    .lb-table th, .lb-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--bg-3); }
     .lb-table th { background: var(--bg-2); font-size: 11px; text-transform: uppercase; color: var(--text-1); font-weight: 500; }
-    .lb-table tr:hover { background: var(--bg-2); }
+    .lb-table tbody tr { cursor: pointer; transition: background 0.15s; }
+    .lb-table tbody tr:hover { background: var(--bg-2); }
     .lb-table .rank { color: var(--text-2); width: 60px; }
-    .lb-table .name { font-weight: 500; } .lb-table .realm { color: var(--text-2); font-size: 11px; margin-left: 6px; }
+    .lb-table .player { }
+    .lb-table .name { font-weight: 500; }
+    .lb-table .realm { color: var(--text-2); font-size: 11px; display: block; }
     .lb-table .rating { font-weight: 600; }
+    .lb-table .wr.positive { color: var(--green); }
 
     /* === SETTINGS === */
-    .settings-form { max-width: 400px; display: flex; flex-direction: column; gap: 14px; }
-    .form-group { display: flex; flex-direction: column; gap: 4px; }
-    .form-group label { font-size: 12px; color: var(--text-1); }
+    .settings-form { max-width: 450px; display: flex; flex-direction: column; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 12px; color: var(--text-1); font-weight: 500; }
     .form-group input, .form-group select { width: 100%; }
-    .settings-note { background: var(--bg-2); border-radius: 6px; padding: 12px; font-size: 12px; color: var(--text-1); margin-bottom: 16px; }
-    .settings-note a { color: var(--accent); }
-    #api-status { margin-top: 8px; font-size: 12px; }
-    .status-ok { color: var(--green); } .status-warn { color: var(--orange); }
+    .settings-note { background: var(--bg-2); border-radius: 8px; padding: 16px; font-size: 13px; color: var(--text-1); margin-bottom: 20px; line-height: 1.5; }
+    .settings-note a { color: var(--accent); text-decoration: none; }
+    .settings-note a:hover { text-decoration: underline; }
+    #api-status { margin-top: 12px; font-size: 13px; }
+    .status-ok { color: var(--green); }
+    .status-warn { color: var(--orange); }
 
     /* Utils */
-    .error-box { background: rgba(248,81,73,0.1); border: 1px solid var(--red); color: var(--red); padding: 12px 16px; border-radius: 6px; font-size: 13px; }
-    .no-data { text-align: center; padding: 40px; color: var(--text-2); }
-    #loader { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 100; }
-    #loader::after { content: ''; width: 36px; height: 36px; border: 3px solid var(--bg-3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    .error-box { background: rgba(248,81,73,0.1); border: 1px solid var(--red); color: var(--red); padding: 14px 18px; border-radius: 8px; font-size: 13px; }
+    .no-data { text-align: center; padding: 48px; color: var(--text-2); font-size: 14px; }
+    #loader { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 100; }
+    #loader::after { content: ''; width: 40px; height: 40px; border: 3px solid var(--bg-3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #toast { position: fixed; bottom: 20px; right: 20px; background: var(--green); color: #fff; padding: 10px 18px; border-radius: 6px; font-size: 13px; transform: translateY(100px); opacity: 0; transition: all 0.3s; }
+    #toast { position: fixed; bottom: 24px; right: 24px; background: var(--green); color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px; transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 101; }
     #toast.show { transform: translateY(0); opacity: 1; }
   </style>
 </head>
 <body>
   <aside class="sidebar">
-    <div class="logo"><h1>WoW PvP</h1><span>Analyzer</span></div>
-    <button class="nav-btn active" data-nav="search"><span class="nav-icon">🔍</span> Player Search</button>
-    <button class="nav-btn" data-nav="builds"><span class="nav-icon">📊</span> Builds</button>
-    <button class="nav-btn" data-nav="meta"><span class="nav-icon">🏆</span> Meta Rankings</button>
-    <button class="nav-btn" data-nav="leaderboard"><span class="nav-icon">📈</span> Leaderboards</button>
-    <button class="nav-btn" data-nav="settings"><span class="nav-icon">⚙️</span> Settings</button>
+    <div class="logo">
+      <h1>WoW PvP</h1>
+      <span>Analyzer</span>
+      <div id="current-season"></div>
+    </div>
+    <button class="nav-btn active" data-nav="search">Player Search</button>
+    <button class="nav-btn" data-nav="builds">Spec Builds</button>
+    <button class="nav-btn" data-nav="meta">Meta Rankings</button>
+    <button class="nav-btn" data-nav="leaderboard">Leaderboards</button>
+    <button class="nav-btn" data-nav="settings">Settings</button>
   </aside>
 
   <main class="main">
@@ -201,7 +282,10 @@
       <h2>Player Search</h2>
       <form id="search-form" class="search-form">
         <input type="text" id="search-name" placeholder="Character name" required>
-        <input type="text" id="search-realm" placeholder="Realm (e.g. Ravencrest)" required>
+        <div class="realm-input-wrap">
+          <input type="text" id="search-realm" placeholder="Realm (e.g. Ravencrest)" required autocomplete="off">
+          <div id="realm-suggestions"></div>
+        </div>
         <button type="submit" class="btn">Search</button>
       </form>
       <div id="search-result"></div>
@@ -211,11 +295,11 @@
     <div id="view-builds" class="view">
       <h2>Spec Builds</h2>
       <div class="mode-tabs">
-        <button class="mode-btn active" data-mode="solo">Solo Shuffle</button>
-        <button class="mode-btn" data-mode="2v2">2v2</button>
-        <button class="mode-btn" data-mode="3v3">3v3</button>
-        <button class="mode-btn" data-mode="rbg">RBG</button>
-        <button class="mode-btn" data-mode="m+">M+</button>
+        <button class="mode-btn active" data-mode="shuffle">Solo Shuffle</button>
+        <button class="mode-btn" data-mode="2v2">2v2 Arena</button>
+        <button class="mode-btn" data-mode="3v3">3v3 Arena</button>
+        <button class="mode-btn" data-mode="rbg">Rated BG</button>
+        <button class="mode-btn" data-mode="blitz">Blitz</button>
       </div>
       <h3>Select Class</h3>
       <div id="class-grid"></div>
@@ -228,14 +312,16 @@
       <h2>Meta Rankings</h2>
       <div class="meta-filters">
         <div class="filter-group">
-          <button class="meta-mode-btn active" data-mode="solo">Solo Shuffle</button>
-          <button class="meta-mode-btn" data-mode="3v3">3v3</button>
-          <button class="meta-mode-btn" data-mode="rbg">RBG</button>
+          <button class="meta-mode-btn active" data-mode="shuffle">Solo Shuffle</button>
+          <button class="meta-mode-btn" data-mode="3v3">3v3 Arena</button>
+          <button class="meta-mode-btn" data-mode="rbg">Rated BG</button>
+          <button class="meta-mode-btn" data-mode="blitz">Blitz</button>
         </div>
         <div class="filter-group">
-          <button class="meta-role-btn active" data-role="dps">DPS</button>
+          <button class="meta-role-btn active" data-role="all">All</button>
+          <button class="meta-role-btn" data-role="dps">DPS</button>
           <button class="meta-role-btn" data-role="healer">Healer</button>
-          <button class="meta-role-btn" data-role="all">All</button>
+          <button class="meta-role-btn" data-role="tank">Tank</button>
         </div>
       </div>
       <div id="meta-list"></div>
@@ -245,26 +331,46 @@
     <div id="view-leaderboard" class="view">
       <h2>Leaderboards</h2>
       <div class="lb-filters">
-        <button class="lb-bracket-btn active" data-bracket="3v3">3v3 Arena</button>
+        <button class="lb-bracket-btn active" data-bracket="shuffle">Solo Shuffle</button>
+        <button class="lb-bracket-btn" data-bracket="3v3">3v3 Arena</button>
         <button class="lb-bracket-btn" data-bracket="2v2">2v2 Arena</button>
-        <button class="lb-bracket-btn" data-bracket="shuffle">Solo Shuffle</button>
         <button class="lb-bracket-btn" data-bracket="rbg">Rated BG</button>
+        <button class="lb-bracket-btn" data-bracket="blitz">Blitz</button>
       </div>
-      <div id="leaderboard-content"><div class="no-data">Select a bracket</div></div>
+      <div id="leaderboard-content"></div>
+      <div class="lb-pagination">
+        <button id="lb-prev">Previous</button>
+        <span id="lb-page-info">Page 1</span>
+        <button id="lb-next">Next</button>
+      </div>
     </div>
 
     <!-- SETTINGS -->
     <div id="view-settings" class="view">
       <h2>Settings</h2>
       <div class="settings-note">
-        To use the API, you need Blizzard API credentials.<br>
-        Get them at <a href="https://develop.battle.net/" target="_blank">develop.battle.net</a>
+        <strong>Blizzard API Credentials Required</strong><br>
+        To use this application, you need to create API credentials at
+        <a href="https://develop.battle.net/" target="_blank">develop.battle.net</a>.<br>
+        Create a new client application and copy the Client ID and Client Secret below.
       </div>
       <form id="settings-form" class="settings-form">
-        <div class="form-group"><label>Client ID</label><input type="text" id="client-id" placeholder="Enter Client ID"></div>
-        <div class="form-group"><label>Client Secret</label><input type="password" id="client-secret" placeholder="Enter Client Secret"></div>
-        <div class="form-group"><label>Region</label>
-          <select id="region-select"><option value="eu">Europe</option><option value="us">US</option><option value="kr">Korea</option><option value="tw">Taiwan</option></select>
+        <div class="form-group">
+          <label>Client ID</label>
+          <input type="text" id="client-id" placeholder="Enter your Client ID">
+        </div>
+        <div class="form-group">
+          <label>Client Secret</label>
+          <input type="password" id="client-secret" placeholder="Enter your Client Secret">
+        </div>
+        <div class="form-group">
+          <label>Region</label>
+          <select id="region-select">
+            <option value="eu">Europe</option>
+            <option value="us">US</option>
+            <option value="kr">Korea</option>
+            <option value="tw">Taiwan</option>
+          </select>
         </div>
         <button type="submit" class="btn">Save Settings</button>
         <div id="api-status"></div>

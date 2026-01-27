@@ -1,5 +1,5 @@
 /**
- * WoW PvP Types - Complete data structures
+ * WoW PvP Types - Complete data structures for murlok.io/check-pvp style app
  */
 
 // === CLASSES & SPECS ===
@@ -84,17 +84,16 @@ export const CLASSES: { id: WowClass; name: string; color: string; specs: SpecIn
   ]},
 ];
 
-// === GAME MODES ===
+// === GAME MODES (all PvP brackets) ===
 
-export type GameMode = 'solo' | '2v2' | '3v3' | 'rbg' | 'blitz' | 'm+';
+export type GameMode = 'shuffle' | '2v2' | '3v3' | 'rbg' | 'blitz';
 
-export const GAME_MODES: { id: GameMode; name: string; isPvP: boolean }[] = [
-  { id: 'solo', name: 'Solo Shuffle', isPvP: true },
-  { id: '2v2', name: '2v2 Arena', isPvP: true },
-  { id: '3v3', name: '3v3 Arena', isPvP: true },
-  { id: 'rbg', name: 'Rated BG', isPvP: true },
-  { id: 'blitz', name: 'Blitz', isPvP: true },
-  { id: 'm+', name: 'Mythic+', isPvP: false },
+export const GAME_MODES: { id: GameMode; name: string; bracket: string }[] = [
+  { id: 'shuffle', name: 'Solo Shuffle', bracket: 'shuffle' },
+  { id: '2v2', name: '2v2 Arena', bracket: 'arena-2v2' },
+  { id: '3v3', name: '3v3 Arena', bracket: 'arena-3v3' },
+  { id: 'rbg', name: 'Rated BG', bracket: 'rbg' },
+  { id: 'blitz', name: 'Blitz', bracket: 'blitz' },
 ];
 
 // === TALENTS ===
@@ -105,52 +104,113 @@ export interface TalentNode {
   icon: string;
   row: number;
   col: number;
-  usagePercent: number;  // 0-100, for heatmap coloring
+  usagePercent: number;
   maxRank: number;
+  currentRank?: number;
   description: string;
+  type?: 'class' | 'spec' | 'hero' | 'pvp';
 }
 
-export interface TalentBuild {
+export interface TalentLoadout {
   specId: number;
-  gameMode: GameMode;
-  talents: TalentNode[];
+  className: string;
+  specName: string;
+  classTalents: TalentNode[];
+  specTalents: TalentNode[];
+  heroTalents: TalentNode[];
   pvpTalents: TalentNode[];
-  popularity: number;
-  winRate: number;
-  sampleSize: number;
+  talentString?: string; // Export string for in-game import
 }
 
-// === GEAR & STATS ===
+// === EQUIPMENT ===
 
-export interface GearItem {
+export interface EquippedItem {
   id: number;
   name: string;
   slot: string;
+  slotType: string;
   icon: string;
   itemLevel: number;
-  usagePercent: number;
-  source: string;  // "Raid", "M+", "PvP Vendor", "Crafted", etc.
+  quality: 'poor' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'artifact';
+  stats: { type: string; value: number }[];
+  enchant?: { id: number; name: string; description: string };
+  gems?: { id: number; name: string; icon: string }[];
+  setInfo?: { name: string; itemsEquipped: number; itemsRequired: number };
+  bonusIds?: number[];
+  source?: string;
+}
+
+export interface CharacterEquipment {
+  items: EquippedItem[];
+  averageItemLevel: number;
+  equippedItemLevel: number;
+}
+
+// === CHARACTER STATS ===
+
+export interface CharacterStats {
+  health: number;
+  power: number;
+  powerType: string;
+  primaryStat: { name: string; value: number; bonus: number };
+  stamina: { value: number; bonus: number };
+  // Secondary stats
+  criticalStrike: { rating: number; percent: number };
+  haste: { rating: number; percent: number };
+  mastery: { rating: number; percent: number };
+  versatility: { rating: number; damagePercent: number; healingPercent: number; drPercent: number };
+  // Tertiary
+  leech: { rating: number; percent: number };
+  avoidance: { rating: number; percent: number };
+  speed: { rating: number; percent: number };
+  // Defense
+  armor: number;
+  dodgePercent: number;
+  parryPercent: number;
+  blockPercent: number;
+}
+
+// === GEAR RECOMMENDATIONS (for murlok.io style) ===
+
+export interface GearRecommendation {
+  slot: string;
+  items: {
+    id: number;
+    name: string;
+    icon: string;
+    itemLevel: number;
+    usagePercent: number;
+    source: string;
+  }[];
 }
 
 export interface StatPriority {
   stat: string;
-  percent: number;  // How many top players prioritize this
+  percent: number;
+  avgRating: number;
 }
 
-export interface Enchant {
+export interface EnchantRecommendation {
   slot: string;
-  name: string;
-  stat: string;
-  usagePercent: number;
+  enchants: {
+    id: number;
+    name: string;
+    stat: string;
+    usagePercent: number;
+  }[];
 }
 
-export interface Gem {
-  name: string;
-  stat: string;
-  usagePercent: number;
+export interface GemRecommendation {
+  type: string; // "Algari Diamond", "Prismatic", etc.
+  gems: {
+    id: number;
+    name: string;
+    stat: string;
+    usagePercent: number;
+  }[];
 }
 
-export interface Embellishment {
+export interface EmbellishmentRecommendation {
   name: string;
   effect: string;
   usagePercent: number;
@@ -158,15 +218,17 @@ export interface Embellishment {
 
 export interface SpecBuild {
   specId: number;
+  className: string;
+  specName: string;
+  classColor: string;
   gameMode: GameMode;
-  talents: TalentNode[];
-  pvpTalents: TalentNode[];
-  stats: StatPriority[];
-  gear: GearItem[];
-  enchants: Enchant[];
-  gems: Gem[];
-  embellishments: Embellishment[];
-  races: { name: string; percent: number }[];
+  talents: TalentLoadout;
+  statPriority: StatPriority[];
+  gear: GearRecommendation[];
+  enchants: EnchantRecommendation[];
+  gems: GemRecommendation[];
+  embellishments: EmbellishmentRecommendation[];
+  racialDistribution: { race: string; faction: string; percent: number }[];
   sampleSize: number;
   lastUpdated: string;
 }
@@ -179,16 +241,19 @@ export interface SpecRanking {
   specName: string;
   classColor: string;
   tier: 'S' | 'A' | 'B' | 'C' | 'D';
-  representation: number;  // % of ladder
+  representation: number;
   winRate: number;
   avgRating: number;
+  gamesPlayed: number;
   trend: 'up' | 'down' | 'stable';
+  changePercent?: number;
 }
 
 export interface MetaSnapshot {
   gameMode: GameMode;
   role: 'dps' | 'healer' | 'tank' | 'all';
   specs: SpecRanking[];
+  totalGames: number;
   lastUpdated: string;
 }
 
@@ -197,29 +262,43 @@ export interface MetaSnapshot {
 export interface Character {
   name: string;
   realm: string;
-  region: 'eu' | 'us' | 'kr' | 'tw';
+  realmSlug: string;
+  region: Region;
   class: WowClass;
+  className: string;
   spec: string;
   specId: number;
   faction: 'alliance' | 'horde';
   race: string;
   level: number;
   itemLevel: number;
+  equippedItemLevel: number;
   avatarUrl?: string;
+  insetUrl?: string; // Full character render
+  mainRawUrl?: string;
+  guild?: { name: string; realm: string; faction: string };
+  title?: string;
+  achievementPoints?: number;
+  lastLogin?: string;
 }
 
 export interface RatingEntry {
   bracket: string;
+  bracketName: string;
   current: number;
   seasonHigh: number;
+  weeklyHigh: number;
   allTimeHigh: number;
   wins: number;
   losses: number;
+  winRate: number;
+  tier?: { id: number; name: string };
+  rank?: number; // Position on leaderboard
 }
 
 export interface RatingHistory {
   bracket: string;
-  data: { date: string; rating: number }[];
+  data: { date: string; rating: number; wins: number; losses: number }[];
 }
 
 export interface Achievement {
@@ -228,15 +307,36 @@ export interface Achievement {
   description: string;
   icon: string;
   earnedDate: string;
-  category: 'gladiator' | 'duelist' | 'rival' | 'challenger' | 'combatant' | 'elite' | 'other';
+  points: number;
+  category: 'gladiator' | 'duelist' | 'rival' | 'challenger' | 'combatant' | 'elite' | 'hero' | 'legend' | 'other';
+  isAccountWide: boolean;
 }
 
 export interface AltCharacter {
   name: string;
   realm: string;
+  realmSlug: string;
   class: WowClass;
+  className: string;
   spec: string;
-  ratings: { bracket: string; current: number; high: number }[];
+  level: number;
+  faction: 'alliance' | 'horde';
+  ratings: { bracket: string; current: number; seasonHigh: number }[];
+  achievementPoints: number;
+  lastPlayed?: string;
+}
+
+export interface MatchHistory {
+  bracket: string;
+  timestamp: string;
+  result: 'win' | 'loss';
+  ratingChange: number;
+  newRating: number;
+  mmr?: number;
+  duration?: number;
+  map?: string;
+  teammates?: { name: string; class: WowClass; spec: string }[];
+  enemies?: { name: string; class: WowClass; spec: string }[];
 }
 
 export interface PlayerProfile {
@@ -245,45 +345,114 @@ export interface PlayerProfile {
   ratingHistory: RatingHistory[];
   achievements: Achievement[];
   alts: AltCharacter[];
+  equipment?: CharacterEquipment;
+  stats?: CharacterStats;
+  talents?: TalentLoadout;
+  matchHistory?: MatchHistory[];
   honorLevel: number;
   honorableKills: number;
+  highestPvPTier?: string;
+  pvpTitles?: string[];
 }
 
 // === LEADERBOARD ===
 
 export interface LeaderboardEntry {
   rank: number;
-  character: Character;
+  character: {
+    name: string;
+    realm: string;
+    realmSlug: string;
+    region: Region;
+    class?: WowClass;
+    className?: string;
+    spec?: string;
+    specId?: number;
+    faction: 'alliance' | 'horde';
+    race?: string;
+  };
   rating: number;
+  seasonHigh?: number;
   wins: number;
   losses: number;
   winRate: number;
-  lastPlayed?: string;
+  tier?: { id: number; name: string };
 }
 
 export interface LeaderboardFilters {
-  bracket: string;
-  region: 'eu' | 'us' | 'kr' | 'tw' | 'all';
+  bracket: GameMode;
+  region: Region | 'all';
   faction: 'alliance' | 'horde' | 'all';
   class?: WowClass;
   spec?: number;
+  minRating?: number;
+  page?: number;
+  pageSize?: number;
 }
+
+export interface LeaderboardResponse {
+  bracket: string;
+  season: number;
+  entries: LeaderboardEntry[];
+  totalCount: number;
+  lastUpdated: string;
+}
+
+// === PVP SEASON ===
+
+export interface PvPSeason {
+  id: number;
+  name: string;
+  startDate: string;
+  endDate?: string;
+  isCurrent: boolean;
+}
+
+export interface PvPTier {
+  id: number;
+  name: string;
+  minRating: number;
+  maxRating: number;
+  color: string;
+  rewards?: string[];
+}
+
+export const PVP_TIERS: PvPTier[] = [
+  { id: 1, name: 'Unranked', minRating: 0, maxRating: 1399, color: '#9d9d9d' },
+  { id: 2, name: 'Combatant', minRating: 1400, maxRating: 1599, color: '#1eff00' },
+  { id: 3, name: 'Challenger', minRating: 1600, maxRating: 1799, color: '#1eff00' },
+  { id: 4, name: 'Rival', minRating: 1800, maxRating: 2099, color: '#0070dd' },
+  { id: 5, name: 'Duelist', minRating: 2100, maxRating: 2399, color: '#a335ee' },
+  { id: 6, name: 'Elite', minRating: 2400, maxRating: 2599, color: '#ff8000' },
+  { id: 7, name: 'Gladiator', minRating: 2600, maxRating: 2999, color: '#ff8000' },
+  { id: 8, name: 'Legend', minRating: 3000, maxRating: 9999, color: '#e6cc80' },
+];
 
 // === REGIONS ===
 
 export const REGIONS = [
-  { id: 'eu', name: 'Europe' },
-  { id: 'us', name: 'US' },
-  { id: 'kr', name: 'Korea' },
-  { id: 'tw', name: 'Taiwan' },
+  { id: 'eu', name: 'Europe', apiHost: 'eu.api.blizzard.com' },
+  { id: 'us', name: 'US', apiHost: 'us.api.blizzard.com' },
+  { id: 'kr', name: 'Korea', apiHost: 'kr.api.blizzard.com' },
+  { id: 'tw', name: 'Taiwan', apiHost: 'tw.api.blizzard.com' },
 ] as const;
 
 export type Region = typeof REGIONS[number]['id'];
 
-// === UTILITY ===
+// === UTILITY FUNCTIONS ===
 
 export function getClassInfo(classId: WowClass) {
   return CLASSES.find(c => c.id === classId);
+}
+
+export function getClassById(classId: number) {
+  // WoW class IDs
+  const classMap: Record<number, WowClass> = {
+    1: 'warrior', 2: 'paladin', 3: 'hunter', 4: 'rogue', 5: 'priest',
+    6: 'death-knight', 7: 'shaman', 8: 'mage', 9: 'warlock', 10: 'monk',
+    11: 'druid', 12: 'demon-hunter', 13: 'evoker',
+  };
+  return classMap[classId];
 }
 
 export function getSpecInfo(specId: number) {
@@ -294,20 +463,58 @@ export function getSpecInfo(specId: number) {
   return null;
 }
 
+export function normalizeClassName(name: string): WowClass {
+  return name.toLowerCase().replace(/\s+/g, '-') as WowClass;
+}
+
+export function getTierForRating(rating: number): PvPTier {
+  for (let i = PVP_TIERS.length - 1; i >= 0; i--) {
+    if (rating >= PVP_TIERS[i].minRating) return PVP_TIERS[i];
+  }
+  return PVP_TIERS[0];
+}
+
 export function getRatingColor(rating: number): string {
-  if (rating >= 2400) return '#ff8000';  // Gladiator - Orange
-  if (rating >= 2100) return '#a335ee';  // Duelist - Purple
-  if (rating >= 1800) return '#0070dd';  // Rival - Blue
-  if (rating >= 1600) return '#1eff00';  // Challenger - Green
-  if (rating >= 1400) return '#ffffff';  // Combatant - White
-  return '#9d9d9d';  // Unranked - Gray
+  return getTierForRating(rating).color;
 }
 
 export function getRatingTitle(rating: number): string {
-  if (rating >= 2400) return 'Gladiator';
-  if (rating >= 2100) return 'Duelist';
-  if (rating >= 1800) return 'Rival';
-  if (rating >= 1600) return 'Challenger';
-  if (rating >= 1400) return 'Combatant';
-  return 'Unranked';
+  return getTierForRating(rating).name;
+}
+
+export function formatWinRate(wins: number, losses: number): number {
+  const total = wins + losses;
+  return total > 0 ? Math.round((wins / total) * 100) : 0;
+}
+
+export function formatNumber(num: number): string {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+}
+
+export function getBracketName(bracket: string): string {
+  const names: Record<string, string> = {
+    'shuffle': 'Solo Shuffle',
+    'arena-2v2': '2v2 Arena',
+    'arena-3v3': '3v3 Arena',
+    '2v2': '2v2 Arena',
+    '3v3': '3v3 Arena',
+    'rbg': 'Rated BG',
+    'blitz': 'Blitz',
+  };
+  return names[bracket] || bracket;
+}
+
+export function getItemQualityColor(quality: string): string {
+  const colors: Record<string, string> = {
+    poor: '#9d9d9d',
+    common: '#ffffff',
+    uncommon: '#1eff00',
+    rare: '#0070dd',
+    epic: '#a335ee',
+    legendary: '#ff8000',
+    artifact: '#e6cc80',
+  };
+  return colors[quality] || '#ffffff';
 }
