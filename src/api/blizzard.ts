@@ -17,6 +17,14 @@ import {
   GearAnalysis, PopularItem, PopularEnchant, PopularGem, PopularEmbellishment,
   LFGListing, LFGFilters, LFGPost, StoredPlayerData, LocalDatabase,
   getRaceName, getRaceFaction, RACES,
+  // New imports for additional API features
+  GuildInfo, GuildRoster, GuildMember, GuildAchievements, GuildAchievement,
+  MythicPlusProfile, MythicPlusRun, MythicPlusDungeon, MythicPlusAffixes,
+  MythicPlusLeaderboardEntry,
+  SpellDetails, PvPTalentDetails, TalentTree, TalentTreeNode,
+  ItemDetails,
+  RaidProgress, RaidInstance, RaidBoss, CharacterRaidProgress,
+  CharacterSummary,
 } from '../types/wow';
 
 interface ApiConfig {
@@ -1415,6 +1423,1019 @@ export class BlizzardAPI {
 
   isConfigured(): boolean {
     return !!(this.config.clientId && this.config.clientSecret);
+  }
+
+  // ===========================================
+  // === GUILD API ===
+  // ===========================================
+
+  async getGuildInfo(guildName: string, realm: string): Promise<GuildInfo | null> {
+    try {
+      const realmSlug = realm.toLowerCase().replace(/\s+/g, '-').replace(/'/g, '');
+      const guildSlug = guildName.toLowerCase().replace(/\s+/g, '-');
+
+      const data = await this.request<any>(
+        `/data/wow/guild/${realmSlug}/${guildSlug}`,
+        {},
+        `profile-${this.config.region}`
+      );
+
+      return {
+        name: data.name,
+        realm: data.realm?.name || realm,
+        realmSlug,
+        region: this.config.region,
+        faction: data.faction?.type?.toLowerCase() as 'alliance' | 'horde',
+        memberCount: data.member_count || 0,
+        achievementPoints: data.achievement_points || 0,
+        createdTimestamp: data.created_timestamp,
+        crest: data.crest ? {
+          emblem: { id: data.crest.emblem?.id || 0, color: this.parseColor(data.crest.emblem?.color) },
+          border: { id: data.crest.border?.id || 0, color: this.parseColor(data.crest.border?.color) },
+          background: { color: this.parseColor(data.crest.background?.color) },
+        } : undefined,
+      };
+    } catch (error: any) {
+      console.error('Guild info fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  private parseColor(color: any): string {
+    if (!color) return '#000000';
+    if (typeof color === 'string') return color;
+    const { r, g, b, a } = color;
+    return `rgba(${r || 0}, ${g || 0}, ${b || 0}, ${a !== undefined ? a : 1})`;
+  }
+
+  async getGuildRoster(guildName: string, realm: string): Promise<GuildRoster | null> {
+    try {
+      const realmSlug = realm.toLowerCase().replace(/\s+/g, '-').replace(/'/g, '');
+      const guildSlug = guildName.toLowerCase().replace(/\s+/g, '-');
+
+      const [guildData, rosterData] = await Promise.all([
+        this.request<any>(`/data/wow/guild/${realmSlug}/${guildSlug}`, {}, `profile-${this.config.region}`),
+        this.request<any>(`/data/wow/guild/${realmSlug}/${guildSlug}/roster`, {}, `profile-${this.config.region}`),
+      ]);
+
+      const members: GuildMember[] = (rosterData.members || []).map((m: any) => ({
+        character: {
+          name: m.character?.name || 'Unknown',
+          realm: m.character?.realm?.name || realm,
+          realmSlug: m.character?.realm?.slug || realmSlug,
+          level: m.character?.level || 0,
+          class: getClassById(m.character?.playable_class?.id) || 'warrior',
+          className: m.character?.playable_class?.name || 'Unknown',
+          race: m.character?.playable_race?.name || 'Unknown',
+        },
+        rank: m.rank || 0,
+      }));
+
+      const guild: GuildInfo = {
+        name: guildData.name,
+        realm: guildData.realm?.name || realm,
+        realmSlug,
+        region: this.config.region,
+        faction: guildData.faction?.type?.toLowerCase() as 'alliance' | 'horde',
+        memberCount: members.length,
+        achievementPoints: guildData.achievement_points || 0,
+      };
+
+      return {
+        guild,
+        members,
+        lastUpdated: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      console.error('Guild roster fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  async getGuildAchievements(guildName: string, realm: string): Promise<GuildAchievements | null> {
+    try {
+      const realmSlug = realm.toLowerCase().replace(/\s+/g, '-').replace(/'/g, '');
+      const guildSlug = guildName.toLowerCase().replace(/\s+/g, '-');
+
+      const [guildData, achData] = await Promise.all([
+        this.request<any>(`/data/wow/guild/${realmSlug}/${guildSlug}`, {}, `profile-${this.config.region}`),
+        this.request<any>(`/data/wow/guild/${realmSlug}/${guildSlug}/achievements`, {}, `profile-${this.config.region}`),
+      ]);
+
+      const achievements: GuildAchievement[] = (achData.achievements || [])
+        .filter((a: any) => a.completed_timestamp)
+        .map((a: any) => ({
+          id: a.achievement?.id || a.id,
+          name: a.achievement?.name || 'Unknown',
+          description: a.achievement?.description || '',
+          points: a.achievement?.points || 0,
+          completedTimestamp: a.completed_timestamp,
+          criteria: a.criteria?.child_criteria?.map((c: any) => ({
+            id: c.id,
+            amount: c.amount || 0,
+            isCompleted: c.is_completed || false,
+          })),
+        }));
+
+      const guild: GuildInfo = {
+        name: guildData.name,
+        realm: guildData.realm?.name || realm,
+        realmSlug,
+        region: this.config.region,
+        faction: guildData.faction?.type?.toLowerCase() as 'alliance' | 'horde',
+        memberCount: guildData.member_count || 0,
+        achievementPoints: achData.total_points || guildData.achievement_points || 0,
+      };
+
+      return {
+        guild,
+        achievements,
+        totalPoints: achData.total_points || 0,
+        lastUpdated: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      console.error('Guild achievements fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  // ===========================================
+  // === MYTHIC+ API ===
+  // ===========================================
+
+  async getMythicPlusProfile(name: string, realm: string): Promise<MythicPlusProfile | null> {
+    try {
+      const realmSlug = realm.toLowerCase().replace(/\s+/g, '-').replace(/'/g, '');
+      const charSlug = name.toLowerCase();
+
+      const profile = await this.request<any>(
+        `/profile/wow/character/${realmSlug}/${charSlug}/mythic-keystone-profile`
+      );
+
+      const currentSeason = profile.current_period?.best_runs || profile.seasons?.[0];
+
+      if (!currentSeason && !profile.current_mythic_rating) {
+        return {
+          currentSeason: {
+            id: 0,
+            rating: 0,
+            ratingColor: '#9d9d9d',
+            bestRuns: [],
+            recentRuns: [],
+          },
+        };
+      }
+
+      // Try to get current season details
+      let seasonBestRuns: MythicPlusRun[] = [];
+      try {
+        const seasonId = profile.current_period?.period?.id || profile.seasons?.[0]?.season?.id;
+        if (seasonId) {
+          const seasonData = await this.request<any>(
+            `/profile/wow/character/${realmSlug}/${charSlug}/mythic-keystone-profile/season/${seasonId}`
+          );
+          seasonBestRuns = this.parseMythicPlusRuns(seasonData.best_runs || []);
+        }
+      } catch {
+        // Season data not available
+      }
+
+      return {
+        currentSeason: {
+          id: profile.current_period?.period?.id || 0,
+          rating: profile.current_mythic_rating?.rating || 0,
+          ratingColor: this.getMythicPlusRatingColor(profile.current_mythic_rating?.rating || 0),
+          bestRuns: seasonBestRuns,
+          recentRuns: [], // Would need additional API calls
+        },
+      };
+    } catch (error: any) {
+      console.error('Mythic+ profile fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  private parseMythicPlusRuns(runs: any[]): MythicPlusRun[] {
+    return runs.map(run => ({
+      dungeon: {
+        id: run.dungeon?.id || 0,
+        name: run.dungeon?.name || 'Unknown',
+        shortName: this.getDungeonShortName(run.dungeon?.name || ''),
+      },
+      keystoneLevel: run.keystone_level || 0,
+      completedTimestamp: run.completed_timestamp || 0,
+      duration: run.duration || 0,
+      timedDuration: run.timed_duration || run.duration || 0,
+      isCompleted: true,
+      isChested: run.is_completed_within_time || false,
+      affixes: (run.keystone_affixes || []).map((a: any) => ({
+        id: a.id,
+        name: a.name || 'Unknown',
+        description: '',
+      })),
+      rating: run.mythic_rating?.rating || 0,
+      members: (run.members || []).map((m: any) => ({
+        name: m.character?.name || 'Unknown',
+        realm: m.character?.realm?.slug || '',
+        class: getClassById(m.character?.playable_class?.id) || 'warrior',
+        spec: m.specialization?.name || '',
+        role: this.getMythicPlusRole(m.specialization?.id),
+      })),
+    }));
+  }
+
+  private getMythicPlusRole(specId: number): 'tank' | 'healer' | 'dps' {
+    const specInfo = getSpecInfo(specId);
+    return specInfo?.role || 'dps';
+  }
+
+  private getDungeonShortName(name: string): string {
+    const shortNames: Record<string, string> = {
+      'The Stonevault': 'SV',
+      'The Dawnbreaker': 'DB',
+      'Ara-Kara, City of Echoes': 'AK',
+      "City of Threads": 'COT',
+      'Mists of Tirna Scithe': 'MISTS',
+      'The Necrotic Wake': 'NW',
+      'Siege of Boralus': 'SOB',
+      'Grim Batol': 'GB',
+    };
+    return shortNames[name] || name.split(' ').map(w => w[0]).join('').toUpperCase();
+  }
+
+  private getMythicPlusRatingColor(rating: number): string {
+    if (rating >= 3000) return '#ff8000'; // Orange (Mythic)
+    if (rating >= 2500) return '#a335ee'; // Purple (Heroic)
+    if (rating >= 2000) return '#0070dd'; // Blue (Rare)
+    if (rating >= 1500) return '#1eff00'; // Green (Uncommon)
+    if (rating >= 750) return '#ffffff';  // White (Common)
+    return '#9d9d9d'; // Gray
+  }
+
+  async getMythicPlusAffixes(): Promise<MythicPlusAffixes | null> {
+    try {
+      const data = await this.request<any>(
+        '/data/wow/mythic-keystone/period/index',
+        {},
+        `dynamic-${this.config.region}`
+      );
+
+      const currentPeriod = data.current_period;
+      if (!currentPeriod) return null;
+
+      // Get current period details
+      const periodData = await this.request<any>(
+        `/data/wow/mythic-keystone/period/${currentPeriod.id}`,
+        {},
+        `dynamic-${this.config.region}`
+      );
+
+      return {
+        currentWeek: {
+          affixes: (periodData.mythic_rating_season?.affixes || []).map((a: any) => ({
+            id: a.keystone_affix?.id || a.id,
+            name: a.keystone_affix?.name || a.name || 'Unknown',
+            description: '',
+            icon: '',
+          })),
+          startTimestamp: periodData.start_timestamp || 0,
+          endTimestamp: periodData.end_timestamp || 0,
+        },
+      };
+    } catch (error: any) {
+      console.error('Mythic+ affixes fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  async getMythicPlusDungeons(): Promise<MythicPlusDungeon[]> {
+    try {
+      const data = await this.request<any>(
+        '/data/wow/mythic-keystone/dungeon/index',
+        {},
+        `dynamic-${this.config.region}`
+      );
+
+      return (data.dungeons || []).map((d: any) => ({
+        id: d.id,
+        name: d.name || 'Unknown',
+        shortName: this.getDungeonShortName(d.name || ''),
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  // ===========================================
+  // === SPELL/TALENT API ===
+  // ===========================================
+
+  async getSpellDetails(spellId: number): Promise<SpellDetails | null> {
+    try {
+      const [spellData, mediaData] = await Promise.all([
+        this.request<any>(`/data/wow/spell/${spellId}`, {}, `static-${this.config.region}`),
+        this.request<any>(`/data/wow/media/spell/${spellId}`, {}, `static-${this.config.region}`).catch(() => null),
+      ]);
+
+      return {
+        id: spellData.id,
+        name: spellData.name || 'Unknown Spell',
+        description: spellData.description || '',
+        icon: mediaData?.assets?.[0]?.key || '',
+        iconUrl: mediaData?.assets?.[0]?.value || '',
+        castTime: spellData.cast_time || 'Instant',
+        cooldown: spellData.cooldown,
+        range: spellData.range,
+        powerCost: spellData.power_cost,
+      };
+    } catch (error: any) {
+      console.error('Spell details fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  async getPvPTalentDetails(pvpTalentId: number): Promise<PvPTalentDetails | null> {
+    try {
+      const data = await this.request<any>(
+        `/data/wow/pvp-talent/${pvpTalentId}`,
+        {},
+        `static-${this.config.region}`
+      );
+
+      let spellDetails: SpellDetails | undefined;
+      if (data.spell?.id) {
+        const spell = await this.getSpellDetails(data.spell.id);
+        if (spell) spellDetails = spell;
+      }
+
+      return {
+        id: data.id,
+        name: data.spell?.name || data.name || 'Unknown',
+        description: data.description || '',
+        icon: spellDetails?.icon || '',
+        iconUrl: spellDetails?.iconUrl || '',
+        spell: spellDetails,
+        unlockLevel: data.unlock_player_level,
+      };
+    } catch (error: any) {
+      console.error('PvP talent details fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  async getTalentTree(specId: number): Promise<TalentTree | null> {
+    try {
+      const specInfo = getSpecInfo(specId);
+      if (!specInfo) return null;
+
+      // Get talent tree data
+      const data = await this.request<any>(
+        `/data/wow/talent-tree/index`,
+        {},
+        `static-${this.config.region}`
+      );
+
+      // Find the tree for this spec's class
+      const classTree = data.talent_trees?.find((t: any) =>
+        t.playable_specialization?.id === specId
+      );
+
+      if (!classTree) {
+        return {
+          specId,
+          className: specInfo.className,
+          specName: specInfo.name,
+          classTalents: [],
+          specTalents: [],
+          heroTalents: [],
+          pvpTalents: [],
+        };
+      }
+
+      // Get detailed tree data
+      const treeData = await this.request<any>(
+        `/data/wow/talent-tree/${classTree.id}`,
+        {},
+        `static-${this.config.region}`
+      );
+
+      const classTalents = this.parseTalentTreeNodes(treeData.class_talent_nodes || [], 'class');
+      const specTalents = this.parseTalentTreeNodes(treeData.spec_talent_nodes || [], 'spec');
+      const heroTalents = this.parseTalentTreeNodes(treeData.hero_talent_nodes || [], 'hero');
+
+      // Get PvP talents
+      const pvpTalents = await this.getPvPTalentsForSpec(specId);
+
+      return {
+        specId,
+        className: specInfo.className,
+        specName: specInfo.name,
+        classTalents,
+        specTalents,
+        heroTalents,
+        pvpTalents,
+      };
+    } catch (error: any) {
+      console.error('Talent tree fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  private parseTalentTreeNodes(nodes: any[], type: 'class' | 'spec' | 'hero'): TalentTreeNode[] {
+    return nodes.map(node => ({
+      id: node.id,
+      name: node.name || 'Unknown',
+      type,
+      posX: node.pos_x || 0,
+      posY: node.pos_y || 0,
+      maxRank: node.max_rank || 1,
+      unlocks: node.unlocks?.map((u: any) => u.id) || [],
+      lockedBy: node.locked_by?.map((l: any) => l.id) || [],
+      spells: (node.entries || []).map((entry: any) => ({
+        rank: entry.rank || 1,
+        spell: {
+          id: entry.spell?.id || entry.talent?.id || 0,
+          name: entry.spell?.name || entry.talent?.name || 'Unknown',
+          description: entry.spell?.description || entry.talent?.description || '',
+          icon: '',
+        },
+      })),
+    }));
+  }
+
+  private async getPvPTalentsForSpec(specId: number): Promise<PvPTalentDetails[]> {
+    try {
+      const data = await this.request<any>(
+        `/data/wow/pvp-talent/index`,
+        {},
+        `static-${this.config.region}`
+      );
+
+      const specPvPTalents = (data.pvp_talents || []).filter((t: any) =>
+        t.playable_specialization?.id === specId
+      );
+
+      const details = await Promise.allSettled(
+        specPvPTalents.slice(0, 20).map((t: any) => this.getPvPTalentDetails(t.id))
+      );
+
+      return details
+        .filter((r): r is PromiseFulfilledResult<PvPTalentDetails | null> => r.status === 'fulfilled' && r.value !== null)
+        .map(r => r.value as PvPTalentDetails);
+    } catch {
+      return [];
+    }
+  }
+
+  // ===========================================
+  // === ITEM API ===
+  // ===========================================
+
+  async getItemDetails(itemId: number): Promise<ItemDetails | null> {
+    try {
+      const [itemData, mediaData] = await Promise.all([
+        this.request<any>(`/data/wow/item/${itemId}`, {}, `static-${this.config.region}`),
+        this.request<any>(`/data/wow/media/item/${itemId}`, {}, `static-${this.config.region}`).catch(() => null),
+      ]);
+
+      const stats = (itemData.preview_item?.stats || []).map((s: any) => ({
+        type: s.type?.name || s.type?.type || 'Unknown',
+        value: s.value || 0,
+      }));
+
+      return {
+        id: itemData.id,
+        name: itemData.name || 'Unknown Item',
+        quality: (itemData.quality?.type?.toLowerCase() || 'common') as ItemDetails['quality'],
+        itemLevel: itemData.level || itemData.preview_item?.level?.value || 0,
+        requiredLevel: itemData.required_level || 0,
+        itemClass: itemData.item_class?.name || '',
+        itemSubclass: itemData.item_subclass?.name || '',
+        inventoryType: itemData.inventory_type?.name || '',
+        binding: this.parseBinding(itemData.preview_item?.binding?.type),
+        icon: mediaData?.assets?.[0]?.key || '',
+        iconUrl: mediaData?.assets?.[0]?.value || '',
+        stats: stats.length > 0 ? stats : undefined,
+        armor: itemData.preview_item?.armor?.value,
+        weaponInfo: itemData.preview_item?.weapon ? {
+          damage: {
+            min: itemData.preview_item.weapon.damage?.min_value || 0,
+            max: itemData.preview_item.weapon.damage?.max_value || 0,
+          },
+          speed: itemData.preview_item.weapon.attack_speed?.value || 0,
+          dps: itemData.preview_item.weapon.dps?.value || 0,
+        } : undefined,
+        socketInfo: itemData.preview_item?.sockets ? {
+          sockets: (itemData.preview_item.sockets || []).map((s: any) => ({
+            type: s.socket_type?.name || 'Prismatic',
+          })),
+          bonus: itemData.preview_item.socket_bonus,
+        } : undefined,
+        setInfo: itemData.preview_item?.set ? {
+          id: itemData.preview_item.set.item_set?.id || 0,
+          name: itemData.preview_item.set.item_set?.name || '',
+          items: (itemData.preview_item.set.items || []).map((i: any) => ({
+            id: i.item?.id || 0,
+            name: i.item?.name || '',
+          })),
+          bonuses: (itemData.preview_item.set.effects || []).map((e: any) => ({
+            threshold: e.required_count || 0,
+            description: e.display_string || '',
+          })),
+        } : undefined,
+        spellEffects: (itemData.preview_item?.spells || []).map((s: any) => ({
+          description: s.description || '',
+          trigger: this.parseSpellTrigger(s.spell?.name),
+        })),
+        description: itemData.preview_item?.description,
+        sellPrice: itemData.preview_item?.sell_price?.value,
+        isUnique: itemData.preview_item?.is_unique || false,
+        isUniqueEquipped: itemData.preview_item?.unique_equipped || false,
+      };
+    } catch (error: any) {
+      console.error('Item details fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  private parseBinding(binding: string): ItemDetails['binding'] {
+    if (!binding) return undefined;
+    const lower = binding.toLowerCase();
+    if (lower.includes('pickup') || lower.includes('acquire')) return 'on_pickup';
+    if (lower.includes('equip')) return 'on_equip';
+    if (lower.includes('use')) return 'on_use';
+    return undefined;
+  }
+
+  private parseSpellTrigger(name?: string): 'on_equip' | 'on_use' | 'on_proc' {
+    if (!name) return 'on_proc';
+    const lower = name.toLowerCase();
+    if (lower.includes('equip')) return 'on_equip';
+    if (lower.includes('use')) return 'on_use';
+    return 'on_proc';
+  }
+
+  async searchItems(query: string, limit: number = 20): Promise<ItemDetails[]> {
+    try {
+      const data = await this.request<any>(
+        '/data/wow/search/item',
+        { name: query, orderby: 'id', _pageSize: String(limit) },
+        `static-${this.config.region}`
+      );
+
+      const items = await Promise.allSettled(
+        (data.results || []).slice(0, limit).map((r: any) =>
+          this.getItemDetails(r.data?.id || r.id)
+        )
+      );
+
+      return items
+        .filter((r): r is PromiseFulfilledResult<ItemDetails | null> => r.status === 'fulfilled' && r.value !== null)
+        .map(r => r.value as ItemDetails);
+    } catch (error: any) {
+      console.error('Item search failed:', error.message);
+      return [];
+    }
+  }
+
+  // ===========================================
+  // === RAID PROGRESS API ===
+  // ===========================================
+
+  async getRaidProgress(name: string, realm: string): Promise<CharacterRaidProgress | null> {
+    try {
+      const realmSlug = realm.toLowerCase().replace(/\s+/g, '-').replace(/'/g, '');
+      const charSlug = name.toLowerCase();
+
+      const data = await this.request<any>(
+        `/profile/wow/character/${realmSlug}/${charSlug}/encounters/raids`
+      );
+
+      const currentTier: RaidProgress[] = [];
+
+      for (const expansion of data.expansions || []) {
+        for (const instance of expansion.instances || []) {
+          for (const mode of instance.modes || []) {
+            const difficulty = this.parseDifficulty(mode.difficulty?.type);
+            const encounters = (mode.progress?.encounters || []).map((enc: any) => ({
+              boss: {
+                id: enc.encounter?.id || 0,
+                name: enc.encounter?.name || 'Unknown',
+                [`${difficulty}Kills`]: enc.completed_count || 0,
+                [`last${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}Kill`]: enc.last_kill_timestamp,
+              },
+              isKilled: (enc.completed_count || 0) > 0,
+              kills: enc.completed_count || 0,
+              lastKill: enc.last_kill_timestamp,
+            }));
+
+            const bossesKilled = encounters.filter((e: any) => e.isKilled).length;
+            const totalBosses = encounters.length;
+
+            if (totalBosses > 0) {
+              currentTier.push({
+                instance: {
+                  id: instance.instance?.id || 0,
+                  name: instance.instance?.name || 'Unknown',
+                  expansion: expansion.expansion?.name || '',
+                  bosses: encounters.map((e: any) => e.boss),
+                },
+                difficulty,
+                bossesKilled,
+                totalBosses,
+                progress: `${bossesKilled}/${totalBosses}`,
+                encounters,
+              });
+            }
+          }
+        }
+      }
+
+      return {
+        character: {
+          name,
+          realm,
+          region: this.config.region,
+        },
+        currentTier,
+        lastUpdated: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      console.error('Raid progress fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  private parseDifficulty(type: string): 'normal' | 'heroic' | 'mythic' | 'lfr' {
+    const lower = (type || '').toLowerCase();
+    if (lower.includes('mythic')) return 'mythic';
+    if (lower.includes('heroic')) return 'heroic';
+    if (lower.includes('lfr') || lower.includes('finder')) return 'lfr';
+    return 'normal';
+  }
+
+  async getRaidInstances(): Promise<RaidInstance[]> {
+    try {
+      const data = await this.request<any>(
+        '/data/wow/journal-instance/index',
+        {},
+        `static-${this.config.region}`
+      );
+
+      const raids: RaidInstance[] = [];
+
+      for (const instance of data.instances || []) {
+        if (instance.category?.type === 'RAID') {
+          const details = await this.request<any>(
+            `/data/wow/journal-instance/${instance.id}`,
+            {},
+            `static-${this.config.region}`
+          ).catch(() => null);
+
+          if (details) {
+            raids.push({
+              id: details.id,
+              name: details.name || 'Unknown',
+              expansion: details.expansion?.name || '',
+              minLevel: details.minimum_level,
+              bosses: (details.encounters || []).map((e: any) => ({
+                id: e.id,
+                name: e.name || 'Unknown',
+                description: e.description,
+              })),
+            });
+          }
+        }
+      }
+
+      return raids;
+    } catch (error: any) {
+      console.error('Raid instances fetch failed:', error.message);
+      return [];
+    }
+  }
+
+  // ===========================================
+  // === CONNECTED TALENT HEATMAP (Real Data) ===
+  // ===========================================
+
+  async getTalentHeatmapFromLeaderboard(specId: number, bracket: GameMode): Promise<TalentHeatmap> {
+    const specInfo = getSpecInfo(specId);
+    if (!specInfo) throw new Error(`Unknown spec: ${specId}`);
+
+    // Get leaderboard and filter to this spec
+    const leaderboard = await this.getLeaderboard(bracket, { page: 1, pageSize: 500 });
+
+    // Enrich with class data
+    const enriched = await this.enrichLeaderboardWithClasses(
+      leaderboard.entries.filter(e => e.rating >= 2400).slice(0, 100)
+    );
+
+    // Filter to the specific spec
+    const specPlayers = enriched.filter(e => e.character.specId === specId);
+
+    // Fetch talents for top players of this spec
+    const talentData = await Promise.allSettled(
+      specPlayers.slice(0, 20).map(async (player) => {
+        const profile = await this.getPlayerProfile(player.character.name, player.character.realm);
+        return profile?.talents;
+      })
+    );
+
+    // Aggregate talent usage
+    const talentUsage = new Map<number, { name: string; type: string; count: number; ranks: number[] }>();
+
+    for (const result of talentData) {
+      if (result.status !== 'fulfilled' || !result.value) continue;
+      const talents = result.value;
+
+      for (const talent of [...talents.classTalents, ...talents.specTalents, ...talents.heroTalents, ...talents.pvpTalents]) {
+        const existing = talentUsage.get(talent.id) || { name: talent.name, type: talent.type || 'class', count: 0, ranks: [] };
+        existing.count++;
+        existing.ranks.push(talent.currentRank || 1);
+        talentUsage.set(talent.id, existing);
+      }
+    }
+
+    const sampleSize = talentData.filter(r => r.status === 'fulfilled' && r.value).length;
+
+    // Convert to heatmap nodes
+    const createNodes = (type: 'class' | 'spec' | 'hero' | 'pvp'): TalentHeatmapNode[] => {
+      const nodes: TalentHeatmapNode[] = [];
+      let index = 0;
+      for (const [id, data] of talentUsage) {
+        if (data.type !== type) continue;
+        const pickRate = sampleSize > 0 ? (data.count / sampleSize) * 100 : 0;
+        const avgRank = data.ranks.length > 0 ? data.ranks.reduce((a, b) => a + b, 0) / data.ranks.length : 1;
+        nodes.push({
+          nodeId: id,
+          talentId: id,
+          name: data.name,
+          icon: '',
+          row: Math.floor(index / 4),
+          col: index % 4,
+          type,
+          pickRate,
+          avgRank,
+          maxRank: Math.max(...data.ranks, 1),
+          popularity: pickRate > 80 ? 'meta' : pickRate > 50 ? 'common' : pickRate > 20 ? 'situational' : 'rare',
+          description: '',
+        });
+        index++;
+      }
+      return nodes;
+    };
+
+    return {
+      specId,
+      className: specInfo.className,
+      specName: specInfo.name,
+      classColor: specInfo.classColor,
+      bracket,
+      sampleSize,
+      classTalents: createNodes('class'),
+      specTalents: createNodes('spec'),
+      heroTalents: createNodes('hero'),
+      pvpTalents: createNodes('pvp'),
+      popularBuilds: [],
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  // ===========================================
+  // === CONNECTED GEAR ANALYSIS (Real Data) ===
+  // ===========================================
+
+  async getGearAnalysisFromLeaderboard(specId: number, bracket: GameMode): Promise<GearAnalysis> {
+    const specInfo = getSpecInfo(specId);
+    if (!specInfo) throw new Error(`Unknown spec: ${specId}`);
+
+    // Get leaderboard and filter to this spec
+    const leaderboard = await this.getLeaderboard(bracket, { page: 1, pageSize: 500 });
+
+    // Enrich with class data
+    const enriched = await this.enrichLeaderboardWithClasses(
+      leaderboard.entries.filter(e => e.rating >= 2400).slice(0, 100)
+    );
+
+    // Filter to the specific spec
+    const specPlayers = enriched.filter(e => e.character.specId === specId);
+
+    // Fetch equipment for top players
+    const equipmentData = await Promise.allSettled(
+      specPlayers.slice(0, 15).map(async (player) => {
+        const profile = await this.getPlayerProfile(player.character.name, player.character.realm);
+        return { equipment: profile?.equipment, stats: profile?.stats };
+      })
+    );
+
+    // Aggregate item usage
+    const itemUsage = new Map<string, Map<number, { item: EquippedItem; count: number }>>();
+    const enchantUsage = new Map<string, Map<string, { name: string; stat: string; count: number }>>();
+    const gemUsage = new Map<string, { name: string; stat: string; count: number }>();
+    const statTotals = new Map<string, number[]>();
+    let totalItemLevel = 0;
+    let sampleSize = 0;
+
+    for (const result of equipmentData) {
+      if (result.status !== 'fulfilled' || !result.value?.equipment) continue;
+      sampleSize++;
+      const { equipment, stats } = result.value;
+      totalItemLevel += equipment.equippedItemLevel || 0;
+
+      for (const item of equipment.items) {
+        if (!itemUsage.has(item.slotType)) {
+          itemUsage.set(item.slotType, new Map());
+        }
+        const slotMap = itemUsage.get(item.slotType)!;
+        const existing = slotMap.get(item.id) || { item, count: 0 };
+        existing.count++;
+        slotMap.set(item.id, existing);
+
+        if (item.enchant) {
+          if (!enchantUsage.has(item.slotType)) {
+            enchantUsage.set(item.slotType, new Map());
+          }
+          const enchantKey = `${item.enchant.id}-${item.enchant.name}`;
+          const enchantMap = enchantUsage.get(item.slotType)!;
+          const existingEnchant = enchantMap.get(enchantKey) || { name: item.enchant.name, stat: item.enchant.description, count: 0 };
+          existingEnchant.count++;
+          enchantMap.set(enchantKey, existingEnchant);
+        }
+
+        for (const gem of item.gems || []) {
+          const existingGem = gemUsage.get(gem.name) || { name: gem.name, stat: '', count: 0 };
+          existingGem.count++;
+          gemUsage.set(gem.name, existingGem);
+        }
+      }
+
+      // Aggregate stats
+      if (stats) {
+        const addStat = (name: string, value: number) => {
+          if (!statTotals.has(name)) statTotals.set(name, []);
+          statTotals.get(name)!.push(value);
+        };
+        addStat('Versatility', stats.versatility.rating);
+        addStat('Haste', stats.haste.rating);
+        addStat('Mastery', stats.mastery.rating);
+        addStat('Critical Strike', stats.criticalStrike.rating);
+      }
+    }
+
+    // Convert to output format
+    const popularItems: Record<string, PopularItem[]> = {};
+    for (const [slot, items] of itemUsage) {
+      popularItems[slot] = Array.from(items.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 3)
+        .map(({ item, count }) => ({
+          id: item.id,
+          name: item.name,
+          icon: item.icon,
+          itemLevel: item.itemLevel,
+          quality: item.quality,
+          pickRate: sampleSize > 0 ? (count / sampleSize) * 100 : 0,
+          source: item.source || 'Unknown',
+          stats: item.stats,
+        }));
+    }
+
+    const popularEnchants: PopularEnchant[] = [];
+    for (const [slot, enchants] of enchantUsage) {
+      const sorted = Array.from(enchants.values()).sort((a, b) => b.count - a.count);
+      if (sorted.length > 0) {
+        popularEnchants.push({
+          id: 0,
+          name: sorted[0].name,
+          slot,
+          stat: sorted[0].stat,
+          pickRate: sampleSize > 0 ? (sorted[0].count / sampleSize) * 100 : 0,
+        });
+      }
+    }
+
+    const popularGems: PopularGem[] = Array.from(gemUsage.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map((gem, i) => ({
+        id: i,
+        name: gem.name,
+        icon: '',
+        stat: gem.stat,
+        pickRate: sampleSize > 0 ? (gem.count / sampleSize) * 100 : 0,
+        type: 'secondary' as const,
+      }));
+
+    // Calculate stat priority
+    const totalStats = Array.from(statTotals.entries())
+      .map(([stat, values]) => ({
+        stat,
+        avgRating: values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 0,
+        total: values.reduce((a, b) => a + b, 0),
+      }))
+      .sort((a, b) => b.avgRating - a.avgRating);
+
+    const totalStatRating = totalStats.reduce((sum, s) => sum + s.avgRating, 0);
+    const statPriority = totalStats.map(s => ({
+      stat: s.stat,
+      avgPercentage: totalStatRating > 0 ? Math.round((s.avgRating / totalStatRating) * 100) : 0,
+      avgRating: s.avgRating,
+    }));
+
+    return {
+      specId,
+      className: specInfo.className,
+      specName: specInfo.name,
+      bracket,
+      sampleSize,
+      avgItemLevel: sampleSize > 0 ? Math.round(totalItemLevel / sampleSize) : 0,
+      statPriority,
+      popularItems,
+      popularEnchants,
+      popularGems,
+      popularEmbellishments: [],
+      setBonuses: [],
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  // ===========================================
+  // === CHARACTER SUMMARY (Extended Info) ===
+  // ===========================================
+
+  async getCharacterSummary(name: string, realm: string): Promise<CharacterSummary | null> {
+    try {
+      const [profile, mythicPlus, raidProgress] = await Promise.all([
+        this.getPlayerProfile(name, realm),
+        this.getMythicPlusProfile(name, realm).catch(() => null),
+        this.getRaidProgress(name, realm).catch(() => null),
+      ]);
+
+      if (!profile) return null;
+
+      // Find best raid progress
+      let raidSummary: { currentProgress: string; bestDifficulty: string } | undefined;
+      if (raidProgress?.currentTier.length) {
+        const mythicProgress = raidProgress.currentTier.find(p => p.difficulty === 'mythic');
+        const heroicProgress = raidProgress.currentTier.find(p => p.difficulty === 'heroic');
+        const normalProgress = raidProgress.currentTier.find(p => p.difficulty === 'normal');
+
+        const best = mythicProgress || heroicProgress || normalProgress;
+        if (best) {
+          const diffSuffix = best.difficulty === 'mythic' ? 'M' : best.difficulty === 'heroic' ? 'H' : 'N';
+          raidSummary = {
+            currentProgress: `${best.bossesKilled}/${best.totalBosses} ${diffSuffix}`,
+            bestDifficulty: best.difficulty,
+          };
+        }
+      }
+
+      return {
+        name: profile.character.name,
+        realm: profile.character.realm,
+        realmSlug: profile.character.realmSlug,
+        region: profile.character.region,
+        class: profile.character.class,
+        className: profile.character.className,
+        spec: profile.character.spec,
+        specId: profile.character.specId,
+        race: profile.character.race,
+        faction: profile.character.faction,
+        level: profile.character.level,
+        itemLevel: profile.character.equippedItemLevel,
+        avatarUrl: profile.character.avatarUrl,
+        insetUrl: profile.character.insetUrl,
+        mainRawUrl: profile.character.mainRawUrl,
+        guild: profile.character.guild ? {
+          name: profile.character.guild.name,
+          realm: profile.character.guild.realm,
+          realmSlug: profile.character.realmSlug,
+          region: profile.character.region,
+          faction: profile.character.faction,
+          memberCount: 0,
+          achievementPoints: 0,
+        } : undefined,
+        pvp: {
+          honorLevel: profile.honorLevel,
+          honorableKills: profile.honorableKills,
+          ratings: profile.ratings,
+          highestTier: profile.highestPvPTier || 'Unranked',
+        },
+        mythicPlus: mythicPlus?.currentSeason ? {
+          rating: mythicPlus.currentSeason.rating,
+          ratingColor: mythicPlus.currentSeason.ratingColor,
+          bestRun: mythicPlus.currentSeason.bestRuns[0],
+        } : undefined,
+        raid: raidSummary,
+        achievementPoints: profile.character.achievementPoints || 0,
+        recentAchievements: profile.achievements.slice(0, 5),
+        lastUpdated: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      console.error('Character summary fetch failed:', error.message);
+      return null;
+    }
   }
 }
 

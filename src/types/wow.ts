@@ -903,3 +903,373 @@ export interface LocalDatabase {
   favoriteCharacters: string[]; // keys to players
   lastSync: string;
 }
+
+// === GUILD DATA ===
+
+export interface GuildMember {
+  character: {
+    name: string;
+    realm: string;
+    realmSlug: string;
+    level: number;
+    class: WowClass;
+    className: string;
+    spec?: string;
+    race: string;
+  };
+  rank: number;
+  rankName?: string;
+}
+
+export interface GuildInfo {
+  name: string;
+  realm: string;
+  realmSlug: string;
+  region: Region;
+  faction: 'alliance' | 'horde';
+  memberCount: number;
+  achievementPoints: number;
+  createdTimestamp?: number;
+  crest?: {
+    emblem: { id: number; color: string };
+    border: { id: number; color: string };
+    background: { color: string };
+  };
+}
+
+export interface GuildRoster {
+  guild: GuildInfo;
+  members: GuildMember[];
+  lastUpdated: string;
+}
+
+export interface GuildAchievement {
+  id: number;
+  name: string;
+  description: string;
+  points: number;
+  completedTimestamp?: number;
+  criteria?: { id: number; amount: number; isCompleted: boolean }[];
+}
+
+export interface GuildAchievements {
+  guild: GuildInfo;
+  achievements: GuildAchievement[];
+  totalPoints: number;
+  lastUpdated: string;
+}
+
+// === MYTHIC+ DATA ===
+
+export interface MythicPlusDungeon {
+  id: number;
+  name: string;
+  shortName: string;
+  icon?: string;
+  zone?: string;
+}
+
+export interface MythicPlusRun {
+  dungeon: MythicPlusDungeon;
+  keystoneLevel: number;
+  completedTimestamp: number;
+  duration: number;
+  timedDuration: number; // Par time
+  isCompleted: boolean;
+  isChested: boolean; // Completed in time
+  affixes: { id: number; name: string; description: string }[];
+  rating: number;
+  ratingImprovement?: number;
+  members?: {
+    name: string;
+    realm: string;
+    class: WowClass;
+    spec: string;
+    role: 'tank' | 'healer' | 'dps';
+  }[];
+}
+
+export interface MythicPlusProfile {
+  currentSeason: {
+    id: number;
+    rating: number;
+    ratingColor: string;
+    bestRuns: MythicPlusRun[];
+    recentRuns: MythicPlusRun[];
+  };
+  previousSeasons?: {
+    id: number;
+    rating: number;
+    bestRuns: MythicPlusRun[];
+  }[];
+}
+
+export interface MythicPlusAffixes {
+  currentWeek: {
+    affixes: { id: number; name: string; description: string; icon: string }[];
+    startTimestamp: number;
+    endTimestamp: number;
+  };
+  nextWeek?: {
+    affixes: { id: number; name: string; description: string; icon: string }[];
+  };
+}
+
+export interface MythicPlusLeaderboardEntry {
+  rank: number;
+  dungeon: MythicPlusDungeon;
+  keystoneLevel: number;
+  duration: number;
+  completedTimestamp: number;
+  members: {
+    name: string;
+    realm: string;
+    class: WowClass;
+    spec: string;
+    faction: 'alliance' | 'horde';
+  }[];
+}
+
+// === SPELL/TALENT DETAILS ===
+
+export interface SpellDetails {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  iconUrl?: string;
+  castTime?: string;
+  cooldown?: string;
+  range?: string;
+  powerCost?: string;
+  school?: string;
+}
+
+export interface PvPTalentDetails {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  iconUrl?: string;
+  spell?: SpellDetails;
+  unlockLevel?: number;
+}
+
+export interface TalentTreeNode {
+  id: number;
+  name: string;
+  type: 'class' | 'spec' | 'hero';
+  posX: number;
+  posY: number;
+  maxRank: number;
+  unlocks?: number[]; // Node IDs this unlocks
+  lockedBy?: number[]; // Node IDs that must be selected first
+  spells: {
+    rank: number;
+    spell: SpellDetails;
+  }[];
+}
+
+export interface TalentTree {
+  specId: number;
+  className: string;
+  specName: string;
+  classTalents: TalentTreeNode[];
+  specTalents: TalentTreeNode[];
+  heroTalents: TalentTreeNode[];
+  pvpTalents: PvPTalentDetails[];
+}
+
+// === ITEM DETAILS ===
+
+export interface ItemDetails {
+  id: number;
+  name: string;
+  quality: 'poor' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'artifact' | 'heirloom';
+  itemLevel: number;
+  requiredLevel: number;
+  itemClass: string; // Armor, Weapon, etc.
+  itemSubclass: string; // Plate, Cloth, etc.
+  inventoryType: string; // Head, Chest, etc.
+  binding?: 'on_equip' | 'on_pickup' | 'on_use';
+  icon: string;
+  iconUrl?: string;
+  stats?: { type: string; value: number }[];
+  armor?: number;
+  weaponInfo?: {
+    damage: { min: number; max: number };
+    speed: number;
+    dps: number;
+  };
+  socketInfo?: {
+    sockets: { type: string }[];
+    bonus?: string;
+  };
+  setInfo?: {
+    id: number;
+    name: string;
+    items: { id: number; name: string }[];
+    bonuses: { threshold: number; description: string }[];
+  };
+  spellEffects?: {
+    description: string;
+    trigger: 'on_equip' | 'on_use' | 'on_proc';
+    cooldown?: number;
+  }[];
+  description?: string;
+  sellPrice?: number;
+  source?: string;
+  isUnique?: boolean;
+  isUniqueEquipped?: boolean;
+}
+
+export interface ItemSearch {
+  query: string;
+  results: ItemDetails[];
+  totalResults: number;
+}
+
+// === RAID/DUNGEON ENCOUNTERS ===
+
+export interface RaidBoss {
+  id: number;
+  name: string;
+  description?: string;
+  icon?: string;
+  normalKills?: number;
+  heroicKills?: number;
+  mythicKills?: number;
+  lastNormalKill?: number;
+  lastHeroicKill?: number;
+  lastMythicKill?: number;
+}
+
+export interface RaidInstance {
+  id: number;
+  name: string;
+  expansion: string;
+  icon?: string;
+  background?: string;
+  minLevel?: number;
+  bosses: RaidBoss[];
+}
+
+export interface RaidProgress {
+  instance: RaidInstance;
+  difficulty: 'normal' | 'heroic' | 'mythic' | 'lfr';
+  bossesKilled: number;
+  totalBosses: number;
+  progress: string; // "5/8"
+  completedTimestamp?: number;
+  encounters: {
+    boss: RaidBoss;
+    isKilled: boolean;
+    kills: number;
+    lastKill?: number;
+  }[];
+}
+
+export interface CharacterRaidProgress {
+  character: {
+    name: string;
+    realm: string;
+    region: Region;
+  };
+  currentTier: RaidProgress[];
+  previousTiers?: RaidProgress[];
+  lastUpdated: string;
+}
+
+// === CHARACTER SUMMARY (Extended) ===
+
+export interface CharacterSummary {
+  // Basic info
+  name: string;
+  realm: string;
+  realmSlug: string;
+  region: Region;
+  class: WowClass;
+  className: string;
+  spec: string;
+  specId: number;
+  race: string;
+  faction: 'alliance' | 'horde';
+  level: number;
+  itemLevel: number;
+
+  // Media
+  avatarUrl?: string;
+  insetUrl?: string;
+  mainRawUrl?: string;
+
+  // Guild
+  guild?: GuildInfo;
+
+  // PvP Summary
+  pvp?: {
+    honorLevel: number;
+    honorableKills: number;
+    ratings: RatingEntry[];
+    highestTier: string;
+  };
+
+  // M+ Summary
+  mythicPlus?: {
+    rating: number;
+    ratingColor: string;
+    bestRun?: MythicPlusRun;
+  };
+
+  // Raid Summary
+  raid?: {
+    currentProgress: string; // "5/8 M"
+    bestDifficulty: string;
+  };
+
+  // Achievements
+  achievementPoints: number;
+  recentAchievements?: Achievement[];
+
+  lastUpdated: string;
+}
+
+// === SEARCH RESULTS ===
+
+export interface SearchResult {
+  type: 'character' | 'guild' | 'item' | 'spell';
+  id: string;
+  name: string;
+  realm?: string;
+  region?: Region;
+  icon?: string;
+  description?: string;
+}
+
+export interface UnifiedSearchResponse {
+  query: string;
+  results: SearchResult[];
+  totalResults: number;
+}
+
+// === COMPARE PLAYERS ===
+
+export interface PlayerComparison {
+  players: PlayerProfile[];
+  ratingDiff: {
+    bracket: string;
+    player1Rating: number;
+    player2Rating: number;
+    diff: number;
+  }[];
+  statDiff?: {
+    stat: string;
+    player1Value: number;
+    player2Value: number;
+    diff: number;
+  }[];
+  commonAchievements: Achievement[];
+  uniqueAchievements: {
+    player: string;
+    achievements: Achievement[];
+  }[];
+}

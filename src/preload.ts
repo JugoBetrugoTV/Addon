@@ -91,4 +91,80 @@ contextBridge.exposeInMainWorld('api', {
 
   getFavorites: () =>
     ipcRenderer.invoke('api:getFavorites'),
+
+  // ===========================================
+  // === GUILD API ===
+  // ===========================================
+
+  getGuildInfo: (guildName: string, realm: string) =>
+    ipcRenderer.invoke('api:getGuildInfo', guildName, realm),
+
+  getGuildRoster: (guildName: string, realm: string) =>
+    ipcRenderer.invoke('api:getGuildRoster', guildName, realm),
+
+  getGuildAchievements: (guildName: string, realm: string) =>
+    ipcRenderer.invoke('api:getGuildAchievements', guildName, realm),
+
+  // ===========================================
+  // === MYTHIC+ API ===
+  // ===========================================
+
+  getMythicPlusProfile: (name: string, realm: string) =>
+    ipcRenderer.invoke('api:getMythicPlusProfile', name, realm),
+
+  getMythicPlusAffixes: () =>
+    ipcRenderer.invoke('api:getMythicPlusAffixes'),
+
+  getMythicPlusDungeons: () =>
+    ipcRenderer.invoke('api:getMythicPlusDungeons'),
+
+  // ===========================================
+  // === SPELL/TALENT API ===
+  // ===========================================
+
+  getSpellDetails: (spellId: number) =>
+    ipcRenderer.invoke('api:getSpellDetails', spellId),
+
+  getPvPTalentDetails: (pvpTalentId: number) =>
+    ipcRenderer.invoke('api:getPvPTalentDetails', pvpTalentId),
+
+  getTalentTree: (specId: number) =>
+    ipcRenderer.invoke('api:getTalentTree', specId),
+
+  // ===========================================
+  // === ITEM API ===
+  // ===========================================
+
+  getItemDetails: (itemId: number) =>
+    ipcRenderer.invoke('api:getItemDetails', itemId),
+
+  searchItems: (query: string, limit?: number) =>
+    ipcRenderer.invoke('api:searchItems', query, limit),
+
+  // ===========================================
+  // === RAID API ===
+  // ===========================================
+
+  getRaidProgress: (name: string, realm: string) =>
+    ipcRenderer.invoke('api:getRaidProgress', name, realm),
+
+  getRaidInstances: () =>
+    ipcRenderer.invoke('api:getRaidInstances'),
+
+  // ===========================================
+  // === REAL DATA TALENT/GEAR ===
+  // ===========================================
+
+  getTalentHeatmapReal: (specId: number, bracket: string) =>
+    ipcRenderer.invoke('api:getTalentHeatmapReal', specId, bracket),
+
+  getGearAnalysisReal: (specId: number, bracket: string) =>
+    ipcRenderer.invoke('api:getGearAnalysisReal', specId, bracket),
+
+  // ===========================================
+  // === CHARACTER SUMMARY ===
+  // ===========================================
+
+  getCharacterSummary: (name: string, realm: string) =>
+    ipcRenderer.invoke('api:getCharacterSummary', name, realm),
 });

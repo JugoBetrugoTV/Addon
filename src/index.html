@@ -325,6 +325,91 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     #toast { position: fixed; bottom: 20px; right: 20px; background: var(--green); color: #fff; padding: 10px 18px; border-radius: 6px; font-size: 12px; transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 101; }
     #toast.show { transform: translateY(0); opacity: 1; }
+
+    /* === GUILD === */
+    .guild-card { background: var(--bg-1); border: 1px solid var(--bg-3); border-radius: 10px; overflow: hidden; }
+    .guild-header { padding: 20px; background: var(--bg-2); }
+    .guild-name { font-size: 22px; margin-bottom: 8px; }
+    .guild-meta { display: flex; gap: 12px; margin-bottom: 8px; font-size: 12px; color: var(--text-1); }
+    .guild-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-1); }
+    .guild-tabs { display: flex; gap: 2px; padding: 0 20px; background: var(--bg-1); border-bottom: 1px solid var(--bg-3); }
+    .guild-tab { padding: 10px 14px; background: none; border: none; color: var(--text-1); font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; }
+    .guild-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .guild-tab-content { padding: 16px 20px; }
+    .guild-panel { display: none; }
+    .guild-panel.active { display: block; }
+    .guild-roster-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+    .guild-member { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-2); border-radius: 4px; cursor: pointer; font-size: 11px; }
+    .guild-member:hover { background: var(--bg-3); }
+    .rank-badge { color: var(--text-2); font-size: 10px; min-width: 50px; }
+    .member-name { flex: 1; font-weight: 500; }
+    .member-class { color: var(--text-2); }
+    .member-level { color: var(--text-2); }
+    .guild-ach-list { display: flex; flex-direction: column; gap: 6px; }
+    .guild-ach { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--bg-2); border-radius: 4px; font-size: 11px; }
+    .total-points { font-size: 14px; color: var(--purple); margin-bottom: 12px; }
+
+    /* === MYTHIC+ === */
+    .mplus-card { background: var(--bg-1); border: 1px solid var(--bg-3); border-radius: 10px; padding: 20px; }
+    .mplus-header { text-align: center; margin-bottom: 20px; }
+    .mplus-rating { }
+    .rating-value { font-size: 48px; font-weight: 700; }
+    .rating-label { display: block; font-size: 12px; color: var(--text-1); margin-top: 4px; }
+    .mplus-runs { margin-top: 20px; }
+    .runs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .run-card { background: var(--bg-2); border-radius: 8px; padding: 12px; border-left: 3px solid var(--bg-3); }
+    .run-card.timed { border-left-color: var(--green); }
+    .run-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .dungeon-name { font-weight: 600; font-size: 13px; }
+    .key-level { font-size: 14px; color: var(--orange); font-weight: 600; }
+    .run-details { display: flex; gap: 12px; margin-bottom: 6px; font-size: 11px; }
+    .run-rating { font-weight: 500; }
+    .run-time { color: var(--text-1); }
+    .timed-badge { color: var(--green); font-size: 10px; }
+    .run-affixes { display: flex; gap: 4px; flex-wrap: wrap; }
+    .affix-tag { font-size: 9px; padding: 2px 6px; background: var(--bg-3); border-radius: 3px; color: var(--text-1); }
+    .affix-list { display: flex; gap: 12px; flex-wrap: wrap; }
+    .affix-card { background: var(--bg-2); padding: 10px 14px; border-radius: 6px; }
+    .affix-name { font-weight: 500; font-size: 12px; }
+    .affix-desc { font-size: 10px; color: var(--text-2); display: block; margin-top: 4px; }
+
+    /* === ITEMS === */
+    .item-results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+    .item-result-card { display: flex; gap: 10px; padding: 10px; background: var(--bg-1); border: 1px solid var(--bg-3); border-left-width: 3px; border-radius: 6px; cursor: pointer; }
+    .item-result-card:hover { background: var(--bg-2); }
+    .item-icon { width: 40px; height: 40px; border-radius: 4px; }
+    .item-icon-placeholder { width: 40px; height: 40px; background: var(--bg-3); border-radius: 4px; }
+    .item-info { flex: 1; }
+    .item-info .item-name { font-size: 12px; font-weight: 500; display: block; }
+    .item-type { font-size: 10px; color: var(--text-2); display: block; }
+    .item-ilvl { font-size: 10px; color: var(--green); display: block; }
+    .item-detail-card { background: var(--bg-1); border: 1px solid var(--bg-3); border-left-width: 4px; border-radius: 8px; overflow: hidden; }
+    .item-detail-header { display: flex; gap: 14px; padding: 16px; background: var(--bg-2); }
+    .item-detail-icon { width: 56px; height: 56px; border-radius: 6px; }
+    .item-detail-main { flex: 1; }
+    .item-detail-main h2 { font-size: 18px; margin-bottom: 4px; }
+    .item-id { font-size: 10px; color: var(--text-2); }
+    .item-detail-body { padding: 16px; }
+    .item-meta { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; font-size: 11px; color: var(--text-1); }
+    .item-armor { font-size: 12px; color: var(--text-0); margin-bottom: 8px; }
+    .item-weapon { font-size: 12px; margin-bottom: 10px; display: flex; gap: 12px; }
+    .item-weapon .damage { color: var(--text-0); }
+    .item-stats { margin-bottom: 12px; }
+    .stat-line { font-size: 11px; color: var(--green); padding: 2px 0; }
+    .item-sockets { margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; }
+    .socket { padding: 3px 8px; background: var(--bg-2); border-radius: 4px; }
+    .socket-bonus { color: var(--text-2); }
+    .item-effects { margin-bottom: 12px; }
+    .effect-line { font-size: 11px; color: var(--green); padding: 4px 0; }
+    .effect-line .trigger { color: var(--text-2); }
+    .item-set { background: var(--bg-2); padding: 12px; border-radius: 6px; margin-bottom: 12px; }
+    .item-set h4 { margin-bottom: 8px; }
+    .set-items { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+    .set-item { font-size: 10px; padding: 2px 6px; background: var(--bg-3); border-radius: 3px; color: var(--text-1); }
+    .set-bonuses { }
+    .set-bonus { font-size: 11px; color: var(--green); padding: 2px 0; }
+    .item-flavor { font-style: italic; font-size: 11px; color: var(--orange); margin-bottom: 12px; }
+    .item-sell { font-size: 10px; color: var(--text-2); }
   </style>
 </head>
 <body>
@@ -337,14 +422,19 @@
     <div class="nav-section">Players</div>
     <button class="nav-btn active" data-nav="search">Player Search</button>
     <button class="nav-btn" data-nav="top-players">Top Players</button>
+    <button class="nav-btn" data-nav="guild">Guild Lookup</button>
     <button class="nav-btn" data-nav="lfg">LFG Finder</button>
     <div class="nav-section">Stats</div>
     <button class="nav-btn" data-nav="leaderboard">Leaderboards</button>
     <button class="nav-btn" data-nav="activity">Activity</button>
     <button class="nav-btn" data-nav="representation">Representation</button>
+    <div class="nav-section">PvE</div>
+    <button class="nav-btn" data-nav="mythicplus">Mythic+</button>
     <div class="nav-section">Guides</div>
     <button class="nav-btn" data-nav="builds">Spec Builds</button>
     <button class="nav-btn" data-nav="meta">Meta Tier List</button>
+    <div class="nav-section">Database</div>
+    <button class="nav-btn" data-nav="items">Item Database</button>
     <div class="nav-section">App</div>
     <button class="nav-btn" data-nav="settings">Settings</button>
   </aside>
@@ -509,6 +599,51 @@
         </div>
       </div>
       <div id="meta-list"></div>
+    </div>
+
+    <!-- GUILD -->
+    <div id="view-guild" class="view">
+      <h2>Guild Lookup</h2>
+      <form id="guild-search-form" class="search-form">
+        <input type="text" id="guild-name" placeholder="Guild name" required>
+        <input type="text" id="guild-realm" placeholder="Realm" required>
+        <button type="submit" class="btn">Search</button>
+      </form>
+      <div id="guild-result"></div>
+    </div>
+
+    <!-- MYTHIC+ -->
+    <div id="view-mythicplus" class="view">
+      <h2>Mythic+</h2>
+      <div id="mplus-affixes" style="margin-bottom: 20px;"></div>
+      <h3>Character M+ Lookup</h3>
+      <form id="mplus-search-form" class="search-form">
+        <input type="text" id="mplus-char-name" placeholder="Character name" required>
+        <input type="text" id="mplus-char-realm" placeholder="Realm" required>
+        <button type="submit" class="btn">Search</button>
+      </form>
+      <div id="mplus-result"></div>
+    </div>
+
+    <!-- ITEMS -->
+    <div id="view-items" class="view">
+      <h2>Item Database</h2>
+      <div class="item-search-section" style="margin-bottom: 20px;">
+        <h3>Search Items</h3>
+        <form id="item-search-form" class="search-form">
+          <input type="text" id="item-search-query" placeholder="Search items..." required style="width: 300px;">
+          <button type="submit" class="btn">Search</button>
+        </form>
+      </div>
+      <div class="item-id-section" style="margin-bottom: 20px;">
+        <h3>Lookup by ID</h3>
+        <form id="item-id-form" class="search-form">
+          <input type="number" id="item-id-input" placeholder="Item ID" required style="width: 150px;">
+          <button type="submit" class="btn">Lookup</button>
+        </form>
+      </div>
+      <div id="item-search-results"></div>
+      <div id="item-details" style="margin-top: 20px;"></div>
     </div>
 
     <!-- SETTINGS -->

@@ -11,6 +11,8 @@ import {
   GameMode, WowClass, CharacterStats, CharacterEquipment, TalentLoadout,
   ActivityTracker, RepresentationStats, TopPlayersResponse, TalentHeatmap, GearAnalysis,
   LFGListing, LFGFilters,
+  GuildRoster, GuildAchievements, MythicPlusProfile, ItemDetails, CharacterRaidProgress,
+  CharacterSummary,
 } from '../types/wow';
 
 declare global {
@@ -40,6 +42,23 @@ declare global {
       addFavorite: (name: string, realm: string) => Promise<any>;
       removeFavorite: (name: string, realm: string) => Promise<any>;
       getFavorites: () => Promise<any[]>;
+      // New APIs
+      getGuildInfo: (guildName: string, realm: string) => Promise<any>;
+      getGuildRoster: (guildName: string, realm: string) => Promise<GuildRoster | { error: string }>;
+      getGuildAchievements: (guildName: string, realm: string) => Promise<GuildAchievements | { error: string }>;
+      getMythicPlusProfile: (name: string, realm: string) => Promise<MythicPlusProfile | { error: string }>;
+      getMythicPlusAffixes: () => Promise<any>;
+      getMythicPlusDungeons: () => Promise<any[]>;
+      getSpellDetails: (spellId: number) => Promise<any>;
+      getPvPTalentDetails: (pvpTalentId: number) => Promise<any>;
+      getTalentTree: (specId: number) => Promise<any>;
+      getItemDetails: (itemId: number) => Promise<ItemDetails | { error: string }>;
+      searchItems: (query: string, limit?: number) => Promise<ItemDetails[]>;
+      getRaidProgress: (name: string, realm: string) => Promise<CharacterRaidProgress | { error: string }>;
+      getRaidInstances: () => Promise<any[]>;
+      getTalentHeatmapReal: (specId: number, bracket: string) => Promise<TalentHeatmap | { error: string }>;
+      getGearAnalysisReal: (specId: number, bracket: string) => Promise<GearAnalysis | { error: string }>;
+      getCharacterSummary: (name: string, realm: string) => Promise<CharacterSummary | { error: string }>;
     };
   }
 }
@@ -67,6 +86,9 @@ class App {
     this.setupRepresentation();
     this.setupTopPlayers();
     this.setupLFG();
+    this.setupGuild();
+    this.setupMythicPlus();
+    this.setupItemSearch();
     this.setupSettings();
     await this.loadConfig();
     await this.loadSeason();
@@ -95,6 +117,7 @@ class App {
     if (view === 'representation') this.loadRepresentation();
     if (view === 'top-players') this.loadTopPlayers();
     if (view === 'lfg') this.loadLFG();
+    if (view === 'mythicplus') this.loadMythicPlusAffixes();
   }
 
   private async loadSeason() {
@@ -1252,6 +1275,352 @@ class App {
     el.textContent = msg;
     el.classList.add('show');
     setTimeout(() => el.classList.remove('show'), 3000);
+  }
+
+  // === GUILD ===
+  private setupGuild() {
+    document.getElementById('guild-search-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const guildName = (document.getElementById('guild-name') as HTMLInputElement)?.value.trim();
+      const realm = (document.getElementById('guild-realm') as HTMLInputElement)?.value.trim();
+      if (!guildName || !realm) return;
+
+      this.showLoader(true);
+      const [roster, achievements] = await Promise.all([
+        window.api.getGuildRoster(guildName, realm),
+        window.api.getGuildAchievements(guildName, realm),
+      ]);
+      this.showLoader(false);
+      this.renderGuild(roster, achievements);
+    });
+  }
+
+  private renderGuild(roster: GuildRoster | { error: string }, achievements: GuildAchievements | { error: string }) {
+    const container = document.getElementById('guild-result')!;
+
+    if ('error' in roster) {
+      container.innerHTML = `<div class="error-box">${roster.error}</div>`;
+      return;
+    }
+
+    const g = roster.guild;
+    const pvpMembers = roster.members.filter(m => m.character.level >= 70).slice(0, 50);
+
+    container.innerHTML = `
+      <div class="guild-card">
+        <div class="guild-header">
+          <h2 class="guild-name faction-${g.faction}">&lt;${g.name}&gt;</h2>
+          <div class="guild-meta">
+            <span class="realm">${g.realm}</span>
+            <span class="region">${g.region.toUpperCase()}</span>
+            <span class="faction faction-${g.faction}">${g.faction}</span>
+          </div>
+          <div class="guild-stats">
+            <span class="members">${g.memberCount} members</span>
+            <span class="achpts">${formatNumber(g.achievementPoints)} achievement points</span>
+          </div>
+        </div>
+
+        <div class="guild-tabs">
+          <button class="guild-tab active" data-tab="roster">Roster</button>
+          <button class="guild-tab" data-tab="achievements">Achievements</button>
+        </div>
+
+        <div class="guild-tab-content">
+          <div class="guild-panel active" id="guild-roster">
+            <h3>Members (Level 70+)</h3>
+            <div class="guild-roster-list">
+              ${pvpMembers.map(m => {
+                const classInfo = getClassInfo(m.character.class);
+                return `
+                  <div class="guild-member" data-name="${m.character.name}" data-realm="${m.character.realmSlug}">
+                    <span class="rank-badge">Rank ${m.rank}</span>
+                    <span class="member-name" style="color: ${classInfo?.color || '#fff'}">${m.character.name}</span>
+                    <span class="member-class">${m.character.className}</span>
+                    <span class="member-level">Lv${m.character.level}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+          <div class="guild-panel" id="guild-achievements">
+            ${'error' in achievements ? `<div class="error-box">${achievements.error}</div>` : `
+              <h3>Guild Achievements</h3>
+              <p class="total-points">Total: ${formatNumber(achievements.totalPoints)} points</p>
+              <div class="guild-ach-list">
+                ${achievements.achievements.slice(0, 30).map(a => `
+                  <div class="guild-ach">
+                    <span class="ach-name">${a.name}</span>
+                    <span class="ach-points">${a.points} pts</span>
+                    ${a.completedTimestamp ? `<span class="ach-date">${new Date(a.completedTimestamp).toLocaleDateString()}</span>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Tab switching
+    container.querySelectorAll('.guild-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        container.querySelectorAll('.guild-tab').forEach(t => t.classList.remove('active'));
+        container.querySelectorAll('.guild-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        const tabId = (tab as HTMLElement).dataset.tab;
+        document.getElementById(`guild-${tabId}`)?.classList.add('active');
+      });
+    });
+
+    // Click member to view profile
+    container.querySelectorAll('.guild-member').forEach(member => {
+      member.addEventListener('click', () => {
+        const name = (member as HTMLElement).dataset.name;
+        const realm = (member as HTMLElement).dataset.realm;
+        if (name && realm) {
+          (document.getElementById('search-name') as HTMLInputElement).value = name;
+          (document.getElementById('search-realm') as HTMLInputElement).value = realm;
+          this.switchView('search');
+          document.getElementById('search-form')?.dispatchEvent(new Event('submit'));
+        }
+      });
+    });
+  }
+
+  // === MYTHIC+ ===
+  private setupMythicPlus() {
+    document.getElementById('mplus-search-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = (document.getElementById('mplus-char-name') as HTMLInputElement)?.value.trim();
+      const realm = (document.getElementById('mplus-char-realm') as HTMLInputElement)?.value.trim();
+      if (!name || !realm) return;
+
+      this.showLoader(true);
+      const profile = await window.api.getMythicPlusProfile(name, realm);
+      this.showLoader(false);
+      this.renderMythicPlusProfile(profile);
+    });
+  }
+
+  private async loadMythicPlusAffixes() {
+    const affixContainer = document.getElementById('mplus-affixes');
+    if (!affixContainer) return;
+
+    const affixes = await window.api.getMythicPlusAffixes();
+    if ('error' in affixes) {
+      affixContainer.innerHTML = `<div class="error-box">${affixes.error}</div>`;
+      return;
+    }
+
+    affixContainer.innerHTML = `
+      <h3>This Week's Affixes</h3>
+      <div class="affix-list">
+        ${affixes.currentWeek.affixes.map((a: any) => `
+          <div class="affix-card">
+            <span class="affix-name">${a.name}</span>
+            ${a.description ? `<span class="affix-desc">${a.description}</span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  private renderMythicPlusProfile(profile: MythicPlusProfile | { error: string }) {
+    const container = document.getElementById('mplus-result')!;
+
+    if ('error' in profile) {
+      container.innerHTML = `<div class="error-box">${profile.error}</div>`;
+      return;
+    }
+
+    const season = profile.currentSeason;
+
+    container.innerHTML = `
+      <div class="mplus-card">
+        <div class="mplus-header">
+          <div class="mplus-rating" style="color: ${season.ratingColor}">
+            <span class="rating-value">${season.rating}</span>
+            <span class="rating-label">M+ Rating</span>
+          </div>
+        </div>
+
+        ${season.bestRuns.length > 0 ? `
+          <div class="mplus-runs">
+            <h3>Best Runs</h3>
+            <div class="runs-grid">
+              ${season.bestRuns.map(run => `
+                <div class="run-card ${run.isChested ? 'timed' : ''}">
+                  <div class="run-header">
+                    <span class="dungeon-name">${run.dungeon.shortName || run.dungeon.name}</span>
+                    <span class="key-level">+${run.keystoneLevel}</span>
+                  </div>
+                  <div class="run-details">
+                    <span class="run-rating" style="color: ${this.getMythicPlusColor(run.rating)}">${run.rating.toFixed(0)}</span>
+                    <span class="run-time">${this.formatDuration(run.duration)}</span>
+                    ${run.isChested ? '<span class="timed-badge">⏱ Timed</span>' : ''}
+                  </div>
+                  <div class="run-affixes">
+                    ${run.affixes.map(a => `<span class="affix-tag">${a.name}</span>`).join('')}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : '<p class="no-data">No Mythic+ runs recorded this season</p>'}
+      </div>
+    `;
+  }
+
+  private getMythicPlusColor(rating: number): string {
+    if (rating >= 300) return '#ff8000';
+    if (rating >= 250) return '#a335ee';
+    if (rating >= 200) return '#0070dd';
+    if (rating >= 150) return '#1eff00';
+    return '#ffffff';
+  }
+
+  private formatDuration(ms: number): string {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  // === ITEM SEARCH ===
+  private setupItemSearch() {
+    document.getElementById('item-search-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const query = (document.getElementById('item-search-query') as HTMLInputElement)?.value.trim();
+      if (!query) return;
+
+      this.showLoader(true);
+      const items = await window.api.searchItems(query, 20);
+      this.showLoader(false);
+      this.renderItemSearchResults(items);
+    });
+
+    document.getElementById('item-id-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const itemId = parseInt((document.getElementById('item-id-input') as HTMLInputElement)?.value);
+      if (!itemId) return;
+
+      this.showLoader(true);
+      const item = await window.api.getItemDetails(itemId);
+      this.showLoader(false);
+      this.renderItemDetails(item);
+    });
+  }
+
+  private renderItemSearchResults(items: ItemDetails[]) {
+    const container = document.getElementById('item-search-results')!;
+
+    if (items.length === 0) {
+      container.innerHTML = '<p class="no-data">No items found</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="item-results-grid">
+        ${items.map(item => `
+          <div class="item-result-card" style="border-color: ${getItemQualityColor(item.quality)}" data-item-id="${item.id}">
+            ${item.iconUrl ? `<img src="${item.iconUrl}" class="item-icon" alt="">` : '<div class="item-icon-placeholder"></div>'}
+            <div class="item-info">
+              <span class="item-name" style="color: ${getItemQualityColor(item.quality)}">${item.name}</span>
+              <span class="item-type">${item.itemSubclass} ${item.inventoryType}</span>
+              <span class="item-ilvl">Item Level ${item.itemLevel}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    // Click to view full details
+    container.querySelectorAll('.item-result-card').forEach(card => {
+      card.addEventListener('click', async () => {
+        const itemId = parseInt((card as HTMLElement).dataset.itemId!);
+        this.showLoader(true);
+        const item = await window.api.getItemDetails(itemId);
+        this.showLoader(false);
+        this.renderItemDetails(item);
+      });
+    });
+  }
+
+  private renderItemDetails(item: ItemDetails | { error: string }) {
+    const container = document.getElementById('item-details')!;
+
+    if ('error' in item) {
+      container.innerHTML = `<div class="error-box">${item.error}</div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="item-detail-card" style="border-color: ${getItemQualityColor(item.quality)}">
+        <div class="item-detail-header">
+          ${item.iconUrl ? `<img src="${item.iconUrl}" class="item-detail-icon" alt="">` : ''}
+          <div class="item-detail-main">
+            <h2 style="color: ${getItemQualityColor(item.quality)}">${item.name}</h2>
+            <span class="item-id">ID: ${item.id}</span>
+          </div>
+        </div>
+
+        <div class="item-detail-body">
+          <div class="item-meta">
+            <span class="item-ilvl">Item Level ${item.itemLevel}</span>
+            ${item.binding ? `<span class="item-binding">${item.binding.replace('_', ' ')}</span>` : ''}
+            <span class="item-type">${item.itemClass} - ${item.itemSubclass}</span>
+            <span class="item-slot">${item.inventoryType}</span>
+            ${item.requiredLevel > 0 ? `<span class="req-level">Requires Level ${item.requiredLevel}</span>` : ''}
+          </div>
+
+          ${item.armor ? `<div class="item-armor">${item.armor} Armor</div>` : ''}
+
+          ${item.weaponInfo ? `
+            <div class="item-weapon">
+              <span class="damage">${item.weaponInfo.damage.min} - ${item.weaponInfo.damage.max} Damage</span>
+              <span class="speed">Speed ${item.weaponInfo.speed.toFixed(2)}</span>
+              <span class="dps">(${item.weaponInfo.dps.toFixed(1)} DPS)</span>
+            </div>
+          ` : ''}
+
+          ${item.stats && item.stats.length > 0 ? `
+            <div class="item-stats">
+              ${item.stats.map(s => `<div class="stat-line">+${s.value} ${s.type}</div>`).join('')}
+            </div>
+          ` : ''}
+
+          ${item.socketInfo ? `
+            <div class="item-sockets">
+              ${item.socketInfo.sockets.map(s => `<span class="socket socket-${s.type.toLowerCase()}">${s.type} Socket</span>`).join('')}
+              ${item.socketInfo.bonus ? `<span class="socket-bonus">Bonus: ${item.socketInfo.bonus}</span>` : ''}
+            </div>
+          ` : ''}
+
+          ${item.spellEffects && item.spellEffects.length > 0 ? `
+            <div class="item-effects">
+              ${item.spellEffects.map(e => `<div class="effect-line"><span class="trigger">${e.trigger}:</span> ${e.description}</div>`).join('')}
+            </div>
+          ` : ''}
+
+          ${item.setInfo ? `
+            <div class="item-set">
+              <h4 style="color: #1eff00">${item.setInfo.name}</h4>
+              <div class="set-items">
+                ${item.setInfo.items.map(i => `<span class="set-item">${i.name}</span>`).join('')}
+              </div>
+              <div class="set-bonuses">
+                ${item.setInfo.bonuses.map(b => `<div class="set-bonus">(${b.threshold}) ${b.description}</div>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${item.description ? `<div class="item-flavor">"${item.description}"</div>` : ''}
+
+          ${item.sellPrice ? `<div class="item-sell">Sell Price: ${formatNumber(item.sellPrice)} gold</div>` : ''}
+        </div>
+      </div>
+    `;
   }
 }
 

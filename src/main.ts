@@ -269,3 +269,251 @@ ipcMain.handle('api:removeFavorite', async (_, name: string, realm: string) => {
 ipcMain.handle('api:getFavorites', async () => {
   return api.getFavorites();
 });
+
+// ===========================================
+// === GUILD API HANDLERS ===
+// ===========================================
+
+ipcMain.handle('api:getGuildInfo', async (_, guildName: string, realm: string) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const guild = await api.getGuildInfo(guildName, realm);
+    if (!guild) {
+      return { error: 'Guild not found' };
+    }
+    return guild;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch guild info' };
+  }
+});
+
+ipcMain.handle('api:getGuildRoster', async (_, guildName: string, realm: string) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const roster = await api.getGuildRoster(guildName, realm);
+    if (!roster) {
+      return { error: 'Guild not found' };
+    }
+    return roster;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch guild roster' };
+  }
+});
+
+ipcMain.handle('api:getGuildAchievements', async (_, guildName: string, realm: string) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const achievements = await api.getGuildAchievements(guildName, realm);
+    if (!achievements) {
+      return { error: 'Guild not found' };
+    }
+    return achievements;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch guild achievements' };
+  }
+});
+
+// ===========================================
+// === MYTHIC+ API HANDLERS ===
+// ===========================================
+
+ipcMain.handle('api:getMythicPlusProfile', async (_, name: string, realm: string) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const profile = await api.getMythicPlusProfile(name, realm);
+    if (!profile) {
+      return { error: 'Character not found' };
+    }
+    return profile;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch M+ profile' };
+  }
+});
+
+ipcMain.handle('api:getMythicPlusAffixes', async () => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const affixes = await api.getMythicPlusAffixes();
+    if (!affixes) {
+      return { error: 'Failed to fetch affixes' };
+    }
+    return affixes;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch M+ affixes' };
+  }
+});
+
+ipcMain.handle('api:getMythicPlusDungeons', async () => {
+  if (!api.isConfigured()) {
+    return [];
+  }
+  try {
+    return await api.getMythicPlusDungeons();
+  } catch {
+    return [];
+  }
+});
+
+// ===========================================
+// === SPELL/TALENT API HANDLERS ===
+// ===========================================
+
+ipcMain.handle('api:getSpellDetails', async (_, spellId: number) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const spell = await api.getSpellDetails(spellId);
+    if (!spell) {
+      return { error: 'Spell not found' };
+    }
+    return spell;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch spell details' };
+  }
+});
+
+ipcMain.handle('api:getPvPTalentDetails', async (_, pvpTalentId: number) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const talent = await api.getPvPTalentDetails(pvpTalentId);
+    if (!talent) {
+      return { error: 'PvP talent not found' };
+    }
+    return talent;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch PvP talent details' };
+  }
+});
+
+ipcMain.handle('api:getTalentTree', async (_, specId: number) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const tree = await api.getTalentTree(specId);
+    if (!tree) {
+      return { error: 'Talent tree not found' };
+    }
+    return tree;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch talent tree' };
+  }
+});
+
+// ===========================================
+// === ITEM API HANDLERS ===
+// ===========================================
+
+ipcMain.handle('api:getItemDetails', async (_, itemId: number) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const item = await api.getItemDetails(itemId);
+    if (!item) {
+      return { error: 'Item not found' };
+    }
+    return item;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch item details' };
+  }
+});
+
+ipcMain.handle('api:searchItems', async (_, query: string, limit?: number) => {
+  if (!api.isConfigured()) {
+    return [];
+  }
+  try {
+    return await api.searchItems(query, limit || 20);
+  } catch {
+    return [];
+  }
+});
+
+// ===========================================
+// === RAID API HANDLERS ===
+// ===========================================
+
+ipcMain.handle('api:getRaidProgress', async (_, name: string, realm: string) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const progress = await api.getRaidProgress(name, realm);
+    if (!progress) {
+      return { error: 'Character not found' };
+    }
+    return progress;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch raid progress' };
+  }
+});
+
+ipcMain.handle('api:getRaidInstances', async () => {
+  if (!api.isConfigured()) {
+    return [];
+  }
+  try {
+    return await api.getRaidInstances();
+  } catch {
+    return [];
+  }
+});
+
+// ===========================================
+// === REAL DATA TALENT/GEAR HANDLERS ===
+// ===========================================
+
+ipcMain.handle('api:getTalentHeatmapReal', async (_, specId: number, bracket: GameMode) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    return await api.getTalentHeatmapFromLeaderboard(specId, bracket);
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch talent heatmap' };
+  }
+});
+
+ipcMain.handle('api:getGearAnalysisReal', async (_, specId: number, bracket: GameMode) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    return await api.getGearAnalysisFromLeaderboard(specId, bracket);
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch gear analysis' };
+  }
+});
+
+// ===========================================
+// === CHARACTER SUMMARY HANDLER ===
+// ===========================================
+
+ipcMain.handle('api:getCharacterSummary', async (_, name: string, realm: string) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const summary = await api.getCharacterSummary(name, realm);
+    if (!summary) {
+      return { error: 'Character not found' };
+    }
+    return summary;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch character summary' };
+  }
+});
