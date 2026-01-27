@@ -2,8 +2,9 @@
  * Electron Main Process - Handles Blizzard API and window management
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
+import { autoUpdater } from 'electron-updater';
 import { BlizzardAPI, createAPI } from './api/blizzard';
 import { Region, GameMode, LFGFilters, LFGPost } from './types/wow';
 
@@ -15,6 +16,41 @@ let config = {
   clientSecret: '',
   region: 'eu' as Region,
 };
+
+// === Auto Updater Setup ===
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+autoUpdater.on('update-available', (info) => {
+  dialog.showMessageBox(mainWindow!, {
+    type: 'info',
+    title: 'Update Available',
+    message: `Version ${info.version} is available. Do you want to download it now?`,
+    buttons: ['Download', 'Later'],
+  }).then((result) => {
+    if (result.response === 0) {
+      autoUpdater.downloadUpdate();
+      mainWindow?.webContents.send('update:downloading');
+    }
+  });
+});
+
+autoUpdater.on('update-downloaded', () => {
+  dialog.showMessageBox(mainWindow!, {
+    type: 'info',
+    title: 'Update Ready',
+    message: 'Update downloaded. The application will restart to install the update.',
+    buttons: ['Restart Now', 'Later'],
+  }).then((result) => {
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall();
+    }
+  });
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('Update error:', err);
+});
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -34,11 +70,32 @@ function createWindow(): void {
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
   mainWindow.setMenu(null);
   mainWindow.on('closed', () => { mainWindow = null; });
+
+  // Check for updates after window is ready (only in production)
+  if (app.isPackaged) {
+    mainWindow.webContents.on('did-finish-load', () => {
+      autoUpdater.checkForUpdates().catch(() => {});
+    });
+  }
 }
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
 app.on('activate', () => { if (!mainWindow) createWindow(); });
+
+// IPC for manual update check
+ipcMain.handle('app:checkForUpdates', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { updateAvailable: !!result?.updateInfo };
+  } catch {
+    return { updateAvailable: false, error: 'Could not check for updates' };
+  }
+});
+
+ipcMain.handle('app:getVersion', () => {
+  return app.getVersion();
+});
 
 // === IPC Handlers ===
 

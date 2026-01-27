@@ -167,4 +167,14 @@ contextBridge.exposeInMainWorld('api', {
 
   getCharacterSummary: (name: string, realm: string) =>
     ipcRenderer.invoke('api:getCharacterSummary', name, realm),
+
+  // ===========================================
+  // === APP UPDATES ===
+  // ===========================================
+
+  checkForUpdates: () =>
+    ipcRenderer.invoke('app:checkForUpdates'),
+
+  getVersion: () =>
+    ipcRenderer.invoke('app:getVersion'),
 });

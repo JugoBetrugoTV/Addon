@@ -59,6 +59,9 @@ declare global {
       getTalentHeatmapReal: (specId: number, bracket: string) => Promise<TalentHeatmap | { error: string }>;
       getGearAnalysisReal: (specId: number, bracket: string) => Promise<GearAnalysis | { error: string }>;
       getCharacterSummary: (name: string, realm: string) => Promise<CharacterSummary | { error: string }>;
+      // App updates
+      checkForUpdates: () => Promise<{ updateAvailable: boolean; error?: string }>;
+      getVersion: () => Promise<string>;
     };
   }
 }
@@ -1253,6 +1256,35 @@ class App {
       this.showMessage('Settings saved successfully!');
       await this.loadConfig();
     });
+
+    // Version display
+    this.loadVersion();
+
+    // Update check button
+    document.getElementById('check-update-btn')?.addEventListener('click', async () => {
+      const statusEl = document.getElementById('update-status')!;
+      statusEl.textContent = 'Checking for updates...';
+      try {
+        const result = await window.api.checkForUpdates();
+        if (result.error) {
+          statusEl.textContent = result.error;
+        } else if (result.updateAvailable) {
+          statusEl.textContent = 'Update available! Download will start...';
+        } else {
+          statusEl.textContent = 'You have the latest version.';
+        }
+      } catch {
+        statusEl.textContent = 'Could not check for updates';
+      }
+    });
+  }
+
+  private async loadVersion() {
+    try {
+      const version = await window.api.getVersion();
+      const versionEl = document.getElementById('app-version');
+      if (versionEl) versionEl.textContent = `v${version}`;
+    } catch { /* ignore */ }
   }
 
   private async loadConfig() {
