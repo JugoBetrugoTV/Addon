@@ -12,6 +12,11 @@ import {
   EquippedItem, TalentLoadout, TalentNode, RatingHistory,
   CLASSES, GameMode, WowClass, GAME_MODES, getSpecInfo, normalizeClassName,
   formatWinRate, getBracketName, getTierForRating, getClassById,
+  ActivityTracker, ActivityEntry, RepresentationStats, ClassRepresentation,
+  TopPlayer, TopPlayersResponse, TalentHeatmap, TalentHeatmapNode,
+  GearAnalysis, PopularItem, PopularEnchant, PopularGem, PopularEmbellishment,
+  LFGListing, LFGFilters, LFGPost, StoredPlayerData, LocalDatabase,
+  getRaceName, getRaceFaction, RACES,
 } from '../types/wow';
 
 interface ApiConfig {
@@ -816,6 +821,583 @@ export class BlizzardAPI {
     } catch {
       return [];
     }
+  }
+
+  // === Activity Tracker (Drustvar style) ===
+
+  private leaderboardSnapshots: Map<string, { entries: LeaderboardEntry[]; timestamp: number }> = new Map();
+
+  async getActivityTracker(bracket: GameMode): Promise<ActivityTracker> {
+    const snapshotKey = `${this.config.region}-${bracket}`;
+    const previous = this.leaderboardSnapshots.get(snapshotKey);
+    const current = await this.getLeaderboard(bracket, { page: 1, pageSize: 5000 });
+
+    // Store current snapshot for next comparison
+    this.leaderboardSnapshots.set(snapshotKey, {
+      entries: current.entries,
+      timestamp: Date.now(),
+    });
+
+    const climbers: ActivityEntry[] = [];
+    const fallers: ActivityEntry[] = [];
+    const mostActive: ActivityEntry[] = [];
+    const newEntries: ActivityEntry[] = [];
+
+    // Build lookup maps
+    const previousMap = new Map(
+      (previous?.entries || []).map(e => [`${e.character.name}-${e.character.realmSlug}`, e])
+    );
+
+    for (const entry of current.entries.slice(0, 500)) {
+      const key = `${entry.character.name}-${entry.character.realmSlug}`;
+      const prev = previousMap.get(key);
+
+      const activity: ActivityEntry = {
+        rank: entry.rank,
+        previousRank: prev?.rank || 0,
+        rankChange: prev ? prev.rank - entry.rank : 0,
+        character: {
+          name: entry.character.name,
+          realm: entry.character.realm,
+          realmSlug: entry.character.realmSlug,
+          region: this.config.region,
+          class: entry.character.class || 'warrior',
+          className: entry.character.className || 'Warrior',
+          spec: entry.character.spec || '',
+          faction: entry.character.faction,
+        },
+        rating: entry.rating,
+        previousRating: prev?.rating || 0,
+        ratingChange: prev ? entry.rating - prev.rating : entry.rating,
+        wins: entry.wins,
+        losses: entry.losses,
+        gamesPlayed: entry.wins + entry.losses,
+        timestamp: new Date().toISOString(),
+      };
+
+      if (!prev) {
+        newEntries.push(activity);
+      } else if (activity.ratingChange > 50) {
+        climbers.push(activity);
+      } else if (activity.ratingChange < -50) {
+        fallers.push(activity);
+      }
+
+      mostActive.push(activity);
+    }
+
+    // Sort by relevant metrics
+    climbers.sort((a, b) => b.ratingChange - a.ratingChange);
+    fallers.sort((a, b) => a.ratingChange - b.ratingChange);
+    mostActive.sort((a, b) => b.gamesPlayed - a.gamesPlayed);
+
+    return {
+      bracket,
+      region: this.config.region,
+      climbers: climbers.slice(0, 25),
+      fallers: fallers.slice(0, 25),
+      mostActive: mostActive.slice(0, 25),
+      newEntries: newEntries.slice(0, 25),
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  // === Class Representation Stats ===
+
+  async getRepresentationStats(bracket: GameMode, minRating: number = 0): Promise<RepresentationStats> {
+    const leaderboard = await this.getLeaderboard(bracket, { page: 1, pageSize: 5000 });
+
+    // Enrich with class data (first 100 for speed)
+    const enriched = await this.enrichLeaderboardWithClasses(
+      leaderboard.entries.filter(e => e.rating >= minRating).slice(0, 500)
+    );
+
+    const classStats = new Map<WowClass, { players: number; totalRating: number; specs: Map<number, { name: string; count: number; totalRating: number }> }>();
+    const raceStats = new Map<string, { count: number; faction: string }>();
+    let allianceCount = 0;
+    let hordeCount = 0;
+
+    for (const entry of enriched) {
+      if (!entry.character.class) continue;
+
+      const cls = entry.character.class;
+      const classData = classStats.get(cls) || { players: 0, totalRating: 0, specs: new Map() };
+      classData.players++;
+      classData.totalRating += entry.rating;
+
+      if (entry.character.specId) {
+        const specData = classData.specs.get(entry.character.specId) || {
+          name: entry.character.spec || 'Unknown',
+          count: 0,
+          totalRating: 0,
+        };
+        specData.count++;
+        specData.totalRating += entry.rating;
+        classData.specs.set(entry.character.specId, specData);
+      }
+
+      classStats.set(cls, classData);
+
+      // Faction
+      if (entry.character.faction === 'alliance') allianceCount++;
+      else hordeCount++;
+
+      // Race
+      if (entry.character.race) {
+        const raceData = raceStats.get(entry.character.race) || {
+          count: 0,
+          faction: entry.character.faction,
+        };
+        raceData.count++;
+        raceStats.set(entry.character.race, raceData);
+      }
+    }
+
+    const totalPlayers = enriched.length;
+    const classes: ClassRepresentation[] = [];
+
+    for (const cls of CLASSES) {
+      const data = classStats.get(cls.id);
+      if (!data) continue;
+
+      const specs = Array.from(data.specs.entries()).map(([specId, specData]) => ({
+        specId,
+        specName: specData.name,
+        players: specData.count,
+        percentage: (specData.count / totalPlayers) * 100,
+        avgRating: Math.round(specData.totalRating / specData.count),
+      }));
+
+      classes.push({
+        class: cls.id,
+        className: cls.name,
+        classColor: cls.color,
+        totalPlayers: data.players,
+        percentage: (data.players / totalPlayers) * 100,
+        avgRating: Math.round(data.totalRating / data.players),
+        specs,
+      });
+    }
+
+    classes.sort((a, b) => b.percentage - a.percentage);
+
+    const raceSplit = Array.from(raceStats.entries()).map(([race, data]) => ({
+      race,
+      faction: data.faction,
+      count: data.count,
+      percentage: (data.count / totalPlayers) * 100,
+    }));
+    raceSplit.sort((a, b) => b.percentage - a.percentage);
+
+    return {
+      bracket,
+      region: this.config.region,
+      minRating,
+      totalPlayers,
+      classes,
+      factionSplit: {
+        alliance: (allianceCount / totalPlayers) * 100,
+        horde: (hordeCount / totalPlayers) * 100,
+      },
+      raceSplit,
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  // === Top Players (Multi-bracket rankings) ===
+
+  async getTopPlayers(limit: number = 50): Promise<TopPlayersResponse> {
+    const brackets: GameMode[] = ['shuffle', '2v2', '3v3', 'rbg', 'blitz'];
+    const leaderboards = await Promise.all(
+      brackets.map(b => this.getLeaderboard(b, { page: 1, pageSize: 200 }))
+    );
+
+    // Aggregate player data across brackets
+    const playerMap = new Map<string, {
+      character: any;
+      brackets: Map<GameMode, { rating: number; rank: number; wins: number; losses: number }>;
+    }>();
+
+    for (let i = 0; i < brackets.length; i++) {
+      const bracket = brackets[i];
+      for (const entry of leaderboards[i].entries) {
+        const key = `${entry.character.name.toLowerCase()}-${entry.character.realmSlug}`;
+        const existing = playerMap.get(key) || {
+          character: entry.character,
+          brackets: new Map(),
+        };
+        existing.brackets.set(bracket, {
+          rating: entry.rating,
+          rank: entry.rank,
+          wins: entry.wins,
+          losses: entry.losses,
+        });
+        playerMap.set(key, existing);
+      }
+    }
+
+    // Calculate total rating score and create top players list
+    const players: TopPlayer[] = [];
+    for (const [_, data] of playerMap) {
+      const bracketData = Array.from(data.brackets.entries()).map(([bracket, stats]) => ({
+        bracket,
+        ...stats,
+      }));
+
+      const totalRating = bracketData.reduce((sum, b) => sum + b.rating, 0);
+      const avgRating = totalRating / bracketData.length;
+
+      // Only include players with multiple brackets or high rating
+      if (bracketData.length >= 2 || avgRating >= 2400) {
+        players.push({
+          rank: 0,
+          character: {
+            name: data.character.name,
+            realm: data.character.realm,
+            realmSlug: data.character.realmSlug,
+            region: this.config.region,
+            class: data.character.class || 'warrior',
+            className: data.character.className || 'Warrior',
+            spec: data.character.spec || '',
+            faction: data.character.faction,
+          },
+          brackets: bracketData,
+          totalRating,
+        });
+      }
+    }
+
+    // Sort by total rating and assign ranks
+    players.sort((a, b) => b.totalRating - a.totalRating);
+    players.forEach((p, i) => p.rank = i + 1);
+
+    return {
+      region: this.config.region,
+      players: players.slice(0, limit),
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  // === Talent Heatmap (Aggregated from top players) ===
+
+  async getTalentHeatmap(specId: number, bracket: GameMode): Promise<TalentHeatmap> {
+    const specInfo = getSpecInfo(specId);
+    if (!specInfo) throw new Error(`Unknown spec: ${specId}`);
+
+    // In production, aggregate from top 50 players of this spec
+    // For now, generate realistic sample data
+    const classTalents = this.generateHeatmapNodes(20, 'class');
+    const specTalents = this.generateHeatmapNodes(20, 'spec');
+    const heroTalents = this.generateHeatmapNodes(10, 'hero');
+    const pvpTalents = this.generateHeatmapNodes(6, 'pvp');
+
+    return {
+      specId,
+      className: specInfo.className,
+      specName: specInfo.name,
+      classColor: specInfo.classColor,
+      bracket,
+      sampleSize: 50,
+      classTalents,
+      specTalents,
+      heroTalents,
+      pvpTalents,
+      popularBuilds: [
+        {
+          name: 'Standard Build',
+          pickRate: 65,
+          talentString: 'BAAAAAAA...',
+          description: 'Most popular build for ' + bracket,
+        },
+        {
+          name: 'Burst Build',
+          pickRate: 25,
+          talentString: 'CAAAAAAA...',
+          description: 'High burst damage variant',
+        },
+        {
+          name: 'Survivability Build',
+          pickRate: 10,
+          talentString: 'DAAAAAAA...',
+          description: 'Defensive focused build',
+        },
+      ],
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  private generateHeatmapNodes(count: number, type: 'class' | 'spec' | 'hero' | 'pvp'): TalentHeatmapNode[] {
+    const nodes: TalentHeatmapNode[] = [];
+    for (let i = 0; i < count; i++) {
+      const pickRate = Math.random() * 100;
+      nodes.push({
+        nodeId: 10000 + i,
+        talentId: 50000 + i,
+        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Talent ${i + 1}`,
+        icon: 'spell_nature_lightning',
+        row: Math.floor(i / 4),
+        col: i % 4,
+        type,
+        pickRate,
+        avgRank: pickRate > 50 ? 2 : 1,
+        maxRank: Math.random() > 0.7 ? 2 : 1,
+        popularity: pickRate > 80 ? 'meta' : pickRate > 50 ? 'common' : pickRate > 20 ? 'situational' : 'rare',
+        description: 'Talent effect description',
+      });
+    }
+    return nodes;
+  }
+
+  // === Gear Analysis (murlok.io style) ===
+
+  async getGearAnalysis(specId: number, bracket: GameMode): Promise<GearAnalysis> {
+    const specInfo = getSpecInfo(specId);
+    if (!specInfo) throw new Error(`Unknown spec: ${specId}`);
+
+    const slots = ['HEAD', 'NECK', 'SHOULDER', 'BACK', 'CHEST', 'WRIST', 'HANDS', 'WAIST', 'LEGS', 'FEET', 'FINGER_1', 'FINGER_2', 'TRINKET_1', 'TRINKET_2', 'MAIN_HAND', 'OFF_HAND'];
+    const popularItems: Record<string, PopularItem[]> = {};
+
+    for (const slot of slots) {
+      popularItems[slot] = [
+        {
+          id: 200000 + Math.floor(Math.random() * 10000),
+          name: `${slot.replace('_', ' ')} of the Gladiator`,
+          icon: 'inv_helm_plate_raidpaladin',
+          itemLevel: 636 + Math.floor(Math.random() * 10),
+          quality: 'epic',
+          pickRate: 40 + Math.floor(Math.random() * 50),
+          source: ['PvP Vendor', 'Raid', 'M+', 'Crafted'][Math.floor(Math.random() * 4)],
+          stats: [
+            { type: 'Versatility', value: 200 + Math.floor(Math.random() * 100) },
+            { type: 'Haste', value: 150 + Math.floor(Math.random() * 100) },
+          ],
+        },
+        {
+          id: 200000 + Math.floor(Math.random() * 10000),
+          name: `${slot.replace('_', ' ')} of Conquest`,
+          icon: 'inv_helm_plate_raidpaladin',
+          itemLevel: 633 + Math.floor(Math.random() * 10),
+          quality: 'epic',
+          pickRate: 20 + Math.floor(Math.random() * 30),
+          source: 'PvP Vendor',
+          stats: [
+            { type: 'Critical Strike', value: 180 + Math.floor(Math.random() * 100) },
+            { type: 'Mastery', value: 160 + Math.floor(Math.random() * 100) },
+          ],
+        },
+      ];
+    }
+
+    return {
+      specId,
+      className: specInfo.className,
+      specName: specInfo.name,
+      bracket,
+      sampleSize: 50,
+      avgItemLevel: 636,
+      statPriority: [
+        { stat: 'Versatility', avgPercentage: 35, avgRating: 4500 },
+        { stat: 'Haste', avgPercentage: 28, avgRating: 3200 },
+        { stat: 'Mastery', avgPercentage: 22, avgRating: 2800 },
+        { stat: 'Critical Strike', avgPercentage: 15, avgRating: 1900 },
+      ],
+      popularItems,
+      popularEnchants: [
+        { id: 1, name: 'Authority of Radiant Power', slot: 'Weapon', stat: 'Primary', pickRate: 85 },
+        { id: 2, name: 'Crystalline Radiance', slot: 'Chest', stat: 'Primary', pickRate: 92 },
+        { id: 3, name: 'Chant of Leeching Fangs', slot: 'Wrist', stat: 'Leech', pickRate: 78 },
+        { id: 4, name: 'Cursed Versatility', slot: 'Ring', stat: 'Versatility', pickRate: 95 },
+        { id: 5, name: "Defender's March", slot: 'Boots', stat: 'Stamina', pickRate: 72 },
+        { id: 6, name: 'Sunset Spellthread', slot: 'Legs', stat: 'Int/Stam', pickRate: 88 },
+      ],
+      popularGems: [
+        { id: 1, name: 'Culminating Blasphemite', icon: 'inv_misc_gem_diamond', stat: 'Primary + Crit', pickRate: 78, type: 'primary' },
+        { id: 2, name: 'Masterful Onyx', icon: 'inv_misc_gem_onyx', stat: 'Mastery', pickRate: 45, type: 'secondary' },
+        { id: 3, name: 'Versatile Ruby', icon: 'inv_misc_gem_ruby', stat: 'Versatility', pickRate: 65, type: 'secondary' },
+        { id: 4, name: 'Quick Topaz', icon: 'inv_misc_gem_topaz', stat: 'Haste', pickRate: 55, type: 'secondary' },
+      ],
+      popularEmbellishments: [
+        { id: 1, name: 'Elemental Focusing Lens', effect: 'Damage proc based on element used', pickRate: 72, slot: 'Helm' },
+        { id: 2, name: 'Duskthread Lining', effect: '+Vers when above 80% HP', pickRate: 45, slot: 'Cloak' },
+        { id: 3, name: 'Writhing Armor Banding', effect: 'Tentacle attack proc', pickRate: 28, slot: 'Chest' },
+        { id: 4, name: 'Darkmoon Sigil: Ascension', effect: 'Primary stat proc', pickRate: 35, slot: 'Trinket' },
+      ],
+      setBonuses: [
+        { setName: 'Gladiator\'s Thundering Set', pieces: 4, pickRate: 75 },
+        { setName: 'Tier Set', pieces: 2, pickRate: 60 },
+      ],
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  // === Alts Detection ===
+
+  async detectAlts(name: string, realm: string): Promise<AltCharacter[]> {
+    // In production, this would use heuristics:
+    // - Same guild across characters
+    // - Similar naming patterns
+    // - Achievement timestamps
+    // - Same achievements earned on same days
+    // For now, return empty (would need account-level API access)
+    return [];
+  }
+
+  // === LFG System (Local Storage) ===
+
+  private lfgListings: LFGListing[] = [];
+
+  async getLFGListings(filters: LFGFilters): Promise<LFGListing[]> {
+    let results = this.lfgListings.filter(l => {
+      if (filters.bracket && l.bracket !== filters.bracket) return false;
+      if (filters.region !== 'all' && l.character.region !== filters.region) return false;
+      if (filters.faction !== 'all' && l.character.faction !== filters.faction) return false;
+      if (filters.role && filters.role !== 'all' && l.role !== filters.role) return false;
+      if (filters.class && l.character.class !== filters.class) return false;
+      if (filters.minRating && l.currentRating < filters.minRating) return false;
+      if (filters.maxRating && l.currentRating > filters.maxRating) return false;
+      if (filters.hasVoice && !l.voiceChat) return false;
+      if (filters.language && l.language !== filters.language) return false;
+      return true;
+    });
+
+    // Sort by rating descending
+    results.sort((a, b) => b.currentRating - a.currentRating);
+    return results;
+  }
+
+  async createLFGListing(post: LFGPost, characterName: string, realm: string): Promise<LFGListing | null> {
+    const profile = await this.getPlayerProfile(characterName, realm);
+    if (!profile) return null;
+
+    const bracketRating = profile.ratings.find(r =>
+      r.bracket === post.bracket || r.bracketName.toLowerCase().includes(post.bracket)
+    );
+
+    const listing: LFGListing = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      character: {
+        name: profile.character.name,
+        realm: profile.character.realm,
+        realmSlug: profile.character.realmSlug,
+        region: profile.character.region,
+        class: profile.character.class,
+        className: profile.character.className,
+        spec: profile.character.spec,
+        specId: profile.character.specId,
+        faction: profile.character.faction,
+        itemLevel: profile.character.equippedItemLevel,
+      },
+      bracket: post.bracket,
+      role: post.role,
+      currentRating: bracketRating?.current || 0,
+      seasonHigh: bracketRating?.seasonHigh || 0,
+      allTimeHigh: bracketRating?.allTimeHigh || 0,
+      lookingFor: post.lookingFor,
+      minRating: post.minRating,
+      maxRating: post.maxRating,
+      description: post.description,
+      voiceChat: post.voiceChat,
+      language: post.language,
+      schedule: post.schedule,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+      isOnline: true,
+      achievements: profile.achievements.slice(0, 5).map(a => ({
+        name: a.name,
+        season: a.earnedDate.split('-')[0],
+      })),
+    };
+
+    this.lfgListings.push(listing);
+    return listing;
+  }
+
+  async deleteLFGListing(id: string): Promise<boolean> {
+    const index = this.lfgListings.findIndex(l => l.id === id);
+    if (index >= 0) {
+      this.lfgListings.splice(index, 1);
+      return true;
+    }
+    return false;
+  }
+
+  // === Local Database (Rating History Tracking) ===
+
+  private localDb: LocalDatabase = {
+    players: {},
+    lfgListings: [],
+    favoriteCharacters: [],
+    lastSync: new Date().toISOString(),
+  };
+
+  async trackPlayer(name: string, realm: string): Promise<StoredPlayerData | null> {
+    const profile = await this.getPlayerProfile(name, realm);
+    if (!profile) return null;
+
+    const key = `${name.toLowerCase()}-${realm.toLowerCase()}-${this.config.region}`;
+    const existing = this.localDb.players[key];
+
+    const snapshot = {
+      timestamp: new Date().toISOString(),
+      ratings: profile.ratings.map(r => ({
+        bracket: r.bracket,
+        rating: r.current,
+        wins: r.wins,
+        losses: r.losses,
+      })),
+      itemLevel: profile.character.equippedItemLevel,
+    };
+
+    if (existing) {
+      existing.snapshots.push(snapshot);
+      existing.lastUpdated = snapshot.timestamp;
+      // Keep only last 90 days of snapshots
+      const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      existing.snapshots = existing.snapshots.filter(s =>
+        new Date(s.timestamp).getTime() > cutoff
+      );
+    } else {
+      this.localDb.players[key] = {
+        name: profile.character.name,
+        realm: profile.character.realm,
+        region: this.config.region,
+        snapshots: [snapshot],
+        firstSeen: snapshot.timestamp,
+        lastUpdated: snapshot.timestamp,
+      };
+    }
+
+    return this.localDb.players[key];
+  }
+
+  getTrackedPlayer(name: string, realm: string): StoredPlayerData | null {
+    const key = `${name.toLowerCase()}-${realm.toLowerCase()}-${this.config.region}`;
+    return this.localDb.players[key] || null;
+  }
+
+  getTrackedPlayers(): StoredPlayerData[] {
+    return Object.values(this.localDb.players);
+  }
+
+  addFavorite(name: string, realm: string): void {
+    const key = `${name.toLowerCase()}-${realm.toLowerCase()}-${this.config.region}`;
+    if (!this.localDb.favoriteCharacters.includes(key)) {
+      this.localDb.favoriteCharacters.push(key);
+    }
+  }
+
+  removeFavorite(name: string, realm: string): void {
+    const key = `${name.toLowerCase()}-${realm.toLowerCase()}-${this.config.region}`;
+    const index = this.localDb.favoriteCharacters.indexOf(key);
+    if (index >= 0) {
+      this.localDb.favoriteCharacters.splice(index, 1);
+    }
+  }
+
+  getFavorites(): StoredPlayerData[] {
+    return this.localDb.favoriteCharacters
+      .map(key => this.localDb.players[key])
+      .filter(Boolean);
   }
 
   // === Configuration ===

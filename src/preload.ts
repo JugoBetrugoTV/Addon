@@ -41,4 +41,54 @@ contextBridge.exposeInMainWorld('api', {
   // Realm Search
   searchRealms: (query: string) =>
     ipcRenderer.invoke('api:searchRealms', query),
+
+  // Activity Tracker (Drustvar style)
+  getActivityTracker: (bracket: string) =>
+    ipcRenderer.invoke('api:getActivityTracker', bracket),
+
+  // Class Representation Stats
+  getRepresentationStats: (bracket: string, minRating: number) =>
+    ipcRenderer.invoke('api:getRepresentationStats', bracket, minRating),
+
+  // Top Players (multi-bracket rankings)
+  getTopPlayers: (limit: number) =>
+    ipcRenderer.invoke('api:getTopPlayers', limit),
+
+  // Talent Heatmap
+  getTalentHeatmap: (specId: number, bracket: string) =>
+    ipcRenderer.invoke('api:getTalentHeatmap', specId, bracket),
+
+  // Gear Analysis
+  getGearAnalysis: (specId: number, bracket: string) =>
+    ipcRenderer.invoke('api:getGearAnalysis', specId, bracket),
+
+  // LFG System
+  getLFGListings: (filters: any) =>
+    ipcRenderer.invoke('api:getLFGListings', filters),
+
+  createLFGListing: (post: any, characterName: string, realm: string) =>
+    ipcRenderer.invoke('api:createLFGListing', post, characterName, realm),
+
+  deleteLFGListing: (id: string) =>
+    ipcRenderer.invoke('api:deleteLFGListing', id),
+
+  // Player Tracking
+  trackPlayer: (name: string, realm: string) =>
+    ipcRenderer.invoke('api:trackPlayer', name, realm),
+
+  getTrackedPlayer: (name: string, realm: string) =>
+    ipcRenderer.invoke('api:getTrackedPlayer', name, realm),
+
+  getTrackedPlayers: () =>
+    ipcRenderer.invoke('api:getTrackedPlayers'),
+
+  // Favorites
+  addFavorite: (name: string, realm: string) =>
+    ipcRenderer.invoke('api:addFavorite', name, realm),
+
+  removeFavorite: (name: string, realm: string) =>
+    ipcRenderer.invoke('api:removeFavorite', name, realm),
+
+  getFavorites: () =>
+    ipcRenderer.invoke('api:getFavorites'),
 });

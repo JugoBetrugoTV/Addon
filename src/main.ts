@@ -5,7 +5,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { BlizzardAPI, createAPI } from './api/blizzard';
-import { Region, GameMode } from './types/wow';
+import { Region, GameMode, LFGFilters, LFGPost } from './types/wow';
 
 let mainWindow: BrowserWindow | null = null;
 let api: BlizzardAPI = createAPI();
@@ -142,4 +142,130 @@ ipcMain.handle('api:searchRealms', async (_, query: string) => {
 // Get current region
 ipcMain.handle('api:getRegion', async () => {
   return api.getRegion();
+});
+
+// Activity tracker (Drustvar style - climbers/fallers)
+ipcMain.handle('api:getActivityTracker', async (_, bracket: GameMode) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    return await api.getActivityTracker(bracket);
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch activity data' };
+  }
+});
+
+// Class representation stats
+ipcMain.handle('api:getRepresentationStats', async (_, bracket: GameMode, minRating: number) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    return await api.getRepresentationStats(bracket, minRating);
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch representation stats' };
+  }
+});
+
+// Top players across all brackets
+ipcMain.handle('api:getTopPlayers', async (_, limit: number) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    return await api.getTopPlayers(limit);
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch top players' };
+  }
+});
+
+// Talent heatmap for spec
+ipcMain.handle('api:getTalentHeatmap', async (_, specId: number, bracket: GameMode) => {
+  try {
+    return await api.getTalentHeatmap(specId, bracket);
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch talent heatmap' };
+  }
+});
+
+// Gear analysis for spec
+ipcMain.handle('api:getGearAnalysis', async (_, specId: number, bracket: GameMode) => {
+  try {
+    return await api.getGearAnalysis(specId, bracket);
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch gear analysis' };
+  }
+});
+
+// LFG - Get listings
+ipcMain.handle('api:getLFGListings', async (_, filters: LFGFilters) => {
+  try {
+    return await api.getLFGListings(filters);
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch LFG listings' };
+  }
+});
+
+// LFG - Create listing
+ipcMain.handle('api:createLFGListing', async (_, post: LFGPost, characterName: string, realm: string) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    const listing = await api.createLFGListing(post, characterName, realm);
+    if (!listing) {
+      return { error: 'Failed to create listing - character not found' };
+    }
+    return listing;
+  } catch (error: any) {
+    return { error: error.message || 'Failed to create LFG listing' };
+  }
+});
+
+// LFG - Delete listing
+ipcMain.handle('api:deleteLFGListing', async (_, id: string) => {
+  try {
+    const success = await api.deleteLFGListing(id);
+    return { success };
+  } catch (error: any) {
+    return { error: error.message || 'Failed to delete listing' };
+  }
+});
+
+// Track player (rating history)
+ipcMain.handle('api:trackPlayer', async (_, name: string, realm: string) => {
+  if (!api.isConfigured()) {
+    return { error: 'API not configured' };
+  }
+  try {
+    return await api.trackPlayer(name, realm);
+  } catch (error: any) {
+    return { error: error.message || 'Failed to track player' };
+  }
+});
+
+// Get tracked player data
+ipcMain.handle('api:getTrackedPlayer', async (_, name: string, realm: string) => {
+  return api.getTrackedPlayer(name, realm);
+});
+
+// Get all tracked players
+ipcMain.handle('api:getTrackedPlayers', async () => {
+  return api.getTrackedPlayers();
+});
+
+// Favorites
+ipcMain.handle('api:addFavorite', async (_, name: string, realm: string) => {
+  api.addFavorite(name, realm);
+  return { success: true };
+});
+
+ipcMain.handle('api:removeFavorite', async (_, name: string, realm: string) => {
+  api.removeFavorite(name, realm);
+  return { success: true };
+});
+
+ipcMain.handle('api:getFavorites', async () => {
+  return api.getFavorites();
 });

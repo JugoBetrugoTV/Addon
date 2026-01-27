@@ -518,3 +518,388 @@ export function getItemQualityColor(quality: string): string {
   };
   return colors[quality] || '#ffffff';
 }
+
+// === LFG / TEAM FINDER ===
+
+export interface LFGListing {
+  id: string;
+  character: {
+    name: string;
+    realm: string;
+    realmSlug: string;
+    region: Region;
+    class: WowClass;
+    className: string;
+    spec: string;
+    specId: number;
+    faction: 'alliance' | 'horde';
+    itemLevel: number;
+  };
+  bracket: GameMode;
+  role: 'dps' | 'healer' | 'tank';
+  currentRating: number;
+  seasonHigh: number;
+  allTimeHigh: number;
+  lookingFor: ('dps' | 'healer' | 'tank')[];
+  minRating?: number;
+  maxRating?: number;
+  description: string;
+  voiceChat: boolean;
+  language?: string;
+  schedule?: string;
+  createdAt: string;
+  expiresAt: string;
+  isOnline: boolean;
+  contactInfo?: string;
+  achievements?: { name: string; season: string }[];
+}
+
+export interface LFGFilters {
+  bracket: GameMode;
+  region: Region | 'all';
+  faction: 'alliance' | 'horde' | 'all';
+  role?: 'dps' | 'healer' | 'tank' | 'all';
+  class?: WowClass;
+  minRating?: number;
+  maxRating?: number;
+  hasVoice?: boolean;
+  language?: string;
+}
+
+export interface LFGPost {
+  bracket: GameMode;
+  role: 'dps' | 'healer' | 'tank';
+  lookingFor: ('dps' | 'healer' | 'tank')[];
+  minRating?: number;
+  maxRating?: number;
+  description: string;
+  voiceChat: boolean;
+  language?: string;
+  schedule?: string;
+}
+
+// === ACTIVITY TRACKER (Drustvar style) ===
+
+export interface ActivityEntry {
+  rank: number;
+  previousRank: number;
+  rankChange: number;
+  character: {
+    name: string;
+    realm: string;
+    realmSlug: string;
+    region: Region;
+    class: WowClass;
+    className: string;
+    spec: string;
+    faction: 'alliance' | 'horde';
+  };
+  rating: number;
+  previousRating: number;
+  ratingChange: number;
+  wins: number;
+  losses: number;
+  gamesPlayed: number;
+  timestamp: string;
+  isStreaming?: boolean;
+  twitchUrl?: string;
+}
+
+export interface ActivityTracker {
+  bracket: GameMode;
+  region: Region;
+  climbers: ActivityEntry[]; // Biggest rating gains
+  fallers: ActivityEntry[]; // Biggest rating drops
+  mostActive: ActivityEntry[]; // Most games played
+  newEntries: ActivityEntry[]; // New to leaderboard
+  lastUpdated: string;
+}
+
+// === CLASS REPRESENTATION ===
+
+export interface ClassRepresentation {
+  class: WowClass;
+  className: string;
+  classColor: string;
+  totalPlayers: number;
+  percentage: number;
+  avgRating: number;
+  specs: {
+    specId: number;
+    specName: string;
+    players: number;
+    percentage: number;
+    avgRating: number;
+  }[];
+}
+
+export interface RepresentationStats {
+  bracket: GameMode;
+  region: Region | 'all';
+  minRating: number;
+  totalPlayers: number;
+  classes: ClassRepresentation[];
+  factionSplit: { alliance: number; horde: number };
+  raceSplit: { race: string; faction: string; count: number; percentage: number }[];
+  lastUpdated: string;
+}
+
+// === TOP PLAYERS ===
+
+export interface TopPlayer {
+  rank: number;
+  character: {
+    name: string;
+    realm: string;
+    realmSlug: string;
+    region: Region;
+    class: WowClass;
+    className: string;
+    spec: string;
+    faction: 'alliance' | 'horde';
+    avatarUrl?: string;
+  };
+  brackets: {
+    bracket: GameMode;
+    rating: number;
+    rank: number;
+    wins: number;
+    losses: number;
+  }[];
+  totalRating: number; // Combined rating score
+  highestAchievement?: string;
+  titles?: string[];
+  isStreaming?: boolean;
+  twitchUrl?: string;
+}
+
+export interface TopPlayersResponse {
+  region: Region | 'all';
+  players: TopPlayer[];
+  lastUpdated: string;
+}
+
+// === TALENT HEATMAP ===
+
+export interface TalentHeatmapNode {
+  nodeId: number;
+  talentId: number;
+  name: string;
+  icon: string;
+  row: number;
+  col: number;
+  type: 'class' | 'spec' | 'hero' | 'pvp';
+  pickRate: number; // 0-100
+  avgRank: number;
+  maxRank: number;
+  popularity: 'meta' | 'common' | 'situational' | 'rare';
+  description: string;
+  linkedNodes?: number[];
+}
+
+export interface TalentHeatmap {
+  specId: number;
+  className: string;
+  specName: string;
+  classColor: string;
+  bracket: GameMode;
+  sampleSize: number;
+  classTalents: TalentHeatmapNode[];
+  specTalents: TalentHeatmapNode[];
+  heroTalents: TalentHeatmapNode[];
+  pvpTalents: TalentHeatmapNode[];
+  popularBuilds: {
+    name: string;
+    pickRate: number;
+    talentString: string;
+    description: string;
+  }[];
+  lastUpdated: string;
+}
+
+// === GEAR ANALYSIS ===
+
+export interface PopularItem {
+  id: number;
+  name: string;
+  icon: string;
+  itemLevel: number;
+  quality: string;
+  pickRate: number;
+  source: string;
+  stats: { type: string; value: number }[];
+}
+
+export interface PopularEnchant {
+  id: number;
+  name: string;
+  slot: string;
+  stat: string;
+  pickRate: number;
+}
+
+export interface PopularGem {
+  id: number;
+  name: string;
+  icon: string;
+  stat: string;
+  pickRate: number;
+  type: 'primary' | 'secondary' | 'meta';
+}
+
+export interface PopularEmbellishment {
+  id: number;
+  name: string;
+  effect: string;
+  pickRate: number;
+  slot: string;
+}
+
+export interface GearAnalysis {
+  specId: number;
+  className: string;
+  specName: string;
+  bracket: GameMode;
+  sampleSize: number;
+  avgItemLevel: number;
+  statPriority: {
+    stat: string;
+    avgPercentage: number;
+    avgRating: number;
+  }[];
+  popularItems: Record<string, PopularItem[]>; // slot -> items
+  popularEnchants: PopularEnchant[];
+  popularGems: PopularGem[];
+  popularEmbellishments: PopularEmbellishment[];
+  setBonuses: {
+    setName: string;
+    pieces: number;
+    pickRate: number;
+  }[];
+  lastUpdated: string;
+}
+
+// === RACES ===
+
+export const RACES = {
+  alliance: [
+    { id: 1, name: 'Human' },
+    { id: 3, name: 'Dwarf' },
+    { id: 4, name: 'Night Elf' },
+    { id: 7, name: 'Gnome' },
+    { id: 11, name: 'Draenei' },
+    { id: 22, name: 'Worgen' },
+    { id: 25, name: 'Pandaren' },
+    { id: 29, name: 'Void Elf' },
+    { id: 30, name: 'Lightforged Draenei' },
+    { id: 32, name: 'Kul Tiran' },
+    { id: 34, name: 'Dark Iron Dwarf' },
+    { id: 37, name: 'Mechagnome' },
+    { id: 52, name: 'Dracthyr' },
+    { id: 84, name: 'Earthen' },
+  ],
+  horde: [
+    { id: 2, name: 'Orc' },
+    { id: 5, name: 'Undead' },
+    { id: 6, name: 'Tauren' },
+    { id: 8, name: 'Troll' },
+    { id: 9, name: 'Goblin' },
+    { id: 10, name: 'Blood Elf' },
+    { id: 26, name: 'Pandaren' },
+    { id: 27, name: 'Nightborne' },
+    { id: 28, name: 'Highmountain Tauren' },
+    { id: 31, name: 'Zandalari Troll' },
+    { id: 35, name: "Mag'har Orc" },
+    { id: 36, name: 'Vulpera' },
+    { id: 70, name: 'Dracthyr' },
+    { id: 85, name: 'Earthen' },
+  ],
+};
+
+export function getRaceName(raceId: number): string {
+  for (const faction of Object.values(RACES)) {
+    const race = faction.find(r => r.id === raceId);
+    if (race) return race.name;
+  }
+  return 'Unknown';
+}
+
+export function getRaceFaction(raceId: number): 'alliance' | 'horde' | 'neutral' {
+  if (RACES.alliance.some(r => r.id === raceId)) return 'alliance';
+  if (RACES.horde.some(r => r.id === raceId)) return 'horde';
+  return 'neutral';
+}
+
+// === AWC/TOURNAMENT ===
+
+export interface AWCMatch {
+  id: string;
+  tournament: string;
+  round: string;
+  team1: {
+    name: string;
+    players: { name: string; class: WowClass; spec: string }[];
+    score: number;
+  };
+  team2: {
+    name: string;
+    players: { name: string; class: WowClass; spec: string }[];
+    score: number;
+  };
+  winner: 'team1' | 'team2';
+  maps: string[];
+  vodUrl?: string;
+  timestamp: string;
+}
+
+export interface AWCStats {
+  season: string;
+  specStats: {
+    specId: number;
+    className: string;
+    specName: string;
+    pickRate: number;
+    winRate: number;
+    banRate: number;
+    gamesPlayed: number;
+  }[];
+  compStats: {
+    comp: string;
+    classes: WowClass[];
+    pickRate: number;
+    winRate: number;
+    gamesPlayed: number;
+  }[];
+  playerStats: {
+    name: string;
+    team: string;
+    class: WowClass;
+    spec: string;
+    wins: number;
+    losses: number;
+    winRate: number;
+  }[];
+  lastUpdated: string;
+}
+
+// === STORED DATA (Local) ===
+
+export interface StoredPlayerData {
+  name: string;
+  realm: string;
+  region: Region;
+  snapshots: {
+    timestamp: string;
+    ratings: { bracket: string; rating: number; wins: number; losses: number }[];
+    itemLevel: number;
+  }[];
+  firstSeen: string;
+  lastUpdated: string;
+}
+
+export interface LocalDatabase {
+  players: Record<string, StoredPlayerData>; // key: "name-realm-region"
+  lfgListings: LFGListing[];
+  favoriteCharacters: string[]; // keys to players
+  lastSync: string;
+}

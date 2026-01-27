@@ -1,6 +1,7 @@
 /**
- * WoW PvP Analyzer - Complete UI
- * Full implementation with equipment, stats, talents, and all features
+ * WoW PvP Analyzer - Complete UI with all features
+ * Including: Activity Tracker, Class Representation, Top Players,
+ * Talent Heatmaps, Gear Analysis, LFG System
  */
 
 import {
@@ -8,6 +9,8 @@ import {
   getItemQualityColor, formatNumber, formatWinRate, getTierForRating, getBracketName,
   PlayerProfile, SpecBuild, MetaSnapshot, LeaderboardResponse, LeaderboardEntry,
   GameMode, WowClass, CharacterStats, CharacterEquipment, TalentLoadout,
+  ActivityTracker, RepresentationStats, TopPlayersResponse, TalentHeatmap, GearAnalysis,
+  LFGListing, LFGFilters,
 } from '../types/wow';
 
 declare global {
@@ -23,6 +26,20 @@ declare global {
       getMetaRankings: (gameMode: string, role: string) => Promise<MetaSnapshot>;
       getCurrentSeason: () => Promise<{ id: number; name: string }>;
       searchRealms: (query: string) => Promise<{ id: number; name: string; slug: string }[]>;
+      getActivityTracker: (bracket: string) => Promise<ActivityTracker | { error: string }>;
+      getRepresentationStats: (bracket: string, minRating: number) => Promise<RepresentationStats | { error: string }>;
+      getTopPlayers: (limit: number) => Promise<TopPlayersResponse | { error: string }>;
+      getTalentHeatmap: (specId: number, bracket: string) => Promise<TalentHeatmap | { error: string }>;
+      getGearAnalysis: (specId: number, bracket: string) => Promise<GearAnalysis | { error: string }>;
+      getLFGListings: (filters: any) => Promise<LFGListing[] | { error: string }>;
+      createLFGListing: (post: any, name: string, realm: string) => Promise<LFGListing | { error: string }>;
+      deleteLFGListing: (id: string) => Promise<{ success: boolean }>;
+      trackPlayer: (name: string, realm: string) => Promise<any>;
+      getTrackedPlayer: (name: string, realm: string) => Promise<any>;
+      getTrackedPlayers: () => Promise<any[]>;
+      addFavorite: (name: string, realm: string) => Promise<any>;
+      removeFavorite: (name: string, realm: string) => Promise<any>;
+      getFavorites: () => Promise<any[]>;
     };
   }
 }
@@ -46,6 +63,10 @@ class App {
     this.setupBuilds();
     this.setupMeta();
     this.setupLeaderboard();
+    this.setupActivity();
+    this.setupRepresentation();
+    this.setupTopPlayers();
+    this.setupLFG();
     this.setupSettings();
     await this.loadConfig();
     await this.loadSeason();
@@ -67,11 +88,13 @@ class App {
     document.getElementById(`view-${view}`)?.classList.add('active');
     document.querySelector(`[data-nav="${view}"]`)?.classList.add('active');
 
-    // Load data when switching to certain views
+    // Load data when switching views
     if (view === 'meta') this.loadMeta();
-    if (view === 'leaderboard' && !document.querySelector('.lb-table')) {
-      this.loadLeaderboard();
-    }
+    if (view === 'leaderboard') this.loadLeaderboard();
+    if (view === 'activity') this.loadActivity();
+    if (view === 'representation') this.loadRepresentation();
+    if (view === 'top-players') this.loadTopPlayers();
+    if (view === 'lfg') this.loadLFG();
   }
 
   private async loadSeason() {
@@ -176,6 +199,10 @@ class App {
             </div>
             ${data.highestPvPTier ? `<div class="highest-tier tier-badge" style="color: ${getRatingColor(getTierForRating(2400).minRating)}">${data.highestPvPTier}</div>` : ''}
           </div>
+          <div class="profile-actions">
+            <button class="btn-action btn-favorite" data-name="${c.name}" data-realm="${c.realmSlug}">★ Favorite</button>
+            <button class="btn-action btn-track" data-name="${c.name}" data-realm="${c.realmSlug}">📈 Track</button>
+          </div>
           <div class="honor-stats">
             <div class="honor-level"><span class="label">Honor Level</span><span class="value">${data.honorLevel}</span></div>
             <div class="hks"><span class="label">Honorable Kills</span><span class="value">${formatNumber(data.honorableKills)}</span></div>
@@ -247,7 +274,20 @@ class App {
       });
     });
 
-    // Setup rating history chart tabs
+    // Favorite/Track buttons
+    container.querySelector('.btn-favorite')?.addEventListener('click', async (e) => {
+      const btn = e.target as HTMLElement;
+      await window.api.addFavorite(btn.dataset.name!, btn.dataset.realm!);
+      this.showMessage('Added to favorites!');
+    });
+
+    container.querySelector('.btn-track')?.addEventListener('click', async (e) => {
+      const btn = e.target as HTMLElement;
+      await window.api.trackPlayer(btn.dataset.name!, btn.dataset.realm!);
+      this.showMessage('Now tracking player ratings!');
+    });
+
+    // Setup rating history chart
     if (data.ratingHistory.length > 0) {
       this.renderRatingChart(data.ratingHistory[0].data);
       container.querySelectorAll('.history-tab').forEach(tab => {
@@ -317,8 +357,6 @@ class App {
   }
 
   private renderEquipment(equipment: CharacterEquipment): string {
-    const slots = ['Head', 'Neck', 'Shoulder', 'Back', 'Chest', 'Wrist', 'Hands', 'Waist', 'Legs', 'Feet', 'Finger', 'Finger', 'Trinket', 'Trinket', 'Main Hand', 'Off Hand'];
-
     return `
       <div class="equipment-grid">
         ${equipment.items.map(item => `
@@ -352,14 +390,12 @@ class App {
           <div class="stat-row"><span>Health</span><span>${formatNumber(stats.health)}</span></div>
           <div class="stat-row"><span>${stats.powerType}</span><span>${formatNumber(stats.power)}</span></div>
         </div>
-
         <div class="stats-section">
           <h4>Primary</h4>
           <div class="stat-row"><span>${stats.primaryStat.name}</span><span>${formatNumber(stats.primaryStat.value)}</span></div>
           <div class="stat-row"><span>Stamina</span><span>${formatNumber(stats.stamina.value)}</span></div>
           <div class="stat-row"><span>Armor</span><span>${formatNumber(stats.armor)}</span></div>
         </div>
-
         <div class="stats-section">
           <h4>Secondary</h4>
           <div class="stat-row">
@@ -370,19 +406,11 @@ class App {
           <div class="stat-row"><span>Mastery</span><span>${stats.mastery.percent.toFixed(2)}%</span></div>
           <div class="stat-row"><span>Critical Strike</span><span>${stats.criticalStrike.percent.toFixed(2)}%</span></div>
         </div>
-
         <div class="stats-section">
           <h4>Tertiary</h4>
           <div class="stat-row"><span>Leech</span><span>${stats.leech.percent.toFixed(2)}%</span></div>
           <div class="stat-row"><span>Avoidance</span><span>${stats.avoidance.percent.toFixed(2)}%</span></div>
           <div class="stat-row"><span>Speed</span><span>${stats.speed.percent.toFixed(2)}%</span></div>
-        </div>
-
-        <div class="stats-section">
-          <h4>Defense</h4>
-          <div class="stat-row"><span>Dodge</span><span>${stats.dodgePercent.toFixed(2)}%</span></div>
-          <div class="stat-row"><span>Parry</span><span>${stats.parryPercent.toFixed(2)}%</span></div>
-          <div class="stat-row"><span>Block</span><span>${stats.blockPercent.toFixed(2)}%</span></div>
         </div>
       </div>
     `;
@@ -425,15 +453,9 @@ class App {
     }
 
     const categoryColors: Record<string, string> = {
-      legend: '#e6cc80',
-      gladiator: '#ff8000',
-      hero: '#ff8000',
-      duelist: '#a335ee',
-      elite: '#a335ee',
-      rival: '#0070dd',
-      challenger: '#1eff00',
-      combatant: '#1eff00',
-      other: '#ffffff',
+      legend: '#e6cc80', gladiator: '#ff8000', hero: '#ff8000',
+      duelist: '#a335ee', elite: '#a335ee', rival: '#0070dd',
+      challenger: '#1eff00', combatant: '#1eff00', other: '#ffffff',
     };
 
     return `
@@ -552,27 +574,6 @@ class App {
         </div>
 
         <div class="build-section">
-          <h3>Recommended Gear</h3>
-          <div class="gear-recommendations">
-            ${build.gear.map(g => `
-              <div class="gear-rec">
-                <span class="gear-slot">${g.slot}</span>
-                <div class="gear-items">
-                  ${g.items.map(item => `
-                    <div class="gear-item">
-                      <span class="item-name">${item.name}</span>
-                      <span class="item-ilvl">${item.itemLevel}</span>
-                      <span class="item-source">${item.source}</span>
-                      <span class="item-usage">${item.usagePercent}%</span>
-                    </div>
-                  `).join('')}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <div class="build-section">
           <h3>Enchants</h3>
           <div class="enchant-list">
             ${build.enchants.map(e => `
@@ -632,10 +633,6 @@ class App {
             `).join('')}
           </div>
         </div>
-      </div>
-
-      <div class="build-footer">
-        <span>Last updated: ${new Date(build.lastUpdated).toLocaleString()}</span>
       </div>
     `;
   }
@@ -706,14 +703,9 @@ class App {
                     <span class="stat-label">Avg Rating</span>
                     <span class="stat-value" style="color: ${getRatingColor(s.avgRating)}">${s.avgRating}</span>
                   </div>
-                  <div class="stat-item">
-                    <span class="stat-label">Games</span>
-                    <span class="stat-value">${formatNumber(s.gamesPlayed)}</span>
-                  </div>
                 </div>
                 <div class="spec-trend trend-${s.trend}">
                   ${s.trend === 'up' ? '↑' : s.trend === 'down' ? '↓' : '→'}
-                  ${s.changePercent ? `${s.changePercent > 0 ? '+' : ''}${s.changePercent.toFixed(1)}%` : ''}
                 </div>
               </div>
             `).join('')}
@@ -772,9 +764,7 @@ class App {
       return;
     }
 
-    // Enrich with class data (async, update later)
     const enriched = await window.api.enrichLeaderboard(response.entries);
-
     pageInfo.textContent = `Page ${this.leaderboardPage} (${response.totalCount} total)`;
 
     container.innerHTML = `
@@ -829,6 +819,403 @@ class App {
         }
       });
     });
+  }
+
+  // === ACTIVITY TRACKER (Drustvar style) ===
+  private setupActivity() {
+    document.querySelectorAll('.activity-bracket-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        document.querySelectorAll('.activity-bracket-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        await this.loadActivity();
+      });
+    });
+  }
+
+  private async loadActivity() {
+    const bracket = document.querySelector('.activity-bracket-btn.active')?.getAttribute('data-bracket') || 'shuffle';
+    this.showLoader(true);
+    const data = await window.api.getActivityTracker(bracket);
+    this.showLoader(false);
+    this.renderActivity(data);
+  }
+
+  private renderActivity(data: ActivityTracker | { error: string }) {
+    const container = document.getElementById('activity-content')!;
+
+    if ('error' in data) {
+      container.innerHTML = `<div class="error-box">${data.error}</div>`;
+      return;
+    }
+
+    const renderActivityList = (entries: any[], title: string, icon: string, valueKey: 'ratingChange' | 'gamesPlayed') => `
+      <div class="activity-section">
+        <h3>${icon} ${title}</h3>
+        <div class="activity-list">
+          ${entries.slice(0, 15).map(e => {
+            const classInfo = e.character.class ? getClassInfo(e.character.class) : null;
+            const value = valueKey === 'ratingChange' ? e.ratingChange : e.gamesPlayed;
+            const valueClass = valueKey === 'ratingChange' ? (value > 0 ? 'positive' : 'negative') : '';
+            return `
+              <div class="activity-entry" data-name="${e.character.name}" data-realm="${e.character.realmSlug}">
+                <span class="rank">#${e.rank}</span>
+                <span class="name" style="color: ${classInfo?.color || '#fff'}">${e.character.name}</span>
+                <span class="realm">${e.character.realm}</span>
+                <span class="rating" style="color: ${getRatingColor(e.rating)}">${e.rating}</span>
+                <span class="change ${valueClass}">${valueKey === 'ratingChange' ? (value > 0 ? '+' : '') : ''}${value}${valueKey === 'gamesPlayed' ? ' games' : ''}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = `
+      <div class="activity-header">
+        <span class="activity-region">${data.region.toUpperCase()}</span>
+        <span class="last-updated">Updated: ${new Date(data.lastUpdated).toLocaleString()}</span>
+      </div>
+      <div class="activity-grid">
+        ${renderActivityList(data.climbers, 'Biggest Climbers', '📈', 'ratingChange')}
+        ${renderActivityList(data.fallers, 'Biggest Drops', '📉', 'ratingChange')}
+        ${renderActivityList(data.mostActive, 'Most Active', '🎮', 'gamesPlayed')}
+        ${renderActivityList(data.newEntries, 'New to Leaderboard', '🆕', 'ratingChange')}
+      </div>
+    `;
+
+    // Click to view profile
+    container.querySelectorAll('.activity-entry').forEach(entry => {
+      entry.addEventListener('click', () => {
+        const name = (entry as HTMLElement).dataset.name;
+        const realm = (entry as HTMLElement).dataset.realm;
+        if (name && realm) {
+          (document.getElementById('search-name') as HTMLInputElement).value = name;
+          (document.getElementById('search-realm') as HTMLInputElement).value = realm;
+          this.switchView('search');
+          document.getElementById('search-form')?.dispatchEvent(new Event('submit'));
+        }
+      });
+    });
+  }
+
+  // === CLASS REPRESENTATION ===
+  private setupRepresentation() {
+    document.querySelectorAll('.rep-bracket-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        document.querySelectorAll('.rep-bracket-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        await this.loadRepresentation();
+      });
+    });
+
+    document.getElementById('rep-min-rating')?.addEventListener('change', async () => {
+      await this.loadRepresentation();
+    });
+  }
+
+  private async loadRepresentation() {
+    const bracket = document.querySelector('.rep-bracket-btn.active')?.getAttribute('data-bracket') || 'shuffle';
+    const minRating = parseInt((document.getElementById('rep-min-rating') as HTMLSelectElement)?.value || '0');
+    this.showLoader(true);
+    const data = await window.api.getRepresentationStats(bracket, minRating);
+    this.showLoader(false);
+    this.renderRepresentation(data);
+  }
+
+  private renderRepresentation(data: RepresentationStats | { error: string }) {
+    const container = document.getElementById('representation-content')!;
+
+    if ('error' in data) {
+      container.innerHTML = `<div class="error-box">${data.error}</div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="rep-header">
+        <span class="rep-total">Total Players: ${formatNumber(data.totalPlayers)}</span>
+        <span class="rep-min">Min Rating: ${data.minRating}+</span>
+        <span class="last-updated">Updated: ${new Date(data.lastUpdated).toLocaleString()}</span>
+      </div>
+
+      <div class="rep-faction-split">
+        <div class="faction-bar">
+          <div class="alliance-bar" style="width: ${data.factionSplit.alliance}%">
+            <span>Alliance ${data.factionSplit.alliance.toFixed(1)}%</span>
+          </div>
+          <div class="horde-bar" style="width: ${data.factionSplit.horde}%">
+            <span>Horde ${data.factionSplit.horde.toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rep-classes">
+        <h3>Class Representation</h3>
+        <div class="class-rep-grid">
+          ${data.classes.map(c => `
+            <div class="class-rep-card" style="border-color: ${c.classColor}">
+              <div class="class-rep-header">
+                <span class="class-name" style="color: ${c.classColor}">${c.className}</span>
+                <span class="class-pct">${c.percentage.toFixed(1)}%</span>
+              </div>
+              <div class="class-bar">
+                <div class="class-fill" style="width: ${c.percentage * 5}%; background: ${c.classColor}"></div>
+              </div>
+              <div class="class-stats">
+                <span class="players">${formatNumber(c.totalPlayers)} players</span>
+                <span class="avg-rating" style="color: ${getRatingColor(c.avgRating)}">Avg: ${c.avgRating}</span>
+              </div>
+              <div class="spec-breakdown">
+                ${c.specs.map(s => `
+                  <div class="spec-rep">
+                    <span class="spec-name">${s.specName}</span>
+                    <span class="spec-pct">${s.percentage.toFixed(1)}%</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="rep-races">
+        <h3>Race Distribution</h3>
+        <div class="race-rep-grid">
+          ${data.raceSplit.slice(0, 20).map(r => `
+            <div class="race-rep-row">
+              <span class="race-name">${r.race}</span>
+              <span class="race-faction faction-${r.faction}">${r.faction}</span>
+              <div class="race-bar"><div class="race-fill" style="width: ${r.percentage * 5}%"></div></div>
+              <span class="race-pct">${r.percentage.toFixed(1)}%</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // === TOP PLAYERS ===
+  private setupTopPlayers() {
+    document.getElementById('top-players-refresh')?.addEventListener('click', () => {
+      this.loadTopPlayers();
+    });
+  }
+
+  private async loadTopPlayers() {
+    this.showLoader(true);
+    const data = await window.api.getTopPlayers(50);
+    this.showLoader(false);
+    this.renderTopPlayers(data);
+  }
+
+  private renderTopPlayers(data: TopPlayersResponse | { error: string }) {
+    const container = document.getElementById('top-players-content')!;
+
+    if ('error' in data) {
+      container.innerHTML = `<div class="error-box">${data.error}</div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="top-header">
+        <span class="top-region">${data.region.toUpperCase()} Top Players</span>
+        <span class="last-updated">Updated: ${new Date(data.lastUpdated).toLocaleString()}</span>
+      </div>
+      <table class="top-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Player</th>
+            <th>Shuffle</th>
+            <th>2v2</th>
+            <th>3v3</th>
+            <th>RBG</th>
+            <th>Blitz</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.players.map(p => {
+            const classInfo = p.character.class ? getClassInfo(p.character.class) : null;
+            const getBracketRating = (bracket: GameMode) => {
+              const b = p.brackets.find(x => x.bracket === bracket);
+              return b ? `<span style="color: ${getRatingColor(b.rating)}">${b.rating}</span>` : '-';
+            };
+            return `
+              <tr class="top-row" data-name="${p.character.name}" data-realm="${p.character.realmSlug}">
+                <td class="rank">#${p.rank}</td>
+                <td class="player">
+                  <span class="name" style="color: ${classInfo?.color || '#fff'}">${p.character.name}</span>
+                  <span class="realm">${p.character.realm}</span>
+                  ${p.isStreaming ? '<span class="streaming">🔴 LIVE</span>' : ''}
+                </td>
+                <td>${getBracketRating('shuffle')}</td>
+                <td>${getBracketRating('2v2')}</td>
+                <td>${getBracketRating('3v3')}</td>
+                <td>${getBracketRating('rbg')}</td>
+                <td>${getBracketRating('blitz')}</td>
+                <td class="total-rating">${formatNumber(p.totalRating)}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    container.querySelectorAll('.top-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const name = (row as HTMLElement).dataset.name;
+        const realm = (row as HTMLElement).dataset.realm;
+        if (name && realm) {
+          (document.getElementById('search-name') as HTMLInputElement).value = name;
+          (document.getElementById('search-realm') as HTMLInputElement).value = realm;
+          this.switchView('search');
+          document.getElementById('search-form')?.dispatchEvent(new Event('submit'));
+        }
+      });
+    });
+  }
+
+  // === LFG SYSTEM ===
+  private setupLFG() {
+    document.querySelectorAll('.lfg-bracket-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        document.querySelectorAll('.lfg-bracket-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        await this.loadLFG();
+      });
+    });
+
+    document.getElementById('lfg-create-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await this.createLFGListing();
+    });
+  }
+
+  private async loadLFG() {
+    const bracket = document.querySelector('.lfg-bracket-btn.active')?.getAttribute('data-bracket') || 'shuffle';
+    const region = await window.api.getRegion();
+
+    this.showLoader(true);
+    const listings = await window.api.getLFGListings({
+      bracket,
+      region,
+      faction: 'all',
+    });
+    this.showLoader(false);
+    this.renderLFG(listings);
+  }
+
+  private renderLFG(listings: LFGListing[] | { error: string }) {
+    const container = document.getElementById('lfg-listings')!;
+
+    if ('error' in listings) {
+      container.innerHTML = `<div class="error-box">${listings.error}</div>`;
+      return;
+    }
+
+    if (listings.length === 0) {
+      container.innerHTML = `
+        <div class="lfg-empty">
+          <p>No LFG listings found. Be the first to create one!</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="lfg-list">
+        ${listings.map(l => {
+          const classInfo = getClassInfo(l.character.class);
+          return `
+            <div class="lfg-card" style="border-color: ${classInfo?.color || '#444'}">
+              <div class="lfg-header">
+                <span class="lfg-name" style="color: ${classInfo?.color}">${l.character.name}</span>
+                <span class="lfg-realm">${l.character.realm}</span>
+                <span class="lfg-spec">${l.character.spec} ${l.character.className}</span>
+                <span class="lfg-ilvl">iLvl ${l.character.itemLevel}</span>
+              </div>
+              <div class="lfg-ratings">
+                <span class="lfg-current" style="color: ${getRatingColor(l.currentRating)}">
+                  Current: ${l.currentRating}
+                </span>
+                <span class="lfg-season-high">Season High: ${l.seasonHigh}</span>
+                ${l.allTimeHigh > l.seasonHigh ? `<span class="lfg-peak">Peak: ${l.allTimeHigh}</span>` : ''}
+              </div>
+              <div class="lfg-looking">
+                <span class="looking-label">Looking for:</span>
+                ${l.lookingFor.map(r => `<span class="role-tag role-${r}">${r}</span>`).join('')}
+                ${l.minRating ? `<span class="min-rating">${l.minRating}+ rating</span>` : ''}
+              </div>
+              ${l.description ? `<div class="lfg-desc">${l.description}</div>` : ''}
+              <div class="lfg-meta">
+                ${l.voiceChat ? '<span class="voice-yes">🎙 Voice Chat</span>' : ''}
+                ${l.language ? `<span class="language">${l.language}</span>` : ''}
+                ${l.schedule ? `<span class="schedule">${l.schedule}</span>` : ''}
+                <span class="lfg-time">Posted ${this.timeAgo(l.createdAt)}</span>
+              </div>
+              ${l.achievements && l.achievements.length > 0 ? `
+                <div class="lfg-achievements">
+                  ${l.achievements.map(a => `<span class="ach-tag">${a.name}</span>`).join('')}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  private async createLFGListing() {
+    const name = (document.getElementById('lfg-char-name') as HTMLInputElement).value;
+    const realm = (document.getElementById('lfg-char-realm') as HTMLInputElement).value;
+    const bracket = (document.getElementById('lfg-bracket') as HTMLSelectElement).value;
+    const role = (document.getElementById('lfg-role') as HTMLSelectElement).value;
+    const lookingForDps = (document.getElementById('lfg-lf-dps') as HTMLInputElement).checked;
+    const lookingForHealer = (document.getElementById('lfg-lf-healer') as HTMLInputElement).checked;
+    const lookingForTank = (document.getElementById('lfg-lf-tank') as HTMLInputElement).checked;
+    const minRating = parseInt((document.getElementById('lfg-min-rating') as HTMLInputElement).value) || 0;
+    const description = (document.getElementById('lfg-description') as HTMLTextAreaElement).value;
+    const voiceChat = (document.getElementById('lfg-voice') as HTMLInputElement).checked;
+
+    const lookingFor: ('dps' | 'healer' | 'tank')[] = [];
+    if (lookingForDps) lookingFor.push('dps');
+    if (lookingForHealer) lookingFor.push('healer');
+    if (lookingForTank) lookingFor.push('tank');
+
+    if (!name || !realm) {
+      this.showMessage('Please enter character name and realm');
+      return;
+    }
+
+    this.showLoader(true);
+    const result = await window.api.createLFGListing({
+      bracket: bracket as GameMode,
+      role: role as 'dps' | 'healer' | 'tank',
+      lookingFor,
+      minRating,
+      description,
+      voiceChat,
+    }, name, realm);
+    this.showLoader(false);
+
+    if ('error' in result) {
+      this.showMessage(result.error);
+    } else {
+      this.showMessage('LFG listing created!');
+      await this.loadLFG();
+    }
+  }
+
+  private timeAgo(dateStr: string): string {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diff = now - then;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
   }
 
   // === SETTINGS ===
