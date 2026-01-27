@@ -39,7 +39,7 @@ const preloadConfig = {
 
 const rendererConfig = {
   ...commonConfig,
-  entry: './src/core/Game.ts',
+  entry: './src/renderer/app.ts',
   devtool: 'source-map',
   target: 'web',
   output: {
